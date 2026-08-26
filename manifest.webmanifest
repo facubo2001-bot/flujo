@@ -1,12 +1,12 @@
 {
-  "name": "Lucas — cuántas te quedan",
-  "short_name": "Lucas",
+  "name": "Gestor de gastos",
+  "short_name": "Gastos",
   "description": "Gastos, cuotas y cuánto te queda para gastar cada mes.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F1F3F7",
+  "background_color": "#F2F2F7",
   "theme_color": "#0E6B7C",
   "lang": "es-AR",
   "icons": [
