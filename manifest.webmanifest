@@ -1,6 +1,6 @@
 {
-  "name": "Flujo — finanzas personales",
-  "short_name": "Flujo",
+  "name": "Lucas — cuántas te quedan",
+  "short_name": "Lucas",
   "description": "Gastos, cuotas y cuánto te queda para gastar cada mes.",
   "start_url": "./",
   "scope": "./",

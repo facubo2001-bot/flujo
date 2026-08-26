@@ -7,11 +7,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Flujo">
+<meta name="apple-mobile-web-app-title" content="Lucas">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 </head><body>
-<title>Flujo</title>
+<title>Lucas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -61,8 +61,9 @@
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
   --shadow-lg:0 24px 60px -20px rgba(0,0,0,.7);
 }
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;overscroll-behavior:none}
+button,a,.nav-btn,.tabbar button{touch-action:manipulation}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;min-height:100vh}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -81,7 +82,9 @@ p{margin:0}
 .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
 .rail{position:sticky;top:0;height:100vh;padding:20px 14px;border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;gap:6px}
 .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
-.brand .logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;color:#fff;font-family:var(--font-display);font-weight:700;font-size:18px}
+.brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,#0E6B7C,#169696);display:grid;place-items:center;color:#fff;font-family:var(--font-display);font-weight:700;font-size:20px;line-height:1}
+.brand .logo{position:relative}
+.brand .logo i{position:absolute;right:5px;bottom:5px;width:10px;height:10px;border-radius:50%;background:#FABE3C;border:1.5px solid #fff}
 .brand .name{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:-.02em}
 .brand .sub{font-size:11px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
 .nav-btn{display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:transparent;color:var(--ink-2);font-weight:500;text-align:left;transition:background .12s}
@@ -114,9 +117,10 @@ p{margin:0}
 .fab svg{width:26px;height:26px;stroke:#fff;stroke-width:2.4;fill:none;stroke-linecap:round}
 @media (min-width:901px){.fab{display:none}}
 @media (max-width:900px){
-  .app{grid-template-columns:1fr}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  .app{grid-template-columns:1fr;height:100dvh;min-height:0}
   .rail{display:none}
-  .main{padding:14px 14px 110px}
+  .main{height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:calc(14px + env(safe-area-inset-top)) 14px calc(110px + env(safe-area-inset-bottom))}
   .mobile-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .mobile-head .brand{padding:0}
   .tabbar{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:25}
@@ -149,7 +153,8 @@ p{margin:0}
 /* KPI tiles */
 .kpi{display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
 .kpi .label{font-size:12.5px;color:var(--ink-2);font-weight:500}
-.kpi.hero .label{padding-right:90px}
+@media (min-width:1181px){.kpi.hero .label{padding-right:90px}}
+.kpi .delta .pill{white-space:normal;line-height:1.35}
 .kpi .value{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
 .kpi .delta{font-size:12.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .kpi .delta b{font-weight:600}
@@ -358,7 +363,8 @@ tr:hover .row-actions,.mrow .row-actions{opacity:1}
 .onboard .hero p{color:var(--ink-2);font-size:16px;margin-top:8px;max-width:56ch}
 kbd{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);padding:1px 6px;border-radius:5px;border:1px solid var(--line-2)}
 .hidden{display:none!important}
-.fade{animation:fade .25s ease}
+.fade{animation:fade .22s ease}
+.nofade{animation:none}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:var(--surface-3);color:var(--ink-2);margin-right:4px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;font-size:13.5px}
@@ -384,14 +390,14 @@ kbd{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);padd
 
 <div class="app" id="app">
   <aside class="rail">
-    <div class="brand"><div class="logo">F</div><div><div class="name">Flujo</div><div class="sub">finanzas personales</div></div></div>
+    <div class="brand"><div class="logo">L<i></i></div><div><div class="name">Lucas</div><div class="sub">cuántas te quedan</div></div></div>
     <nav id="rail-nav"></nav>
     <div class="spacer"></div>
     <div class="save-state" id="save-state"><span class="save-dot"></span><span>Cargando…</span></div>
   </aside>
   <main class="main">
     <div class="mobile-head">
-      <div class="brand"><div class="logo">F</div><div><div class="name">Flujo</div></div></div>
+      <div class="brand"><div class="logo">L<i></i></div><div><div class="name">Lucas</div></div></div>
       <div class="row" style="gap:6px">
         <div class="save-state" id="save-state-m" style="padding:0 4px;font-size:11px"><span class="save-dot"></span></div>
       </div>
@@ -1120,11 +1126,15 @@ const Charts = {
 /* tooltip delegation */
 (function () {
   const tip = $('#tooltip');
-  const show = (e) => { const t = e.target.closest('[data-tip]'); if (!t) { tip.classList.remove('show'); return; } tip.innerHTML = t.dataset.tip; tip.classList.add('show'); move(e); };
+  let lastTouch = 0; document.addEventListener('touchstart', () => { lastTouch = Date.now(); }, { passive: true });
+  const show = (e) => { if (Date.now() - lastTouch < 800) return; const t = e.target.closest('[data-tip]'); if (!t) { tip.classList.remove('show'); return; } tip.innerHTML = t.dataset.tip; tip.classList.add('show'); move(e); };
   const move = (e) => { const x = e.clientX, y = e.clientY; tip.style.left = clamp(x, 130, window.innerWidth - 130) + 'px'; tip.style.top = (y < 90 ? y + 90 : y) + 'px'; };
   document.addEventListener('mouseover', show); document.addEventListener('mousemove', e => { if (tip.classList.contains('show')) move(e); });
   document.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('[data-tip]')) tip.classList.remove('show'); });
-  document.addEventListener('touchstart', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) { tip.innerHTML = t.dataset.tip; tip.classList.add('show'); const r = t.getBoundingClientRect(); tip.style.left = clamp(r.left + r.width / 2, 130, window.innerWidth - 130) + 'px'; tip.style.top = (r.top < 90 ? r.bottom + 90 : r.top) + 'px'; setTimeout(() => tip.classList.remove('show'), 2500); } }, { passive: true });
+  let ts = null;
+  document.addEventListener('touchstart', e => { const t = e.target.closest && e.target.closest('[data-tip]'); ts = t ? { t, x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+  document.addEventListener('touchend', e => { if (!ts) return; const c = e.changedTouches[0]; const moved = Math.abs(c.clientX - ts.x) + Math.abs(c.clientY - ts.y); const t = ts.t; ts = null; if (moved > 8) return; tip.innerHTML = t.dataset.tip; tip.classList.add('show'); const r = t.getBoundingClientRect(); tip.style.left = clamp(r.left + r.width / 2, 130, window.innerWidth - 130) + 'px'; tip.style.top = (r.top < 90 ? r.bottom + 90 : r.top) + 'px'; setTimeout(() => tip.classList.remove('show'), 2500); }, { passive: true });
+  document.addEventListener('touchmove', () => { if (tip.classList.contains('show')) tip.classList.remove('show'); }, { passive: true });
 })();
 
 /* chart mounting: charts render against the real container width */
@@ -1220,7 +1230,7 @@ const Insights = {
   resumenTexto(ym) {
     const c = E.consumo(ym), ing = E.ingreso(ym); const mg = E.margen(ym);
     const lines = [];
-    lines.push(`# Resumen financiero ${D.monthName(ym)} (generado por Flujo)`);
+    lines.push(`# Resumen financiero ${D.monthName(ym)} (generado por Lucas)`);
     lines.push(`Tipo de cambio usado: ${state.settings.tc} ARS/USD. Ingreso: ${M.f(ing.total, { cur: 'ARS' })} (${M.f(ing.total, { cur: 'USD' })}).`);
     lines.push(`Gastos del mes: ${M.f(c.total, { cur: 'ARS' })} — fijos ${M.f(c.fijo, { cur: 'ARS' })}, cuotas de compras anteriores ${M.f(c.cuotas, { cur: 'ARS' })}, compras ${M.f(c.compras, { cur: 'ARS' })}. Innecesario: ${M.f(c.innecesario, { cur: 'ARS' })} (${M.pct(c.innecesario / (c.total || 1))}).`);
     lines.push(`Presupuesto mensual: ${M.f(mg.presupuesto, { cur: 'ARS' })} (el resto, ${M.f(mg.ahorro, { cur: 'ARS' })}, va a inversión). Queda para gastar: ${M.f(mg.queda, { cur: 'ARS' })}.`);
@@ -1276,7 +1286,7 @@ function viewResumen() {
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${deltaPill(c.total, prevToDate)} <span>vs ${isCur ? 'mismo punto del' : ''} mes anterior · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
   html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: M.f(proj.total), sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
   html += kpi({ label: `Fijos + cuotas de ${mesN}`, value: M.f(comp), sub: `<span>Fijos ${M.c(margen.fijos)} · ${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'} ${M.c(c.cuotas)}</span>${pres ? `<span class="pill ${comp / pres > 0.6 ? 'crit' : comp / pres > 0.4 ? 'warn' : 'neutral'}">${M.pct(comp / pres)} del presupuesto</span>` : ''}`, cls: 'amber' });
-  html += kpi({ label: isCur ? 'Te queda para gastar' : ym < D.thisMonth() ? 'Te quedó sin gastar' : 'Quedará para gastar', value: M.f(margen.queda), sub: pres ? `<span class="pill ${margen.queda < 0 ? 'crit' : margen.queda < pres * 0.1 ? 'warn' : 'good'}">${margen.queda < 0 ? 'te pasaste del presupuesto' : 'de un presupuesto de ' + M.c(pres)}</span>${isCur && margen.restantes ? `<span>${M.f(Math.max(0, margen.queda) / margen.restantes)}/día por ${margen.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>', cls: 'accent' });
+  html += kpi({ label: isCur ? 'Te queda para gastar' : ym < D.thisMonth() ? 'Te quedó sin gastar' : 'Quedará para gastar', value: M.f(margen.queda), sub: pres ? `<span class="pill ${margen.queda < 0 ? 'crit' : margen.queda < pres * 0.1 ? 'warn' : 'good'}">${margen.queda < 0 ? 'te pasaste del presupuesto' : 'presupuesto ' + M.c(pres)}</span>${isCur && margen.restantes ? `<span>${M.f(Math.max(0, margen.queda) / margen.restantes)}/día por ${margen.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>', cls: 'accent' });
   html += `</div>`;
 
   // ritmo + margen
@@ -1352,7 +1362,7 @@ function renderInsights(list) {
 
 function viewOnboarding() {
   return `<div class="onboard fade">
-    <div class="hero"><div class="eyebrow">Bienvenido</div><h1>Tu plata, con pronóstico.</h1><p>Flujo sigue lo que gastás con tarjeta, te dice en qué resumen cae cada compra, cuánto ya tenés comprometido en cuotas y cuánto te queda para invertir.</p></div>
+    <div class="hero"><div class="eyebrow">Bienvenido</div><h1>¿Cuántas lucas te quedan?</h1><p>Lucas sigue lo que gastás con tarjeta, te dice en qué resumen cae cada compra, cuánto ya tenés comprometido en cuotas y cuánto te queda para invertir.</p></div>
     <div class="card"><div class="card-head"><h2>Arranquemos con lo básico</h2></div>
       <div class="form-grid">
         <div class="field"><label>Sueldo neto mensual (ARS)</label><input class="input" id="ob-ingreso" inputmode="numeric" placeholder="2.500.000"></div>
@@ -1945,16 +1955,19 @@ function renderTopbar() {
   </div></div>`;
 }
 
+let lastView = null;
 function render() {
+  const viewChanged = lastView !== ui.view; lastView = ui.view;
+  const scroller = window.innerWidth <= 900 ? $('.main') : null; const keepY = viewChanged ? 0 : (scroller ? scroller.scrollTop : window.scrollY);
   E.build(); ChartQ.reset(); renderNav();
   const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
   let body = '';
   try { body = fns[ui.view](); } catch (e) { console.error(e); body = `<div class="card"><div class="empty">Algo falló al dibujar esta vista: ${esc(e.message)}. <button class="btn sm" data-act="reload">Recargar</button></div></div>`; }
-  $('#view').innerHTML = renderTopbar() + `<div class="fade">${body}</div>`;
+  $('#view').innerHTML = renderTopbar() + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
   if (window.innerWidth > 900) $('#btn-new-desktop').style.display = '';
   ChartQ.mount();
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
-  window.scrollTo({ top: 0 });
+  if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
 }
 function go(view) { ui.view = view; render(); }
 
@@ -2008,10 +2021,10 @@ const Actions = {
     Persist.save(); toast('Listo. Cargá tu primer gasto con el +'); render();
   },
   async export() {
-    const json = JSON.stringify(state, null, 1); const filename = `flujo-${D.today()}.json`;
+    const json = JSON.stringify(state, null, 1); const filename = `lucas-${D.today()}.json`;
     let dl = null; try { if (window.claude && window.claude.use) dl = await window.claude.use('downloads'); } catch (e) {}
     if (dl) { try { await dl.save({ filename, data: json }); toast('Respaldo guardado'); return; } catch (e) { if (e && e.code === 'unavailable') dl = null; else { toast('No se guardó el respaldo'); return; } } }
-    if (!window.claude && navigator.canShare) { try { const file = new File([json], filename, { type: 'application/json' }); if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Respaldo Flujo' }); toast('Respaldo compartido'); return; } } catch (e) { if (e && e.name === 'AbortError') return; } }
+    if (!window.claude && navigator.canShare) { try { const file = new File([json], filename, { type: 'application/json' }); if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Respaldo Lucas' }); toast('Respaldo compartido'); return; } } catch (e) { if (e && e.name === 'AbortError') return; } }
     if (!window.claude) { const blob = new Blob([json], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return; }
     Modal.open({ title: 'Respaldo', body: `<p class="small muted" style="margin-bottom:8px">Copiá este texto y guardalo en un archivo .json:</p><textarea class="input textarea" style="min-height:300px" readonly>${esc(json)}</textarea>`, submit: '' });
   },
@@ -2022,7 +2035,7 @@ const Actions = {
 /* ---------- global events ---------- */
 document.addEventListener('click', e => {
   const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); go(go_.dataset.go); return; }
-  const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); render(); return; }
+  const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); lastView = null; render(); return; }
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.trendRange = Number(rg.dataset.range); render(); return; }
@@ -2050,7 +2063,7 @@ document.addEventListener('keydown', e => {
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
   if (e.key === 'n' || e.key === 'N') formMov();
 });
-let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (!$('#overlay').classList.contains('open')) render(); }, 200); });
+let rzT, lastW = window.innerWidth; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (!$('#overlay').classList.contains('open')) render(); }, 250); });
 window.addEventListener('beforeunload', () => { if (Persist.dirty) { Persist.local(); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } });
 
