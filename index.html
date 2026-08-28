@@ -617,7 +617,7 @@ function defaultState() {
     aprendido: {},
   };
 }
-const BUILD = '202608282139';
+const BUILD = '202608282158';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1437,7 +1437,7 @@ function viewResumen() {
   </div>`;
 
   // últimos movimientos
-  const last = c.movs.filter(m => !m.cuotaRow).slice().sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id > a.id ? 1 : -1)).slice(0, 6);
+  const last = c.movs.slice().sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id > a.id ? 1 : -1)).slice(0, 6);
   html += `<div class="card section"><div class="card-head"><h2>Últimos movimientos</h2><button class="btn ghost sm" data-go="movimientos">Ver todos →</button></div>${renderMovTable(last, { compact: true })}</div>`;
   return html;
 }
