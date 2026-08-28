@@ -240,7 +240,8 @@ tr.cuota td:first-child{border-left:2px solid var(--s4)}
 .nec-3{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit-text)}
 .row-actions{display:inline-flex;gap:2px;opacity:0;transition:opacity .1s}
 tr:hover .row-actions,.mrow .row-actions{opacity:1}
-.mini-btn{border:0;background:transparent;color:var(--ink-3);border-radius:6px;width:28px;height:28px;display:inline-grid;place-items:center}
+.mini-btn{border:0;background:transparent;color:var(--ink-3);border-radius:8px;width:28px;height:28px;display:inline-grid;place-items:center}
+@media (max-width:900px){.mini-btn{width:36px;height:36px}.mini-btn svg{width:18px;height:18px}.row-actions{opacity:1}}
 .mini-btn:hover{background:var(--surface-3);color:var(--ink)}
 .mini-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .empty{padding:28px;text-align:center;color:var(--ink-3);font-size:13.5px}
@@ -616,6 +617,7 @@ function defaultState() {
     aprendido: {},
   };
 }
+const BUILD = '202608282139';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -947,6 +949,20 @@ const E = {
     const fijoTotal = Math.max(c.fijo, E.fijosEstimados(ym));
     return { total: variable + fijoTotal + c.cuotas, variable, fijo: fijoTotal, cuotas: c.cuotas, pace, restantes, dia };
   },
+  /** Average cumulative spend curve over previous months (accrual). Returns {vals, n} for ym's days */
+  promedioAcumulado(ym, maxMeses = 12) {
+    const dias = D.daysIn(ym); const curvas = [];
+    for (let i = 1; i <= maxMeses; i++) {
+      const m = D.addMonths(ym, -i); const c = E.consumo(m); if (c.count < 5) continue;
+      const dm = D.daysIn(m); const cum = []; let acc = 0;
+      for (let d = 1; d <= dm; d++) { acc += (c.byDay[d] || 0); cum.push(acc); }
+      curvas.push({ cum, dm });
+      if (curvas.length >= 6) break;
+    }
+    if (!curvas.length) return { vals: null, n: 0 };
+    const vals = Array.from({ length: dias }, (_, i) => sum(curvas.map(c => c.cum[Math.min(i, c.dm - 1)])) / curvas.length);
+    return { vals, n: curvas.length };
+  },
   promedioVariable(ym, n) {
     const vals = [];
     for (let i = 1; i <= n; i++) { const m = D.addMonths(ym, -i); const c = E.consumo(m); if (c.count >= 5) vals.push(c.variable); }
@@ -961,14 +977,19 @@ const E = {
       return { ym, ingreso: ing, presupuesto: pres, fijos, cuotas: c.cuotas, nuevo: c.compras, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 };
     });
   },
-  /** Active installment plans */
+  /** Active installment plans. idx = calendar month; idxPeriodo advances when the card closes */
   cuotasActivas(ym = D.thisMonth()) {
+    const hoy = D.today();
     return state.movimientos.filter(m => (m.cuotas || 1) > 1).map(m => {
       const first = E.baseMes(m); const n = Number(m.cuotas);
       const last = D.addMonths(first, n - 1);
       const idx = clamp(D.diffMonths(first, ym) + 1, 0, n);
+      const t = m.medio === 'tarjeta' ? L.tarjeta(m.tarjetaId) : null;
+      const cierre = t ? E.cycle(t, hoy).cierre : null;
+      const ymPer = ym === D.thisMonth() && cierre ? D.ym(cierre) : ym;
+      const idxPeriodo = clamp(D.diffMonths(first, ymPer) + 1, 0, n);
       const total = M.toARS(m.monto, m.moneda);
-      return { m, first, last, n, idx, cuota: total / n, total, restante: total / n * (n - idx), restantes: n - idx, activa: last >= ym };
+      return { m, first, last, n, idx, idxPeriodo, cierre, cuota: total / n, total, restante: total / n * (n - idxPeriodo), restantes: n - idxPeriodo, activa: last >= ymPer || last >= ym };
     }).filter(x => x.activa).sort((a, b) => a.last.localeCompare(b.last));
   },
   /** Presupuesto del mes: lo que decidiste gastar (el resto del sueldo va a inversión/ahorro) */
@@ -1359,14 +1380,15 @@ function viewResumen() {
   const c = E.consumo(ym), prev = E.consumo(D.addMonths(ym, -1)), ing = E.ingreso(ym), proj = E.proyeccion(ym);
   if (!state.settings.ingreso && !state.movimientos.length && !state.recurrentes.length) return viewOnboarding();
   const dia = Number(D.today().slice(8, 10));
-  const prevToDate = isCur ? sum(Object.entries(prev.byDay).filter(([k]) => Number(k) <= dia).map(([, v]) => v)) : prev.total;
+  const avg = E.promedioAcumulado(ym);
+  const avgToDate = avg.vals ? avg.vals[(isCur ? dia : D.daysIn(ym)) - 1] : null;
   const last6 = D.range(D.addMonths(ym, -5), 6).map(m => E.consumo(m).total);
   const margen = E.margen(ym); const mesN = D.monthName(ym).split(' ')[0];
   const projPct = margen.presupuesto ? proj.total / margen.presupuesto : 0; const pres = margen.presupuesto; const comp = margen.fijos + c.cuotas;
 
   let html = renderCierreBanner();
   html += `<div class="grid g-kpi">`;
-  html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${deltaPill(c.total, prevToDate)} <span>vs ${isCur ? 'mismo punto del' : ''} mes anterior · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
+  html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${avgToDate ? deltaPill(c.total, avgToDate) : ''} <span>${avgToDate ? `vs promedio${isCur ? ' al mismo día' : ''} (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})` : ''} · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
   html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: M.f(proj.total), sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
   html += kpi({ label: `Fijos + cuotas de ${mesN}`, value: M.f(comp), sub: `<span>Fijos ${M.c(margen.fijos)} · ${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'} ${M.c(c.cuotas)}</span>${pres ? `<span class="pill ${comp / pres > 0.6 ? 'crit' : comp / pres > 0.4 ? 'warn' : 'neutral'}">${M.pct(comp / pres)} del presupuesto</span>` : ''}`, cls: 'amber' });
   html += kpi({ label: isCur ? 'Te queda para gastar' : ym < D.thisMonth() ? 'Te quedó sin gastar' : 'Quedará para gastar', value: M.f(margen.queda), sub: pres ? `<span class="pill ${margen.queda < 0 ? 'crit' : margen.queda < pres * 0.1 ? 'warn' : 'good'}">${margen.queda < 0 ? 'te pasaste del presupuesto' : 'presupuesto ' + M.c(pres)}</span>${isCur && margen.restantes ? `<span>${M.f(Math.max(0, margen.queda) / margen.restantes)}/día por ${margen.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>', cls: 'accent' });
@@ -1376,17 +1398,17 @@ function viewResumen() {
   const days = D.daysIn(ym); const labels = Array.from({ length: days }, (_, i) => String(i + 1));
   const cum = (agg, upto) => { let a = 0; return labels.map((_, i) => { if (i + 1 > upto) return null; a += (agg.byDay[i + 1] || 0); return a; }); };
   const curVals = cum(c, isCur ? dia : days);
-  const prevVals = cum(prev, D.daysIn(D.addMonths(ym, -1)));
+  const avgVals = avg.vals ? avg.vals.slice(0, days) : labels.map(() => null);
   let projVals = labels.map(() => null);
   if (isCur && proj.pace != null) { const base = curVals[dia - 1] || 0; const fijosRest = Math.max(0, proj.fijo - c.fijo); for (let i = dia - 1; i < days; i++) projVals[i] = base + (proj.pace + fijosRest / Math.max(1, proj.restantes)) * (i + 1 - dia); }
   html += `<div class="grid g-21 section">
     <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">Acumulado por día de compra</span></div>
       ${ChartQ.reg(w => Charts.line({ w, labels, h: 230, tipTitle: i => `Día ${labels[i]}`, refY: margen.presupuesto || null, refLabel: margen.presupuesto ? 'Presupuesto' : '', series: [
-        { name: 'Mes anterior', color: 'var(--line-2)', values: prevVals },
+        ...(avg.vals ? [{ name: `Promedio ${avg.n} ${avg.n === 1 ? 'mes' : 'meses'}`, color: 'var(--line-2)', values: avgVals }] : []),
         { name: D.monthName(ym).split(' ')[0], color: 'var(--accent)', values: curVals, area: true, strong: true },
         ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', values: projVals, dashed: true }] : []),
       ] }), 230)}
-      ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, { name: 'Mes anterior', color: 'var(--line-2)', kind: 'line' }, ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
+      ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, ...(avg.vals ? [{ name: `Promedio (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})`, color: 'var(--line-2)', kind: 'line' }] : []), ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
     </div>
     <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><span class="hint">${D.monthName(ym)}</span></div>${renderMargen(margen, proj)}</div>
   </div>`;
@@ -1527,7 +1549,7 @@ function viewCuotas() {
     </tbody></table></div></div>`;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Cuotas en curso</h2><span class="hint">${act.length} planes</span></div>
-      ${act.length ? act.map(a => `<div class="cuota-row"><div><b style="font-weight:500">${esc(a.m.desc)}</b> <span class="progress-pill">${a.idx}/${a.n}</span></div><div class="amt">${M.f(a.cuota)}<span class="muted"> /mes</span></div><div class="sub">${L.cat(a.m.catId).nombre} · ${medioLabel(a.m)} · termina ${D.monthName(a.last, true)} · faltan ${M.f(a.restante)}</div><div class="meter"><i style="width:${a.idx / a.n * 100}%;background:var(--s4)"></i></div></div>`).join('') : '<div class="empty">No tenés compras en cuotas activas.</div>'}
+      ${act.length ? act.map(a => `<div class="cuota-row"><div><b style="font-weight:500">${esc(a.m.desc)}</b> <span class="progress-pill">${a.idxPeriodo}/${a.n}</span></div><div class="amt">${M.f(a.cuota)}<span class="muted"> /mes</span></div><div class="sub">${L.cat(a.m.catId).nombre} · ${medioLabel(a.m)}${a.cierre && a.idxPeriodo <= a.n ? ` · la ${a.idxPeriodo}/${a.n} cierra el ${D.fmt(a.cierre)}` : ''} · termina ${D.monthName(a.last, true)} · faltan ${M.f(a.restante)}</div><div class="meter"><i style="width:${a.idxPeriodo / a.n * 100}%;background:var(--s4)"></i></div></div>`).join('') : '<div class="empty">No tenés compras en cuotas activas.</div>'}
     </div>
     <div class="card"><div class="card-head"><h2>Simulador: ¿me conviene sacar cuotas?</h2></div>
       <div class="form-grid">
@@ -1543,7 +1565,7 @@ function viewCuotas() {
   const det = Smart.detectarRecurrentes();
   html += `<div class="card section"><div class="card-head"><h2>Gastos fijos y suscripciones</h2><button class="btn sm" data-act="new-rec">${ICONS.plus} Nuevo fijo</button></div>
     ${det.length ? `<div class="callout amber" style="margin-bottom:12px"><b>Se repiten todos los meses:</b> ${det.map(d => `<button class="btn sm" style="margin:3px 4px 0 0" data-act="rec-from" data-id="${d.m.id}">${esc(d.desc)} · ~${M.c(d.avg)}</button>`).join('')}<div class="small muted" style="margin-top:6px">Tocá uno para convertirlo en gasto fijo y que entre en el pronóstico.</div></div>` : ''}
-    ${recs.length ? `<div class="table-wrap"><table class="responsive"><thead><tr><th>Concepto</th><th>Categoría</th><th>Medio</th><th>Día</th><th class="r">Monto / mes</th><th></th></tr></thead><tbody>${recs.map(r => `<tr style="${r.activo === false ? 'opacity:.5' : ''}">
+    ${recs.length ? `<div class="table-wrap"><table class="responsive"><thead><tr><th>Concepto</th><th>Categoría</th><th>Medio</th><th>Día</th><th class="r">Monto / mes</th><th></th></tr></thead><tbody>${recs.map(r => `<tr data-rec="${r.id}" style="cursor:pointer;${r.activo === false ? 'opacity:.5' : ''}">
       <td class="keep"><div class="mrow"><div><b style="font-weight:500">${esc(r.desc)}</b>${r.activo === false ? ' <span class="tag">pausado</span>' : ''}<span class="sub">${L.cat(r.catId).nombre} · ${medioLabel(r)} · día ${r.dia || 1}${r.hasta ? ` · hasta ${D.monthName(r.hasta, true)}` : ''}</span></div><div class="mob"><span class="mono">${M.f(M.toARS(r.monto, r.moneda))}</span></div></div></td>
       <td>${catChip(r.catId)}</td><td class="small">${esc(medioLabel(r))}</td><td class="mono">${r.dia || 1}</td><td class="amount r">${M.f(M.toARS(r.monto, r.moneda))}${r.moneda === 'USD' ? `<span class="sub">${M.orig(r)}</span>` : ''}</td>
       <td class="r" style="white-space:nowrap"><span class="row-actions"><button class="mini-btn" data-act="edit-rec" data-id="${r.id}" title="Editar">${ICONS.edit}</button><button class="mini-btn" data-act="toggle-rec" data-id="${r.id}" title="${r.activo === false ? 'Reactivar' : 'Pausar'}">${ICONS.clock}</button><button class="mini-btn" data-act="del-rec" data-id="${r.id}" title="Borrar">${ICONS.trash}</button></span></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Cargá tus gastos fijos (alquiler, seguro del auto, Claude, Netflix…) para que el pronóstico los descuente solo.</div>'}
@@ -1576,7 +1598,7 @@ function viewTarjetas() {
     const cerrando = E.resumen(t.id, now.mesPago);
     const lim = Number(t.limite) || 0; const uso = lim ? (prox.ym === now.mesPago ? cerrando.total : prox.total + cerrando.total) / lim : 0;
     const cierreDesde = D.addDays(E.fechaCierre(t.id, D.addMonths(now.mesPago, -1)), 1);
-    html += `<div class="tcard" style="background:linear-gradient(135deg,${t.color || CARD_COLORS[i % CARD_COLORS.length]},${t.color || CARD_COLORS[i % CARD_COLORS.length]}cc)">
+    html += `<div class="tcard" data-act="edit-card" data-id="${t.id}" style="cursor:pointer;background:linear-gradient(135deg,${t.color || CARD_COLORS[i % CARD_COLORS.length]},${t.color || CARD_COLORS[i % CARD_COLORS.length]}cc)">
       <div class="tname"><span>${esc(t.nombre)}<span style="font-weight:400;opacity:.8;font-size:13px"> ${esc(t.banco || '')}</span></span><button class="mini-btn" style="color:#fff" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button></div>
       <div><div style="font-size:12px;opacity:.85">Período ${D.fmt(cierreDesde)} – ${D.fmt(now.cierre)} · cierra en ${now.diasAlCierre} día${now.diasAlCierre === 1 ? '' : 's'}</div><div class="tbig">${M.f(cerrando.total)}</div></div>
       <div class="tmeta"><span>Consumo nuevo<b>${M.f(consumoPeriodo)}</b></span><span>Cuotas y fijos<b>${M.f(cerrando.total - consumoPeriodo)}</b></span>${prox.ym !== now.mesPago ? `<span>A pagar el ${D.fmt(prox.fecha)}<b>${M.f(prox.total)}</b></span>` : ''}</div>
@@ -1594,7 +1616,7 @@ function viewTarjetas() {
       <td><select class="input sm" data-pago="${t.id}|${m}"><option value="">Elegir cuenta…</option>${state.cuentas.map(c => `<option value="${c.id}" ${p.cuentaId === c.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></td>
       <td><label class="switch"><input type="checkbox" data-pagado="${t.id}|${m}" ${p.pagado ? 'checked' : ''}><span>${p.pagado ? 'Sí' : 'No'}</span></label></td></tr>`; })).join('')}
     </tbody></table></div>
-    <p class="small muted" style="margin-top:8px">Tocá una tarjeta arriba para ver el detalle del resumen. Los resúmenes futuros incluyen las cuotas que ya conocés.</p></div>`;
+    <p class="small muted" style="margin-top:8px">Tocá una tarjeta arriba para editar sus datos (cierre, vencimiento, límite). Los resúmenes futuros incluyen las cuotas que ya conocés.</p></div>`;
 
   // Cuentas
   const pend = state.pagos.filter(p => !p.pagado && p.cuentaId);
@@ -1767,6 +1789,7 @@ function viewConfig() {
         <div class="list-item"><div><b style="font-weight:500">Borrar todo</b><span class="sub small muted">Elimina movimientos, fijos, tarjetas y ajustes</span></div><button class="btn sm danger" data-act="reset">Borrar</button></div>
       </div>
       <div class="divider"></div>
+      <p class="small muted">${(() => { const b = BUILD; const v = /^\d{12}/.test(b) ? `${b.slice(6, 8)}/${b.slice(4, 6)}/${b.slice(0, 4)} ${b.slice(8, 10)}:${b.slice(10, 12)} UTC` : '—'; const u = state.updatedAt ? new Date(state.updatedAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; return `App actualizada al ${v} · tus datos modificados por última vez el ${u}`; })()}</p>
       <p class="small muted">Estado: ${Persist.status === 'ok' ? 'guardado en la nube (esta página se actualiza sola en todos tus dispositivos).' : Persist.status === 'local' ? 'guardado solo en este dispositivo. Exportá un respaldo cada tanto.' : Persist.status === 'err' ? 'error al guardar: ' + esc(Persist.lastError) : 'sincronizando…'}</p>
     </div>
   </div>`;
@@ -2141,6 +2164,7 @@ document.addEventListener('click', e => {
   if (e.target.id === 'overlay') { Modal.close(); return; }
   const act = e.target.closest('[data-act]'); if (act) { e.preventDefault(); const fn = Actions[act.dataset.act]; if (fn) fn(act.dataset.id); return; }
   const tr = e.target.closest('tr[data-id]'); if (tr && !e.target.closest('button,select,input,a,label')) { const id = tr.dataset.id; if (id.startsWith('v:')) Actions.confirmar(id); else Actions.edit(id.split('#')[0]); return; }
+  const trr = e.target.closest('tr[data-rec]'); if (trr && !e.target.closest('button,select,input,a,label')) { Actions['edit-rec'](trr.dataset.rec); return; }
 });
 document.addEventListener('change', e => {
   const t = e.target;
