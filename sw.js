@@ -1,5 +1,5 @@
 /* Flujo — service worker: la app funciona offline. Cambiar VERSION al publicar una versión nueva. */
-const VERSION = '202608282158';
+const VERSION = '202608282206';
 const SHELL = `flujo-shell-${VERSION}`;
 const RUNTIME = 'flujo-runtime';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];

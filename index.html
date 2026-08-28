@@ -617,7 +617,7 @@ function defaultState() {
     aprendido: {},
   };
 }
-const BUILD = '202608282158';
+const BUILD = '202608282206';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -698,7 +698,7 @@ const Persist = {
   },
   setStatus(st, msg) {
     Persist.status = st;
-    const map = { idle: ['', 'Sin datos guardados'], busy: ['busy', 'Guardando…'], ok: ['ok', 'Guardado en la nube'], local: ['local', 'Guardado en este dispositivo'], err: ['err', msg || 'No se pudo guardar'] };
+    const map = { idle: ['', 'Sin datos guardados'], busy: ['busy', 'Guardando…'], ok: ['ok', Gist.cfg() && !Persist.artifact ? 'Sincronizado con tu GitHub' : 'Guardado en la nube'], local: ['local', 'Guardado en este dispositivo'], err: ['err', msg || 'No se pudo guardar'] };
     const [cls, text] = map[st] || map.idle;
     for (const id of ['#save-state', '#save-state-m']) {
       const el = $(id); if (!el) continue;
@@ -713,6 +713,10 @@ const Persist = {
   async flush() {
     Persist.dirty = false;
     if (Persist.artifact === undefined && Persist.capPromise) await Persist.capPromise;
+    if (!Persist.artifact && Gist.cfg()) {
+      try { await Gist.push(); Persist.setStatus('ok'); } catch (e) { Persist.setStatus(e && e.status === 401 ? 'err' : 'local', e && e.status === 401 ? 'Token de GitHub inválido' : ''); }
+      return;
+    }
     if (!Persist.artifact) { Persist.setStatus('local'); return; }
     const json = JSON.stringify(state);
     try {
@@ -737,6 +741,57 @@ const Persist = {
       else if (code === 'rate_limited') { Persist.setStatus('busy'); Persist.schedule(15000); }
       else { Persist.lastError = (e && e.message) || String(e); Persist.setStatus('err'); }
     }
+  },
+};
+
+/* ---------- sincronización vía Gist privado de GitHub (la config vive en ESTE dispositivo) ---------- */
+const Gist = {
+  FILE: 'gestor-gastos-datos.json', lastPull: 0,
+  cfg() { try { return JSON.parse(localStorage.getItem('flujo.gist') || 'null'); } catch (e) { return null; } },
+  guardar(c) { try { localStorage.setItem('flujo.gist', JSON.stringify(c)); } catch (e) {} },
+  clear() { try { localStorage.removeItem('flujo.gist'); } catch (e) {} },
+  hdr(t) { return { 'Authorization': 'Bearer ' + t, 'Accept': 'application/vnd.github+json' }; },
+  async conectar(token) {
+    const r = await fetch('https://api.github.com/gists?per_page=100', { headers: Gist.hdr(token) });
+    if (r.status === 401) throw new Error('El token no es válido. Fijate que sea un token clásico con permiso "gist".');
+    if (!r.ok) throw new Error('GitHub respondió ' + r.status);
+    const list = await r.json();
+    let g = Array.isArray(list) ? list.find(x => x.files && x.files[Gist.FILE]) : null;
+    if (!g) {
+      const c = await fetch('https://api.github.com/gists', { method: 'POST', headers: Gist.hdr(token), body: JSON.stringify({ description: 'Gestor de gastos — datos (privado)', public: false, files: { [Gist.FILE]: { content: JSON.stringify(state) } } }) });
+      if (!c.ok) throw new Error('No pude crear el archivo en GitHub (' + c.status + '). ¿El token tiene permiso "gist"?');
+      g = await c.json();
+    }
+    Gist.guardar({ token, id: g.id });
+    return g.id;
+  },
+  async pull() {
+    const c = Gist.cfg(); if (!c) return null;
+    const r = await fetch('https://api.github.com/gists/' + c.id, { headers: Gist.hdr(c.token), cache: 'no-store' });
+    if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    const g = await r.json(); const f = g.files && g.files[Gist.FILE]; if (!f) return null;
+    let content = f.content;
+    if (f.truncated && f.raw_url) { const rr = await fetch(f.raw_url); content = await rr.text(); }
+    return JSON.parse(content);
+  },
+  async push() {
+    const c = Gist.cfg(); if (!c) return false;
+    const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files: { [Gist.FILE]: { content: JSON.stringify(state) } } }) });
+    if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    return true;
+  },
+  /** trae del gist si hay algo más nuevo; devuelve true si cambió el estado local */
+  async refrescar(force = false) {
+    if (!Gist.cfg()) return false;
+    if (!force && Date.now() - Gist.lastPull < 60000) return false;
+    Gist.lastPull = Date.now();
+    try {
+      const remote = await Gist.pull();
+      if (remote && remote.v && (remote.updatedAt || 0) > (state.updatedAt || 0)) { state = Persist.migrate(remote); if (Persist.applyPreset()) { state.updatedAt = Date.now(); Persist.schedule(1500); } Persist.local(); Persist.setStatus('ok'); return true; }
+      if (remote && (state.updatedAt || 0) > (remote.updatedAt || 0)) Persist.schedule(800);
+      Persist.setStatus('ok');
+    } catch (e) { if (e && e.status === 401) Persist.setStatus('err', 'Token de GitHub inválido'); }
+    return false;
   },
 };
 
@@ -1781,6 +1836,9 @@ function viewConfig() {
     </div>
     <div class="card"><div class="card-head"><h2>Datos</h2></div>
       <div class="stack">
+        ${(() => { const g = Gist.cfg(); return g
+          ? `<div class="list-item"><div><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Conectada a tu GitHub (gist ${esc(String(g.id).slice(0, 8))}…). Sube al guardar y baja al abrir la app.</span></div><div class="row" style="gap:4px"><button class="btn sm" data-act="gist-pull">Traer ahora</button><button class="btn sm danger" data-act="gist-off">Desconectar</button></div></div>`
+          : `<div class="list-item" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Guarda tus datos en un gist privado de tu GitHub para verlos iguales en el celu y la PC. Creá un token clásico con permiso "gist" en github.com → Settings → Developer settings → Personal access tokens → Tokens (classic) y pegalo acá (una vez por dispositivo).</span></div><div class="row" style="gap:6px;width:100%;margin-top:8px"><input class="input sm" type="password" id="g-token" placeholder="ghp_…" style="flex:1;min-width:160px"><button class="btn sm primary" data-act="gist-connect">Conectar</button></div></div>`; })()}
         <div class="list-item"><div><b style="font-weight:500">Resumen para analizar con Claude</b><span class="sub small muted">Copia un informe del mes en texto para pegarlo en el chat del proyecto</span></div><button class="btn sm" data-act="copiar-resumen">${ICONS.copy} Copiar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Exportar respaldo</b><span class="sub small muted">Descarga todo en JSON (${state.movimientos.length} movimientos)</span></div><button class="btn sm" data-act="export">${ICONS.download} Exportar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Importar respaldo</b><span class="sub small muted">Reemplaza los datos actuales por un JSON exportado</span></div><label class="btn sm">${ICONS.upload} Importar<input type="file" accept="application/json" id="import-file" class="hidden"></label></div>
@@ -2118,6 +2176,14 @@ const Actions = {
     $('#sim-out').innerHTML = renderSimulacion(res, monto);
   },
   'tc-update'() { TC.actualizar(false); },
+  async 'gist-connect'() {
+    const token = ($('#g-token') && $('#g-token').value || '').trim(); if (!token) { toast('Pegá el token primero'); return; }
+    toast('Conectando con GitHub…');
+    try { await Gist.conectar(token); const ch = await Gist.refrescar(true); if (!ch) { Persist.schedule(500); } toast('Sincronización conectada'); lastView = null; render(); }
+    catch (e) { toast((e && e.message) || 'No se pudo conectar', 5000); }
+  },
+  'gist-off'() { Gist.clear(); Persist.setStatus(state.movimientos.length ? 'local' : 'idle'); toast('Sincronización desconectada en este dispositivo'); render(); },
+  async 'gist-pull'() { const ch = await Gist.refrescar(true); toast(ch ? 'Datos actualizados' : 'Ya estabas al día'); if (ch) { lastView = null; render(); } },
   'cierre-ok'(v) { const [tid, ym, fecha] = v.split('|'); const t = L.tarjeta(tid); if (!t) return; t.cierres = t.cierres || {}; t.cierres[ym] = fecha; Persist.save(); toast(`${t.nombre}: cierre ${D.fmt(fecha)} confirmado`); render(); },
   'cierre-later'() { ui.cierreDismiss = true; render(); },
   'cierre-edit'(v) {
@@ -2186,7 +2252,7 @@ document.addEventListener('keydown', e => {
 });
 let rzT, lastW = window.innerWidth; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (!$('#overlay').classList.contains('open')) render(); }, 250); });
 window.addEventListener('beforeunload', () => { if (Persist.dirty) { Persist.local(); } });
-document.addEventListener('visibilitychange', () => { if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } else if (!document.hidden && Gist.cfg() && !Persist.dirty) { Gist.refrescar().then(ch => { if (ch && !$('#overlay').classList.contains('open')) { render(); toast('Datos actualizados'); } }); } });
 
 function importarCSV(txt) {
   const lines = txt.split(/\r?\n/).filter(l => l.trim()); if (lines.length < 2) { toast('CSV vacío'); return; }
@@ -2215,6 +2281,7 @@ function importarCSV(txt) {
   await Persist.init();
   render();
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
+  if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();
 
 </script>
