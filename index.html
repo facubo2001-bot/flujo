@@ -2,11 +2,10 @@
 <html lang="es"><head>
 <meta charset="utf-8">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0E6B7C" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#161A21" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gastos">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
@@ -16,50 +15,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
+/* OLED: un solo tema, negro puro (píxeles apagados) */
 :root{
-  color-scheme:light;
-  --bg:#F2F2F7; --surface:#FFFFFF; --surface-2:#F7F7FA; --surface-3:#EEEEF3;
-  --ink:#0B0B0F; --ink-2:#4A4A4F; --ink-3:#8A8A8F; --line:#E5E5EA; --line-2:#D1D1D6;
-  --accent:#0E6B7C; --accent-ink:#0A5460; --accent-soft:#DDF0F3; --accent-soft-2:#B9E1E8;
-  --amber:#A9701A; --amber-soft:#FBEED3;
-  --good:#0ca30c; --good-text:#006300; --warn:#fab219; --warn-text:#8a5a00; --serious:#ec835a; --crit:#d03b3b; --crit-text:#a52a2a;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
-  --seq1:#cde2fb; --seq2:#86b6ef; --seq3:#3987e5; --seq4:#1c5cab; --seq5:#0d366b;
-  --grid:#E6E9EF; --axis:#C9CFD8;
-  --shadow:0 1px 2px rgba(18,24,38,.05),0 8px 24px -12px rgba(18,24,38,.14);
-  --shadow-lg:0 24px 60px -20px rgba(18,24,38,.35);
-  --r:14px; --r-sm:9px;
+  color-scheme:dark;
+  --bg:#000000; --surface:#0A0A0B; --surface-2:#111113; --surface-3:#1A1A1D;
+  --ink:#F5F5F7; --ink-2:#A6A6AD; --ink-3:#68686F; --line:#1B1B1E; --line-2:#2A2A2E;
+  --accent:#4FC3D6; --accent-ink:#8EDCE8; --accent-soft:#0B2429; --accent-soft-2:#12363E;
+  --amber:#E0A648; --amber-soft:#241A08;
+  --good:#30C85E; --good-text:#4ADE80; --warn:#F5B72E; --warn-text:#F5B72E; --serious:#EC835A; --crit:#E5484D; --crit-text:#F07373;
+  --s1:#4C95EB; --s2:#E06A38; --s3:#26AD7E; --s4:#D99C1E; --s5:#DE6B95; --s6:#5CA82E; --s7:#9C90F2; --s8:#E66767;
+  --seq1:#14324F; --seq2:#1E568C; --seq3:#3987E5; --seq4:#6DA7EC; --seq5:#B7D3F6;
+  --grid:#151518; --axis:#2C2C31;
+  --shadow:none;
+  --shadow-lg:0 24px 60px -16px rgba(0,0,0,.9);
+  --r:16px; --r-sm:10px;
   --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Instrument Sans",system-ui,"Segoe UI",sans-serif;
   --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
   --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    color-scheme:dark;
-    --bg:#000000; --surface:#1C1C1E; --surface-2:#232326; --surface-3:#2C2C2E;
-    --ink:#F5F5F7; --ink-2:#C7C7CC; --ink-3:#8E8E93; --line:#2C2C2E; --line-2:#3A3A3C;
-    --accent:#4FB3C4; --accent-ink:#8ED3DF; --accent-soft:#12333A; --accent-soft-2:#1B4750;
-    --amber:#E0A648; --amber-soft:#3A2C12;
-    --good:#0ca30c; --good-text:#3ad03a; --warn:#fab219; --warn-text:#fab219; --serious:#ec835a; --crit:#d03b3b; --crit-text:#f07373;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
-    --seq1:#184f95; --seq2:#256abf; --seq3:#3987e5; --seq4:#6da7ec; --seq5:#b7d3f6;
-    --grid:#242A34; --axis:#3A414D;
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
-    --shadow-lg:0 24px 60px -20px rgba(0,0,0,.7);
-  }
-}
-:root[data-theme="dark"]{
-  color-scheme:dark;
-  --bg:#000000; --surface:#1C1C1E; --surface-2:#232326; --surface-3:#2C2C2E;
-  --ink:#F5F5F7; --ink-2:#C7C7CC; --ink-3:#8E8E93; --line:#2C2C2E; --line-2:#3A3A3C;
-  --accent:#4FB3C4; --accent-ink:#8ED3DF; --accent-soft:#12333A; --accent-soft-2:#1B4750;
-  --amber:#E0A648; --amber-soft:#3A2C12;
-  --good:#0ca30c; --good-text:#3ad03a; --warn:#fab219; --warn-text:#fab219; --serious:#ec835a; --crit:#d03b3b; --crit-text:#f07373;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
-  --seq1:#184f95; --seq2:#256abf; --seq3:#3987e5; --seq4:#6da7ec; --seq5:#b7d3f6;
-  --grid:#242A34; --axis:#3A414D;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
-  --shadow-lg:0 24px 60px -20px rgba(0,0,0,.7);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%;overscroll-behavior:none}
@@ -385,9 +357,7 @@ kbd{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);padd
 
 
 /* ---------- iOS skin ---------- */
-.card{border:0;box-shadow:0 1px 2px rgba(0,0,0,.04);border-radius:16px}
-:root[data-theme="dark"] .card{box-shadow:none}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .card{box-shadow:none}}
+.card{border:0;box-shadow:none;border-radius:18px}
 .input,select.input,textarea.input{border:0;background:var(--surface-3);border-radius:11px;min-height:44px;padding:10px 13px;font-size:16px}
 .input.sm{min-height:36px;font-size:14px;padding:6px 11px}
 .input:focus{box-shadow:0 0 0 2px var(--accent) inset}
@@ -399,9 +369,7 @@ kbd{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);padd
 .month-nav{border:0;background:var(--surface-3);border-radius:12px}
 .seg{border:0;background:var(--surface-3);border-radius:11px;padding:3px}
 .seg button{border-radius:9px;padding:6px 12px}
-.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-:root[data-theme="dark"] .seg button.on{background:#636366;color:#fff}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.on{background:#636366;color:#fff}}
+.seg button.on{background:#2C2C2E;color:#fff;box-shadow:none}
 .choice button{border:0;background:var(--surface-3);border-radius:10px;min-height:38px;padding:8px 13px;font-size:14.5px}
 .choice button.on{background:var(--accent);color:#fff}
 .choice button.on.n3{background:var(--crit);color:#fff}
@@ -447,6 +415,48 @@ tr.day td span{float:right;font-family:var(--font-mono);font-weight:500}
 @media (max-width:700px){table.responsive tr.day{display:block;padding:8px 0 4px;border-bottom:0}table.responsive tr.day td{display:block}table.grouped td.fecha{display:none!important}}
 .toast{display:flex;gap:14px;align-items:center;pointer-events:auto}
 .toast button{border:0;background:transparent;color:var(--accent-soft-2);font-weight:700;padding:0;font-size:13.5px}
+
+/* ---------- OLED skin: negro puro, minimalista ---------- */
+html,body{background:#000}
+.card{background:var(--surface);border:1px solid var(--line)}
+.rail{background:#000;border-right:1px solid var(--line)}
+.nav-btn.active{background:var(--surface-3);color:#fff}
+.tabbar{background:rgba(0,0,0,.78);border-top:1px solid var(--line)}
+.tabbar button.active{color:#fff}
+.month-nav,.seg,.icon-btn{background:var(--surface-2)}
+.input,select.input,textarea.input{background:var(--surface-2)}
+.btn{background:var(--surface-2)}
+.btn:hover{background:var(--surface-3)}
+.btn.primary{background:#fff;border-color:#fff;color:#000}
+.btn.primary:hover{background:#E5E5EA}
+.btn.danger{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit-text)}
+.btn.ghost{background:transparent}
+.fab{background:#fff;box-shadow:0 10px 28px -6px rgba(255,255,255,.28),0 2px 8px rgba(0,0,0,.6)}
+.fab svg{stroke:#000}
+.chips button{background:var(--surface-2)}
+.chips button.on{background:#fff;color:#000}
+.chips button.on i{background:#000!important}
+.choice button{background:var(--surface-2)}
+.choice button.on{background:#fff;color:#000}
+.choice button.on.n3{background:var(--crit);color:#fff}
+#tooltip{background:#161618;color:var(--ink);border:1px solid var(--line-2)}
+.toast{background:#161618;color:var(--ink);border:1px solid var(--line-2)}
+.toast button{color:var(--accent-ink)}
+.overlay{background:rgba(0,0,0,.7)}
+.modal{background:#0C0C0E;border:1px solid var(--line-2)}
+.modal .m-head,.modal .m-foot{background:#0C0C0E}
+.grabber{background:#3A3A3C}
+.big-amount input{color:#fff}
+.big-amount input::placeholder{color:#2E2E33}
+.switch input{background:#2E2E33}
+.callout{background:var(--surface)}
+.sim-result .box{background:var(--surface-2)}
+kbd{background:var(--surface-2)}
+tr.day td{background:var(--surface)}
+.kpi.accent{background:linear-gradient(140deg,var(--accent-soft),var(--surface) 72%)}
+.kpi.amber{background:linear-gradient(140deg,var(--amber-soft),var(--surface) 72%)}
+.tcard{box-shadow:none}
+@media (max-width:520px){.kpi .value{font-size:clamp(14px,5vw,21px)}.kpi.hero .value{font-size:clamp(16px,5.6vw,23px)}}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -617,7 +627,7 @@ function defaultState() {
     aprendido: {},
   };
 }
-const BUILD = '202608301601';
+const BUILD = '202609112318';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1507,9 +1517,9 @@ function viewResumen() {
     </div>
   </div>`;
 
-  // últimos movimientos
-  const last = c.movs.slice().sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id > a.id ? 1 : -1)).slice(0, 6);
-  html += `<div class="card section"><div class="card-head"><h2>Últimos movimientos</h2><button class="btn ghost sm" data-go="movimientos">Ver todos →</button></div>${renderMovTable(last, { compact: true })}</div>`;
+  // últimas compras (solo lo cargado a mano en el mes visto: sin fijos ni cuotas)
+  const last = state.movimientos.filter(m => !m.recId && m.fecha.startsWith(ym)).slice().sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id > a.id ? 1 : -1));
+  html += `<div class="card section"><div class="card-head"><h2>Últimas compras</h2><div class="row" style="gap:8px"><span class="hint">Sin fijos ni cuotas</span><button class="btn ghost sm" data-go="movimientos">Ver todo el mes →</button></div></div>${renderMovTable(last, { compact: true })}</div>`;
   return html;
 }
 
@@ -1837,7 +1847,6 @@ function viewConfig() {
       ${inp('tc', 'Dólar MEP (ARS por USD)', s.tc, 'inputmode="numeric"', `${s.tcFecha ? `Actualizado ${D.fmt(s.tcFecha, { year: true })}${s.tcFuente ? ' · ' + esc(s.tcFuente) : ''}. ` : ''}Se usa para la vista en USD y para gastos en dólares. <a href="#" data-act="tc-update">Actualizar desde dolarapi.com</a>`)}
       ${inp('presupuesto', 'Presupuesto mensual de gasto (ARS)', s.presupuesto ? fmtARS.format(s.presupuesto) : '', 'inputmode="numeric"', `Lo que decidís gastar por mes (fijos + cuotas + compras). El resto del sueldo${s.ingreso && s.presupuesto ? ` (${M.f(s.ingreso - s.presupuesto)})` : ''} es para invertir.`)}
       ${inp('alertaCuotasPct', 'Alerta de cuotas (% del presupuesto)', s.alertaCuotasPct, 'inputmode="numeric"', 'Te aviso cuando fijos + cuotas superan esto')}
-      <div class="field"><label>Tema</label><div class="seg" style="width:fit-content">${[['auto', 'Sistema'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([k, l]) => `<button class="${(localStorage.getItem('flujo.theme') || 'auto') === k ? 'on' : ''}" data-theme-set="${k}">${l}</button>`).join('')}</div></div>
     </div></div>
     <div class="card"><div class="card-head"><h2>Tarjetas</h2><button class="btn sm" data-act="new-card">${ICONS.plus} Tarjeta</button></div>
       ${state.tarjetas.length ? state.tarjetas.map((t, i) => `<div class="list-item"><div class="row" style="gap:10px"><i class="swatch" style="width:28px;height:18px;border-radius:4px;background:${t.color || CARD_COLORS[i % CARD_COLORS.length]}"></i><div><b style="font-weight:500">${esc(t.nombre)}</b> <span class="muted small">${esc(t.banco || '')}</span><span class="sub small muted">Cierra el ${t.cierre} · vence el ${t.vencimiento}${t.limite ? ` · límite ${M.c(t.limite)}` : ''}</span></div></div><div class="row" style="gap:2px"><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-card" data-id="${t.id}">${ICONS.trash}</button></div></div>`).join('') : '<div class="empty">Sin tarjetas</div>'}
@@ -1910,7 +1919,9 @@ function formMov(m = null, opts = {}) {
   const topCats = state.categorias.slice().sort((p, q) => (freq[q.id] || 0) - (freq[p.id] || 0)).slice(0, 8);
   if (!topCats.find(c => c.id === base.catId)) topCats.unshift(L.cat(base.catId));
   const descs = [...new Set(state.movimientos.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(x => x.desc))].slice(0, 60);
+  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Inversión</button></div>` : '';
   const body = `<div class="form-grid">
+    ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
     ${F.field('Categoría', `<div class="chips" id="f-catchips">${topCats.map(c => `<button type="button" data-act="pick-cat" data-id="${c.id}" class="${c.id === base.catId ? 'on' : ''}"><i style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</button>`).join('')}</div>${F.select('f-cat', F.catOpts(), base.catId)}`, '', 'full')}
@@ -2028,14 +2039,16 @@ function formCuenta(c = null) {
 
 /* ---------- inversión / ingreso extra ---------- */
 function formInv() {
+  const destinos = [...new Set(state.inversiones.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(i => i.destino).filter(Boolean))].slice(0, 6);
   const body = `<div class="form-grid">
-    ${F.field('Monto', `<div class="amount-input"><span class="cur">$</span><input class="input" id="i-monto" inputmode="decimal" autofocus></div>`)}
-    ${F.field('Moneda', F.choice('i-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], 'ARS'))}
-    ${F.field('Fecha', F.input('i-fecha', ui.mes === D.thisMonth() ? D.today() : D.dateIn(ui.mes, 1), 'type="date"'))}
-    ${F.field('Destino', F.input('i-destino', '', 'placeholder="Balanz · CEDEARs, BTC, FCI…"'))}
+    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Inversión</button></div>
+    <div class="full"><div class="big-amount"><span class="cur" id="i-cursym">$</span><input id="i-monto" inputmode="decimal" autocomplete="off" placeholder="0" autofocus></div><div class="row" style="justify-content:center;gap:6px">${F.choice('i-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], 'ARS')}</div></div>
+    ${F.field('Destino', `${destinos.length ? `<div class="chips" style="margin-bottom:6px">${destinos.map(d => `<button type="button" data-act="pick-destino" data-id="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : ''}<input class="input" id="i-destino" placeholder="Balanz · CEDEARs, BTC, plazo fijo…">`, '', 'full')}
+    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-inv" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-inv" data-id="ayer">Ayer</button>${F.input('i-fecha', ui.mes === D.thisMonth() ? D.today() : D.dateIn(ui.mes, 1), 'type="date"')}</div>`, '', 'full')}
     ${F.field('Detalle', F.input('i-desc', '', 'placeholder="opcional"'), '', 'full')}
   </div>`;
-  Modal.open({ title: 'Registrar inversión', body, onSubmit: () => { const monto = M.parse(Modal.val('i-monto')); if (!monto) { toast('Falta el monto'); return false; } state.inversiones.push({ id: uid(), monto, moneda: Modal.choice('i-moneda') || 'ARS', fecha: Modal.val('i-fecha') || D.today(), destino: Modal.val('i-destino').trim(), desc: Modal.val('i-desc').trim() }); Persist.save(); toast('Inversión registrada'); render(); } });
+  Modal.open({ title: 'Registrar inversión', body, submit: 'Guardar inversión', onSubmit: () => { const monto = M.parse(Modal.val('i-monto')); if (!monto) { toast('Falta el monto'); return false; } state.inversiones.push({ id: uid(), monto, moneda: Modal.choice('i-moneda') || 'ARS', fecha: Modal.val('i-fecha') || D.today(), destino: Modal.val('i-destino').trim(), desc: Modal.val('i-desc').trim() }); Persist.save(); toast('Inversión registrada'); render(); } });
+  $('#modal').onchange = () => { const el = $('#i-cursym'); if (el) el.textContent = (Modal.choice('i-moneda') || 'ARS') === 'USD' ? 'US$' : '$'; };
 }
 function formIng() {
   const body = `<div class="form-grid">
@@ -2122,7 +2135,7 @@ function cargarDemo() {
 
 /* ===================== FLUJO — main: render, navigation, events ===================== */
 
-function applyTheme() { const t = localStorage.getItem('flujo.theme') || 'auto'; if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }
+function applyTheme() { /* estética OLED: un solo tema, negro puro */ document.documentElement.setAttribute('data-theme', 'dark'); }
 
 function renderNav() {
   const btn = (v, cls) => `<button class="${cls} ${ui.view === v.id ? 'active' : ''}" data-go="${v.id}">${ICONS[v.id]}<span>${cls === 'nav-btn' ? v.label : v.short}</span></button>`;
@@ -2132,11 +2145,9 @@ function renderNav() {
 
 function renderTopbar() {
   const [t, sub] = VIEW_TITLES[ui.view]; const withMonth = ['resumen', 'movimientos', 'tarjetas', 'plan', 'tendencias'].includes(ui.view);
-  const isDark = (localStorage.getItem('flujo.theme') || 'auto') === 'dark' || (localStorage.getItem('flujo.theme') || 'auto') === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches;
   return `<div class="topbar"><div class="title"><h1>${t}</h1><small>${sub}${state.settings.nombre && ui.view === 'resumen' ? ` · ${esc(state.settings.nombre)}` : ''}</small></div><div class="tools">
     ${withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
     <div class="seg" id="cur-seg">${['ARS', 'USD'].map(c => `<button class="${ui.cur === c ? 'on' : ''}" data-cur="${c}">${c === 'ARS' ? '$ ARS' : 'US$'}</button>`).join('')}</div>
-    <button class="icon-btn" data-act="theme" title="Cambiar tema">${isDark ? ICONS.sun : ICONS.moon}</button>
     <button class="btn primary" data-act="new" style="display:none" id="btn-new-desktop">${ICONS.plus} Gasto</button>
   </div></div>`;
 }
@@ -2206,9 +2217,12 @@ const Actions = {
     const [tid, ym, est] = v.split('|'); const t = L.tarjeta(tid); if (!t) return;
     Modal.open({ title: `Cierre de ${t.nombre}`, body: `<div class="form-grid">${F.field('Fecha de cierre de este período', F.input('cc-fecha', est, 'type="date"'), 'La encontrás en la app del banco, en "próximo cierre"')}</div>`, submit: 'Guardar', onSubmit: () => { const f = Modal.val('cc-fecha'); if (!f) return false; t.cierres = t.cierres || {}; t.cierres[D.ym(f)] = f; Persist.save(); render(); } });
   },
+  'switch-inv'() { formInv(); },
+  'switch-gasto'() { formMov(); },
+  'pick-destino'(d) { const el = $('#i-destino'); if (el) el.value = d; },
+  'set-date-inv'(v) { const f = $('#i-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
   'set-date'(v) { const f = $('#f-fecha'); if (f) { f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); f.dispatchEvent(new Event('change', { bubbles: true })); } },
   'pick-cat'(id) { const s = $('#f-cat'); if (s) { s.value = id; s.dataset.touched = '1'; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === id)); } },
-  theme() { const cur = localStorage.getItem('flujo.theme') || 'auto'; const isDark = cur === 'dark' || cur === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches; localStorage.setItem('flujo.theme', isDark ? 'light' : 'dark'); applyTheme(); render(); },
   close() { Modal.close(); },
   submit() { Modal.submit(); },
   reload() { location.reload(); },
@@ -2241,7 +2255,6 @@ document.addEventListener('click', e => {
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.trendRange = Number(rg.dataset.range); render(); return; }
-  const ts = e.target.closest('[data-theme-set]'); if (ts) { localStorage.setItem('flujo.theme', ts.dataset.themeSet); applyTheme(); render(); return; }
   if (e.target.closest('#fab')) { formMov(); return; }
   if (e.target.id === 'overlay') { Modal.close(); return; }
   const act = e.target.closest('[data-act]'); if (act) { e.preventDefault(); const fn = Actions[act.dataset.act]; if (fn) fn(act.dataset.id); return; }
