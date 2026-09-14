@@ -37,7 +37,7 @@ function formMov(m = null, opts = {}) {
   const topCats = state.categorias.slice().sort((p, q) => (freq[q.id] || 0) - (freq[p.id] || 0)).slice(0, 8);
   if (!topCats.find(c => c.id === base.catId)) topCats.unshift(L.cat(base.catId));
   const descs = [...new Set(state.movimientos.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(x => x.desc))].slice(0, 60);
-  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Inversión</button></div>` : '';
+  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Aporte</button><button type="button" data-act="switch-op">Cartera</button></div>` : '';
   const body = `<div class="form-grid">
     ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
@@ -159,7 +159,7 @@ function formCuenta(c = null) {
 function formInv() {
   const destinos = [...new Set(state.inversiones.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(i => i.destino).filter(Boolean))].slice(0, 6);
   const body = `<div class="form-grid">
-    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Inversión</button></div>
+    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Aporte</button><button type="button" data-act="switch-op">Cartera</button></div>
     <div class="full"><div class="big-amount"><span class="cur" id="i-cursym">$</span><input id="i-monto" inputmode="decimal" autocomplete="off" placeholder="0" autofocus></div><div class="row" style="justify-content:center;gap:6px">${F.choice('i-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], 'ARS')}</div></div>
     ${F.field('Destino', `${destinos.length ? `<div class="chips" style="margin-bottom:6px">${destinos.map(d => `<button type="button" data-act="pick-destino" data-id="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : ''}<input class="input" id="i-destino" placeholder="Balanz · CEDEARs, BTC, plazo fijo…">`, '', 'full')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-inv" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-inv" data-id="ayer">Ayer</button>${F.input('i-fecha', ui.mes === D.thisMonth() ? D.today() : D.dateIn(ui.mes, 1), 'type="date"')}</div>`, '', 'full')}
@@ -191,3 +191,66 @@ function formCat(c = null) {
 
 /* ---------- confirm ---------- */
 function confirmar(msg, onOk, label = 'Borrar') { Modal.open({ title: 'Confirmar', body: `<p>${esc(msg)}</p>`, submit: label, onSubmit: () => { onOk(); } }); const b = $('#modal [data-act="submit"]'); if (b && label === 'Borrar') b.classList.add('danger'); }
+
+/* ---------- cartera: operaciones, posiciones, alertas ---------- */
+function formOp(pre = {}) {
+  const k = E.cartera(); const tickers = [...new Set([...k.posiciones.map(p => p.ticker), ...k.watch.map(p => p.ticker)])];
+  const tipo = pre.tipo || 'compra';
+  const body = `<div class="form-grid">
+    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button type="button" data-act="switch-inv">Aporte</button><button class="on" type="button">Cartera</button></div>
+    <div class="full">${F.choice('o-tipo', [['compra', 'Compra'], ['venta', 'Venta'], ['dividendo', 'Dividendo']], tipo)}</div>
+    ${F.field('Ticker', `${tickers.length ? `<div class="chips" style="margin-bottom:6px">${tickers.map(t => `<button type="button" data-act="pick-ticker" data-id="${esc(t)}" class="${t === pre.ticker ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>` : ''}<input class="input" id="o-ticker" value="${esc(pre.ticker || '')}" placeholder="MELI, NVDA, GLD…" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase" ${pre.ticker ? '' : 'autofocus'}>`, 'El ticker de USA (subyacente del CEDEAR), como lo ves en Yahoo/Balanz.', 'full')}
+    <div id="o-campos" class="full form-grid" style="padding:0">${formOpCampos(tipo, pre)}</div>
+    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, '', 'full')}
+    ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
+  </div>`;
+  Modal.open({ title: 'Operación de cartera', body, submit: 'Guardar', onSubmit: () => {
+    const tipo = Modal.choice('o-tipo') || 'compra'; const ticker = Modal.val('o-ticker').trim().toUpperCase().replace(/\s+/g, '');
+    if (!ticker) { toast('Falta el ticker'); return false; }
+    const o = { id: uid(), tipo, ticker, fecha: Modal.val('o-fecha') || D.today(), nota: Modal.val('o-nota').trim() };
+    if (tipo === 'dividendo') { o.monto = M.parse(Modal.val('o-monto')); if (!o.monto) { toast('Falta el monto del dividendo'); return false; } }
+    else { o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); if (!o.acciones || !o.precio) { toast('Faltan acciones o precio'); return false; }
+      if (tipo === 'venta') { const p = E.cartera().posiciones.find(x => x.ticker === ticker); if (!p || p.acciones + 1e-6 < o.acciones) { toast(`No tenés ${fmtAcc(o.acciones)} acciones de ${ticker} para vender`); return false; } } }
+    state.cartera.operaciones.push(o); if (!state.cartera.precios[ticker] && tipo !== 'dividendo') state.cartera.precios[ticker] = { c: o.precio, dp: 0, t: 0, estimado: true };
+    Persist.save(); toast(`${tipo === 'compra' ? 'Compra' : tipo === 'venta' ? 'Venta' : 'Dividendo'} de ${ticker} registrada`); if (ui.view !== 'cartera') ui.view = 'cartera'; render();
+  } });
+  $('#modal').onchange = e => { if (e.target.closest('#o-tipo')) { const t = Modal.choice('o-tipo'); const box = $('#o-campos'); if (box) box.innerHTML = formOpCampos(t, { ticker: Modal.val('o-ticker') }); } };
+}
+function formOpCampos(tipo, pre = {}) {
+  if (tipo === 'dividendo') return F.field('Monto cobrado (USD)', F.input('o-monto', pre.monto || '', 'inputmode="decimal" placeholder="0,00"'), 'Neto, lo que entró en la cuenta.', 'full');
+  const p = pre.ticker ? E.cartera().posiciones.find(x => x.ticker === pre.ticker) : null;
+  return F.field('Acciones', F.input('o-acc', pre.acciones || '', 'inputmode="decimal" placeholder="0,5"'), tipo === 'venta' && p ? `Tenés ${fmtAcc(p.acciones)}` : 'Fracciones con coma: 0,508') + F.field('Precio por acción (USD)', F.input('o-precio', pre.precio || (p && p.precio ? String(p.precio).replace('.', ',') : ''), 'inputmode="decimal" placeholder="0,00"'), tipo === 'venta' && p ? `PPC ${fmtU(p.ppc)}` : '');
+}
+function formPosicion(ticker) {
+  const k = E.cartera(); const p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker); if (!p) return;
+  const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
+  const al = p.alerta || {};
+  const body = `<div class="stack">
+    ${p.acciones ? `<div class="sim-result">
+      <div class="box"><div class="l">Tenés</div><div class="v">${fmtAcc(p.acciones)} acc</div></div>
+      <div class="box"><div class="l">PPC</div><div class="v">${fmtU(p.ppc)}</div></div>
+      <div class="box"><div class="l">Precio hoy</div><div class="v">${p.precio != null ? fmtU(p.precio) : '—'}</div></div>
+      <div class="box"><div class="l">Valor</div><div class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</div></div>
+      <div class="box"><div class="l">Resultado</div><div class="v ${p.gp > 0 ? 'up' : p.gp < 0 ? 'down' : ''}">${p.gp != null ? (p.gp >= 0 ? '+' : '') + fmtU(p.gp, 0) : '—'}</div><div class="l">${p.gpPct != null ? (p.gp >= 0 ? '+' : '') + M.pct(p.gpPct, 1) : ''}</div></div>
+      <div class="box"><div class="l">Peso</div><div class="v">${M.pct(p.peso || 0, 1)}</div></div>
+    </div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
+    <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas de precio (USD)</div></div>
+      ${F.field('🟡 Che, mirala ≤', F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
+      ${F.field('🔴 Comprá urgente ≤', F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
+    </div>
+    <div class="row" style="gap:8px"><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
+    ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones</div>${ops.map(o => `<div class="list-item"><div><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b><span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px"><span class="mono">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0))}</span><button type="button" class="mini-btn" data-act="del-op-modal" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('')}</div>` : ''}
+  </div>`;
+  Modal.open({ title: ticker, body, submit: 'Guardar alertas', onSubmit: () => {
+    const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente'));
+    if (!mirala && !urgente) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null };
+    Persist.save(); toast('Alertas guardadas'); render();
+  } });
+}
+function formWatch() {
+  Modal.open({ title: 'Vigilar un ticker', body: `<div class="form-grid">${F.field('Ticker', F.input('w-ticker', '', 'placeholder="TSM" autofocus autocapitalize="characters" style="text-transform:uppercase"'), 'Sin tenerlo: solo para que la app y el bot te avisen.', 'full')}${F.field('🟡 Che, mirala ≤ (USD)', F.input('w-mirala', '', 'inputmode="decimal"'))}${F.field('🔴 Comprá urgente ≤ (USD)', F.input('w-urgente', '', 'inputmode="decimal"'))}</div>`, submit: 'Guardar', onSubmit: () => {
+    const t = Modal.val('w-ticker').trim().toUpperCase(); const mirala = M.parse(Modal.val('w-mirala')), urgente = M.parse(Modal.val('w-urgente'));
+    if (!t || (!mirala && !urgente)) { toast('Ticker y al menos un nivel'); return false; }
+    state.cartera.alertas[t] = { mirala: mirala || null, urgente: urgente || null }; Persist.save(); render();
+  } });
+}

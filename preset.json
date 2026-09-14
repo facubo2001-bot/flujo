@@ -1956,5 +1956,256 @@
     "desc": "0,333 acc · PPC US$ 275,02"
    }
   ]
+ },
+ {
+  "id": "cartera-2026-09-14",
+  "cartera": {
+   "removeInversiones": [
+    "inv-meli",
+    "inv-msft",
+    "inv-nvda",
+    "inv-mcd",
+    "inv-nu",
+    "inv-ibm",
+    "inv-meta",
+    "inv-googl",
+    "inv-asml",
+    "inv-amzn",
+    "inv-pfe",
+    "inv-brkb",
+    "inv-unh",
+    "inv-gld",
+    "inv-vist",
+    "inv-ceg"
+   ],
+   "operaciones": [
+    {
+     "id": "op0-meli",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.508333,
+     "precio": 1892.11,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-msft",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 1.666665,
+     "precio": 428.17,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-nvda",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 2.625,
+     "precio": 177.71,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-mcd",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 1.791667,
+     "precio": 265.48,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-nu",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 32,
+     "precio": 14.13,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-ibm",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 1.666667,
+     "precio": 241.15,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-meta",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.583334,
+     "precio": 613.04,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-googl",
+     "tipo": "compra",
+     "ticker": "GOOGL",
+     "acciones": 1.086207,
+     "precio": 320.37,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-asml",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.226027,
+     "precio": 1148.89,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-amzn",
+     "tipo": "compra",
+     "ticker": "AMZN",
+     "acciones": 0.993055,
+     "precio": 217.13,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-pfe",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 8.25,
+     "precio": 25.37,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-brkb",
+     "tipo": "compra",
+     "ticker": "BRK-B",
+     "acciones": 0.363636,
+     "precio": 468.18,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-unh",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.424242,
+     "precio": 267.8,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-gld",
+     "tipo": "compra",
+     "ticker": "GLD",
+     "acciones": 0.36,
+     "precio": 329.97,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-vist",
+     "tipo": "compra",
+     "ticker": "VIST",
+     "acciones": 1.333333,
+     "precio": 50.88,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-ceg",
+     "tipo": "compra",
+     "ticker": "CEG",
+     "acciones": 0.333333,
+     "precio": 275.02,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    }
+   ],
+   "alertas": {
+    "MELI": {
+     "mirala": 1750,
+     "urgente": 1600
+    },
+    "MSFT": {
+     "mirala": 460,
+     "urgente": 420
+    },
+    "NVDA": {
+     "mirala": 195,
+     "urgente": 175
+    },
+    "NU": {
+     "mirala": 13,
+     "urgente": 11.5
+    },
+    "AMZN": {
+     "mirala": 230,
+     "urgente": 210
+    },
+    "IBM": {
+     "mirala": 210,
+     "urgente": 195
+    },
+    "ASML": {
+     "mirala": 1550,
+     "urgente": 1450
+    },
+    "GOOGL": {
+     "mirala": 285,
+     "urgente": 270
+    },
+    "META": {
+     "mirala": 600,
+     "urgente": 545
+    },
+    "PFE": {
+     "mirala": 26,
+     "urgente": 24.5
+    },
+    "BRK-B": {
+     "mirala": 480,
+     "urgente": 465
+    },
+    "UNH": {
+     "mirala": 340,
+     "urgente": 300
+    },
+    "GLD": {
+     "mirala": 360,
+     "urgente": 335
+    },
+    "CEG": {
+     "mirala": 250,
+     "urgente": 230
+    },
+    "VIST": {
+     "mirala": 65,
+     "urgente": 55
+    },
+    "MCD": {
+     "mirala": 260,
+     "urgente": 240
+    },
+    "MU": {
+     "mirala": 720,
+     "urgente": 550
+    },
+    "GEV": {
+     "mirala": 700,
+     "urgente": 650
+    },
+    "YPF": {
+     "mirala": 45,
+     "urgente": 34
+    },
+    "TSM": {
+     "mirala": 330,
+     "urgente": 290
+    }
+   }
+  }
  }
 ]

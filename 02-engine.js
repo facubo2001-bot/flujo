@@ -208,10 +208,52 @@ const E = {
       const t = m.medio === 'tarjeta' ? L.tarjeta(m.tarjetaId) : null;
       const cierre = t ? E.cycle(t, hoy).cierre : null;
       const ymPer = ym === D.thisMonth() && cierre ? D.ym(cierre) : ym;
-      const idxPeriodo = clamp(Math.min(D.diffMonths(first, ymPer) + 1, idx + 1), 0, n);
+      // Nº de cuota "en curso" = cierres de la tarjeta que YA pasaron desde la compra + 1 (la que va al próximo cierre).
+      // Solo se usa el calendario si no hay tarjeta o si se mira un mes que no es el actual.
+      let idxPeriodo, pasados = null;
+      if (t && ym === D.thisMonth()) {
+        let c = E.cycle(t, m.fecha).cierre; pasados = 0;
+        while (c && c <= hoy && pasados < n) { pasados++; c = E.cycle(t, D.addDays(c, 1)).cierre; }
+        idxPeriodo = clamp(pasados + 1, 1, n);
+      } else idxPeriodo = clamp(Math.min(D.diffMonths(first, ymPer) + 1, idx + 1), 0, n);
       const total = M.toARS(m.monto, m.moneda);
-      return { m, first, last, n, idx, idxPeriodo, cierre, cuota: total / n, total, restante: total / n * (n - idxPeriodo), restantes: n - idxPeriodo, activa: last >= ymPer || last >= ym };
+      return { m, first, last, n, idx, idxPeriodo, cierre, cuota: total / n, total, restante: total / n * (n - idxPeriodo), restantes: n - idxPeriodo, activa: pasados !== null ? pasados < n : (last >= ymPer || last >= ym) };
     }).filter(x => x.activa).sort((a, b) => a.last.localeCompare(b.last));
+  },
+  /** Cartera de inversiones: posiciones derivadas de las operaciones (PPC = costo promedio ponderado), valuadas a último precio.
+      compra: suma acciones y costo · venta: baja acciones al PPC y registra resultado realizado · dividendo: monto cobrado en USD */
+  cartera() {
+    const c = state.cartera || { operaciones: [], alertas: {}, precios: {} };
+    const ops = c.operaciones.slice().sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.id > b.id ? 1 : -1));
+    const pos = {}; let dividendos = 0;
+    const get = t => pos[t] || (pos[t] = { ticker: t, acciones: 0, costo: 0, dividendos: 0, realizado: 0, nOps: 0 });
+    for (const o of ops) {
+      const p = get(o.ticker); const q = Number(o.acciones) || 0; const px = Number(o.precio) || 0; p.nOps++;
+      if (o.tipo === 'compra') { p.acciones += q; p.costo += q * px; }
+      else if (o.tipo === 'venta') { const ppc = p.acciones ? p.costo / p.acciones : 0; const qv = Math.min(q, p.acciones); p.realizado += qv * (px - ppc); p.costo -= qv * ppc; p.acciones -= qv; if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; } }
+      else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
+    }
+    const mep = Number(state.settings.tc) || 0, ccl = Number(state.settings.ccl) || mep;
+    const enrich = p => {
+      const pr = c.precios[p.ticker]; const precio = pr && pr.c ? pr.c : null;
+      const ppc = p.acciones ? p.costo / p.acciones : 0;
+      const valor = precio != null ? p.acciones * precio : null;
+      const gp = valor != null ? valor - p.costo : null;
+      const al = c.alertas[p.ticker] || null;
+      let estado = null; if (al && precio != null) { if (al.urgente && precio <= al.urgente) estado = 'urgente'; else if (al.mirala && precio <= al.mirala) estado = 'mirala'; }
+      return { ...p, ppc, precio, dp: pr ? pr.dp : null, precioT: pr ? pr.t : null, valor, gp, gpPct: p.costo ? (gp != null ? gp / p.costo : null) : null, alerta: al, estado, distMirala: al && al.mirala && precio ? (precio - al.mirala) / precio : null };
+    };
+    const all = Object.values(pos).map(enrich);
+    const abiertas = all.filter(p => p.acciones > 0);
+    const costo = sum(abiertas.map(p => p.costo));
+    const conPrecio = abiertas.filter(p => p.valor != null).length;
+    const valor = abiertas.length && conPrecio ? sum(abiertas.map(p => p.valor != null ? p.valor : p.costo)) : null;
+    for (const p of abiertas) p.peso = valor ? (p.valor != null ? p.valor : p.costo) / valor : (costo ? p.costo / costo : 0);
+    abiertas.sort((a, b) => (b.valor != null ? b.valor : b.costo) - (a.valor != null ? a.valor : a.costo));
+    // watchlist: tickers con niveles de alerta pero sin posición
+    const watch = Object.keys(c.alertas).filter(t => !pos[t] || pos[t].acciones <= 0).map(t => enrich(get(t)));
+    return { posiciones: abiertas, cerradas: all.filter(p => p.acciones <= 0 && p.nOps), watch, costo, valor, conPrecio, gp: valor != null ? valor - costo : null, gpPct: valor != null && costo ? (valor - costo) / costo : null,
+      dividendos, realizado: sum(all.map(p => p.realizado)), mep, ccl, valorMEP: valor != null ? valor * mep : null, valorCCL: valor != null ? valor * ccl : null, preciosFecha: c.preciosFecha, ops, cerradasCount: all.filter(p => p.acciones <= 0 && p.nOps).length };
   },
   /** Presupuesto del mes: lo que decidiste gastar (el resto del sueldo va a inversión/ahorro) */
   presupuesto(ym) { return Number(state.settings.presupuesto) || 0; },

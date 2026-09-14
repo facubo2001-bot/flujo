@@ -5,7 +5,7 @@ function applyTheme() { /* estética OLED: un solo tema, negro puro */ document.
 function renderNav() {
   const btn = (v, cls) => `<button class="${cls} ${ui.view === v.id ? 'active' : ''}" data-go="${v.id}">${ICONS[v.id]}<span>${cls === 'nav-btn' ? v.label : v.short}</span></button>`;
   $('#rail-nav').innerHTML = VIEWS.map(v => btn(v, 'nav-btn')).join('');
-  $('#tabbar').innerHTML = VIEWS.filter(v => v.id !== 'config').slice(0, 5).map(v => btn(v, '')).join('') + btn(VIEWS[6], '');
+  $('#tabbar').innerHTML = VIEWS.filter(v => v.id !== 'config').slice(0, 5).map(v => btn(v, '')).join('') + btn(VIEWS.find(v => v.id === 'config'), '');
 }
 
 function renderTopbar() {
@@ -22,7 +22,7 @@ function render() {
   const viewChanged = lastView !== ui.view; lastView = ui.view;
   const scroller = window.innerWidth <= 900 ? $('.main') : null; const keepY = viewChanged ? 0 : (scroller ? scroller.scrollTop : window.scrollY);
   E.build(); ChartQ.reset(); renderNav();
-  const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
+  const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, cartera: viewCartera, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
   let body = '';
   try { body = fns[ui.view](); } catch (e) { console.error(e); body = `<div class="card"><div class="empty">Algo falló al dibujar esta vista: ${esc(e.message)}. <button class="btn sm" data-act="reload">Recargar</button></div></div>`; }
   $('#view').innerHTML = renderTopbar() + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
@@ -83,6 +83,18 @@ const Actions = {
     Modal.open({ title: `Cierre de ${t.nombre}`, body: `<div class="form-grid">${F.field('Fecha de cierre de este período', F.input('cc-fecha', est, 'type="date"'), 'La encontrás en la app del banco, en "próximo cierre"')}</div>`, submit: 'Guardar', onSubmit: () => { const f = Modal.val('cc-fecha'); if (!f) return false; t.cierres = t.cierres || {}; t.cierres[D.ym(f)] = f; Persist.save(); render(); } });
   },
   'switch-inv'() { formInv(); },
+  'switch-op'() { formOp(); },
+  'new-op'() { formOp(); },
+  'op-para'(v) { const [t, tipo] = v.split('|'); formOp({ ticker: t, tipo }); },
+  'pick-ticker'(t) { const el = $('#o-ticker'); if (el) { el.value = t; const box = $('#o-campos'); if (box) box.innerHTML = formOpCampos(Modal.choice('o-tipo') || 'compra', { ticker: t }); } $$('#modal [data-act="pick-ticker"]').forEach(b => b.classList.toggle('on', b.dataset.id === t)); },
+  'set-date-op'(v) { const f = $('#o-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
+  'del-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (!o) return; confirmar(`¿Borrar ${o.tipo} de ${o.ticker} del ${D.fmt(o.fecha, { year: true })}?`, () => { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); render(); }); },
+  'del-op-modal'(id) { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); Modal.close(); render(); toast('Operación borrada'); },
+  pos(t) { formPosicion(t); },
+  'new-watch'() { formWatch(); },
+  'del-alerta'(t) { delete state.cartera.alertas[t]; Persist.save(); Modal.close(); render(); toast(`Alerta de ${t} quitada`); },
+  'precios-update'() { toast('Buscando precios…'); Precios.actualizar(false); },
+  'go-config'() { go('config'); },
   'switch-gasto'() { formMov(); },
   'pick-destino'(d) { const el = $('#i-destino'); if (el) el.value = d; },
   'set-date-inv'(v) { const f = $('#i-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
@@ -120,7 +132,8 @@ document.addEventListener('click', e => {
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.trendRange = Number(rg.dataset.range); render(); return; }
-  if (e.target.closest('#fab')) { formMov(); return; }
+  if (e.target.closest('#fab')) { if (ui.view === 'cartera') formOp(); else formMov(); return; }
+  const ta = e.target.closest('tr[data-alerta]'); if (ta && !e.target.closest('button')) { formPosicion(ta.dataset.alerta); return; }
   if (e.target.id === 'overlay') { Modal.close(); return; }
   const act = e.target.closest('[data-act]'); if (act) { e.preventDefault(); const fn = Actions[act.dataset.act]; if (fn) fn(act.dataset.id); return; }
   const tr = e.target.closest('tr[data-id]'); if (tr && !e.target.closest('button,select,input,a,label')) { const id = tr.dataset.id; if (id.startsWith('v:')) Actions.confirmar(id); else Actions.edit(id.split('#')[0]); return; }
@@ -129,7 +142,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.filter) { ui.filtros[t.dataset.filter] = t.value; render(); const again = $(`[data-filter="${t.dataset.filter}"]`); if (again && t.dataset.filter === 'q') { again.focus(); again.setSelectionRange(again.value.length, again.value.length); } return; }
-  if (t.dataset.setting) { const k = t.dataset.setting; const v = ['ingreso', 'tc', 'presupuesto'].includes(k) ? M.parse(t.value) : ['diaCobro', 'alertaCuotasPct'].includes(k) ? Number(t.value) || 0 : t.value.trim(); state.settings[k] = v; Persist.save(); if (k !== 'nombre') render(); return; }
+  if (t.dataset.setting) { const k = t.dataset.setting; const v = ['ingreso', 'tc', 'presupuesto', 'ccl'].includes(k) ? M.parse(t.value) : ['diaCobro', 'alertaCuotasPct'].includes(k) ? Number(t.value) || 0 : t.value.trim(); state.settings[k] = v; Persist.save(); if (k !== 'nombre') render(); return; }
   if (t.dataset.budget) { const c = state.categorias.find(c => c.id === t.dataset.budget); if (c) { c.presupuesto = M.parse(t.value); Persist.save(); render(); } return; }
   if (t.dataset.pago) { const [tarjetaId, mes] = t.dataset.pago.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.cuentaId = t.value; Persist.save(); render(); return; }
   if (t.dataset.pagado) { const [tarjetaId, mes] = t.dataset.pagado.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.pagado = t.checked; Persist.save(); render(); return; }
@@ -175,5 +188,6 @@ function importarCSV(txt) {
   await Persist.init();
   render();
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
+  if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();

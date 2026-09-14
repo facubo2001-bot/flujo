@@ -458,6 +458,16 @@ tr.day td{background:var(--surface)}
 .tcard{box-shadow:none}
 @media (max-width:520px){.kpi .value{font-size:clamp(14px,5vw,21px)}.kpi.hero .value{font-size:clamp(16px,5.6vw,23px)}}
 
+/* cartera */
+.pos-row{display:grid;grid-template-columns:1.2fr 1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.pos-row:last-child{border-bottom:0}
+.pos-row .sub{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.pos-row .pos-m{text-align:right;font-size:13px}
+.pos-row .pos-r{text-align:right}
+.pos-row .pos-r b{display:block}
+.pos-row .up{color:var(--good-text)} .pos-row .down{color:var(--crit-text)}
+.sim-result .box .v.up{color:var(--good-text)} .sim-result .box .v.down{color:var(--crit-text)}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">[
@@ -2418,6 +2428,257 @@ tr.day td{background:var(--surface)}
     "desc": "0,333 acc · PPC US$ 275,02"
    }
   ]
+ },
+ {
+  "id": "cartera-2026-09-14",
+  "cartera": {
+   "removeInversiones": [
+    "inv-meli",
+    "inv-msft",
+    "inv-nvda",
+    "inv-mcd",
+    "inv-nu",
+    "inv-ibm",
+    "inv-meta",
+    "inv-googl",
+    "inv-asml",
+    "inv-amzn",
+    "inv-pfe",
+    "inv-brkb",
+    "inv-unh",
+    "inv-gld",
+    "inv-vist",
+    "inv-ceg"
+   ],
+   "operaciones": [
+    {
+     "id": "op0-meli",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.508333,
+     "precio": 1892.11,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-msft",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 1.666665,
+     "precio": 428.17,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-nvda",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 2.625,
+     "precio": 177.71,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-mcd",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 1.791667,
+     "precio": 265.48,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-nu",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 32,
+     "precio": 14.13,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-ibm",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 1.666667,
+     "precio": 241.15,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-meta",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.583334,
+     "precio": 613.04,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-googl",
+     "tipo": "compra",
+     "ticker": "GOOGL",
+     "acciones": 1.086207,
+     "precio": 320.37,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-asml",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.226027,
+     "precio": 1148.89,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-amzn",
+     "tipo": "compra",
+     "ticker": "AMZN",
+     "acciones": 0.993055,
+     "precio": 217.13,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-pfe",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 8.25,
+     "precio": 25.37,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-brkb",
+     "tipo": "compra",
+     "ticker": "BRK-B",
+     "acciones": 0.363636,
+     "precio": 468.18,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-unh",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.424242,
+     "precio": 267.8,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-gld",
+     "tipo": "compra",
+     "ticker": "GLD",
+     "acciones": 0.36,
+     "precio": 329.97,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-vist",
+     "tipo": "compra",
+     "ticker": "VIST",
+     "acciones": 1.333333,
+     "precio": 50.88,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    },
+    {
+     "id": "op0-ceg",
+     "tipo": "compra",
+     "ticker": "CEG",
+     "acciones": 0.333333,
+     "precio": 275.02,
+     "fecha": "2026-01-01",
+     "nota": "Posición inicial (PPC al 14-sep-26)"
+    }
+   ],
+   "alertas": {
+    "MELI": {
+     "mirala": 1750,
+     "urgente": 1600
+    },
+    "MSFT": {
+     "mirala": 460,
+     "urgente": 420
+    },
+    "NVDA": {
+     "mirala": 195,
+     "urgente": 175
+    },
+    "NU": {
+     "mirala": 13,
+     "urgente": 11.5
+    },
+    "AMZN": {
+     "mirala": 230,
+     "urgente": 210
+    },
+    "IBM": {
+     "mirala": 210,
+     "urgente": 195
+    },
+    "ASML": {
+     "mirala": 1550,
+     "urgente": 1450
+    },
+    "GOOGL": {
+     "mirala": 285,
+     "urgente": 270
+    },
+    "META": {
+     "mirala": 600,
+     "urgente": 545
+    },
+    "PFE": {
+     "mirala": 26,
+     "urgente": 24.5
+    },
+    "BRK-B": {
+     "mirala": 480,
+     "urgente": 465
+    },
+    "UNH": {
+     "mirala": 340,
+     "urgente": 300
+    },
+    "GLD": {
+     "mirala": 360,
+     "urgente": 335
+    },
+    "CEG": {
+     "mirala": 250,
+     "urgente": 230
+    },
+    "VIST": {
+     "mirala": 65,
+     "urgente": 55
+    },
+    "MCD": {
+     "mirala": 260,
+     "urgente": 240
+    },
+    "MU": {
+     "mirala": 720,
+     "urgente": 550
+    },
+    "GEV": {
+     "mirala": 700,
+     "urgente": 650
+    },
+    "YPF": {
+     "mirala": 45,
+     "urgente": 34
+    },
+    "TSM": {
+     "mirala": 330,
+     "urgente": 290
+    }
+   }
+  }
  }
 ]</script>
 
@@ -2584,9 +2845,10 @@ function defaultState() {
     inversiones: [],
     pagos: [],
     aprendido: {},
+    cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null },
   };
 }
-const BUILD = '202609142245';
+const BUILD = '202609142313';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2654,6 +2916,12 @@ const Persist = {
     for (const g of p.pagos || []) if (!state.pagos.find(x => x.tarjetaId === g.tarjetaId && x.mes === g.mes)) state.pagos.push(g);
     if (p.limpiarInversionesExcepto) { const keep = p.limpiarInversionesExcepto.map(norm); state.inversiones = state.inversiones.filter(i => keep.some(t => norm(i.desc || '').includes(t) || norm(i.destino || '').includes(t))); }
     for (const i of p.inversiones || []) if (!byId(state.inversiones).has(i.id)) state.inversiones.push(i);
+    if (p.cartera) {
+      const c = state.cartera;
+      for (const id of p.cartera.removeInversiones || []) state.inversiones = state.inversiones.filter(x => x.id !== id);
+      for (const o of p.cartera.operaciones || []) if (!byId(c.operaciones).has(o.id)) c.operaciones.push(o);
+      for (const [t, a] of Object.entries(p.cartera.alertas || {})) if (!c.alertas[t]) c.alertas[t] = a;
+    }
     if (p.settings) for (const [k, v] of Object.entries(p.settings)) if (p.forceSettings || !state.settings[k]) state.settings[k] = v;
     for (const u of p.updates || []) { const m = state.movimientos.find(x => x.id === u.id); if (m) Object.assign(m, u); }
     state.presets.push(p.id);
@@ -2664,6 +2932,9 @@ const Persist = {
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
     for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
+    if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
+    for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
+    for (const k of ['alertas', 'precios']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
@@ -2776,12 +3047,37 @@ const TC = {
       if (!r.ok) throw new Error(r.status);
       const j = await r.json(); const v = Number(j.venta) || Number(j.compra); if (!v) throw new Error('sin valor');
       state.settings.tc = Math.round(v); state.settings.tcFecha = D.today(); state.settings.tcFuente = 'dolarapi.com (MEP venta)';
-      Persist.save(); if (!silencioso) { toast(`Dólar MEP actualizado: $ ${fmtARS.format(state.settings.tc)}`); render(); }
+      try { const r2 = await fetch('https://dolarapi.com/v1/dolares/contadoconliqui', { cache: 'no-store' }); if (r2.ok) { const j2 = await r2.json(); const v2 = Number(j2.venta) || Number(j2.compra); if (v2) { state.settings.ccl = Math.round(v2); state.settings.cclFecha = D.today(); } } } catch (e2) {}
+      Persist.save(); if (!silencioso) { toast(`Dólar actualizado · MEP $ ${fmtARS.format(state.settings.tc)}${state.settings.ccl ? ' · CCL $ ' + fmtARS.format(state.settings.ccl) : ''}`); render(); }
       return true;
     } catch (e) {
       if (!silencioso) toast('No se pudo consultar la cotización desde acá (la versión publicada no puede salir a internet). Cargalo a mano o pedímelo en el chat.', 5000);
       return false;
     }
+  },
+};
+
+/* ---------- precios de acciones (Finnhub, clave gratuita en Ajustes) ---------- */
+const Precios = {
+  simbolo(t) { return t.replace('-', '.'); },
+  tickers() { const c = state.cartera; const set = new Set(); for (const o of c.operaciones) set.add(o.ticker); for (const t of Object.keys(c.alertas)) set.add(t); return [...set]; },
+  async actualizar(silencioso = false) {
+    const key = (state.settings.finnhubKey || '').trim();
+    if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes → Cartera para traer precios.', 5000); return false; }
+    const tickers = Precios.tickers(); if (!tickers.length) return false;
+    let ok = 0;
+    for (const t of tickers) {
+      try {
+        const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' });
+        if (r.status === 429) { await new Promise(res => setTimeout(res, 1200)); continue; }
+        if (!r.ok) continue;
+        const j = await r.json(); if (!j || !Number(j.c)) continue;
+        state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; ok++;
+      } catch (e) {}
+    }
+    if (ok) { state.cartera.preciosFecha = new Date().toISOString(); Persist.save(); }
+    if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${tickers.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
+    return ok > 0;
   },
 };
 
@@ -2796,6 +3092,7 @@ const ICONS = {
   cuotas: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 15h3"/></svg>',
   tarjetas: '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 10.5h20M6 15h4"/></svg>',
   plan: '<svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg>',
+  cartera: '<svg viewBox="0 0 24 24"><path d="M21.2 15.1A9 9 0 1 1 8.9 2.8"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg>',
   tendencias: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   config: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   edit: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
@@ -3029,10 +3326,52 @@ const E = {
       const t = m.medio === 'tarjeta' ? L.tarjeta(m.tarjetaId) : null;
       const cierre = t ? E.cycle(t, hoy).cierre : null;
       const ymPer = ym === D.thisMonth() && cierre ? D.ym(cierre) : ym;
-      const idxPeriodo = clamp(Math.min(D.diffMonths(first, ymPer) + 1, idx + 1), 0, n);
+      // Nº de cuota "en curso" = cierres de la tarjeta que YA pasaron desde la compra + 1 (la que va al próximo cierre).
+      // Solo se usa el calendario si no hay tarjeta o si se mira un mes que no es el actual.
+      let idxPeriodo, pasados = null;
+      if (t && ym === D.thisMonth()) {
+        let c = E.cycle(t, m.fecha).cierre; pasados = 0;
+        while (c && c <= hoy && pasados < n) { pasados++; c = E.cycle(t, D.addDays(c, 1)).cierre; }
+        idxPeriodo = clamp(pasados + 1, 1, n);
+      } else idxPeriodo = clamp(Math.min(D.diffMonths(first, ymPer) + 1, idx + 1), 0, n);
       const total = M.toARS(m.monto, m.moneda);
-      return { m, first, last, n, idx, idxPeriodo, cierre, cuota: total / n, total, restante: total / n * (n - idxPeriodo), restantes: n - idxPeriodo, activa: last >= ymPer || last >= ym };
+      return { m, first, last, n, idx, idxPeriodo, cierre, cuota: total / n, total, restante: total / n * (n - idxPeriodo), restantes: n - idxPeriodo, activa: pasados !== null ? pasados < n : (last >= ymPer || last >= ym) };
     }).filter(x => x.activa).sort((a, b) => a.last.localeCompare(b.last));
+  },
+  /** Cartera de inversiones: posiciones derivadas de las operaciones (PPC = costo promedio ponderado), valuadas a último precio.
+      compra: suma acciones y costo · venta: baja acciones al PPC y registra resultado realizado · dividendo: monto cobrado en USD */
+  cartera() {
+    const c = state.cartera || { operaciones: [], alertas: {}, precios: {} };
+    const ops = c.operaciones.slice().sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.id > b.id ? 1 : -1));
+    const pos = {}; let dividendos = 0;
+    const get = t => pos[t] || (pos[t] = { ticker: t, acciones: 0, costo: 0, dividendos: 0, realizado: 0, nOps: 0 });
+    for (const o of ops) {
+      const p = get(o.ticker); const q = Number(o.acciones) || 0; const px = Number(o.precio) || 0; p.nOps++;
+      if (o.tipo === 'compra') { p.acciones += q; p.costo += q * px; }
+      else if (o.tipo === 'venta') { const ppc = p.acciones ? p.costo / p.acciones : 0; const qv = Math.min(q, p.acciones); p.realizado += qv * (px - ppc); p.costo -= qv * ppc; p.acciones -= qv; if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; } }
+      else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
+    }
+    const mep = Number(state.settings.tc) || 0, ccl = Number(state.settings.ccl) || mep;
+    const enrich = p => {
+      const pr = c.precios[p.ticker]; const precio = pr && pr.c ? pr.c : null;
+      const ppc = p.acciones ? p.costo / p.acciones : 0;
+      const valor = precio != null ? p.acciones * precio : null;
+      const gp = valor != null ? valor - p.costo : null;
+      const al = c.alertas[p.ticker] || null;
+      let estado = null; if (al && precio != null) { if (al.urgente && precio <= al.urgente) estado = 'urgente'; else if (al.mirala && precio <= al.mirala) estado = 'mirala'; }
+      return { ...p, ppc, precio, dp: pr ? pr.dp : null, precioT: pr ? pr.t : null, valor, gp, gpPct: p.costo ? (gp != null ? gp / p.costo : null) : null, alerta: al, estado, distMirala: al && al.mirala && precio ? (precio - al.mirala) / precio : null };
+    };
+    const all = Object.values(pos).map(enrich);
+    const abiertas = all.filter(p => p.acciones > 0);
+    const costo = sum(abiertas.map(p => p.costo));
+    const conPrecio = abiertas.filter(p => p.valor != null).length;
+    const valor = abiertas.length && conPrecio ? sum(abiertas.map(p => p.valor != null ? p.valor : p.costo)) : null;
+    for (const p of abiertas) p.peso = valor ? (p.valor != null ? p.valor : p.costo) / valor : (costo ? p.costo / costo : 0);
+    abiertas.sort((a, b) => (b.valor != null ? b.valor : b.costo) - (a.valor != null ? a.valor : a.costo));
+    // watchlist: tickers con niveles de alerta pero sin posición
+    const watch = Object.keys(c.alertas).filter(t => !pos[t] || pos[t].acciones <= 0).map(t => enrich(get(t)));
+    return { posiciones: abiertas, cerradas: all.filter(p => p.acciones <= 0 && p.nOps), watch, costo, valor, conPrecio, gp: valor != null ? valor - costo : null, gpPct: valor != null && costo ? (valor - costo) / costo : null,
+      dividendos, realizado: sum(all.map(p => p.realizado)), mep, ccl, valorMEP: valor != null ? valor * mep : null, valorCCL: valor != null ? valor * ccl : null, preciosFecha: c.preciosFecha, ops, cerradasCount: all.filter(p => p.acciones <= 0 && p.nOps).length };
   },
   /** Presupuesto del mes: lo que decidiste gastar (el resto del sueldo va a inversión/ahorro) */
   presupuesto(ym) { return Number(state.settings.presupuesto) || 0; },
@@ -3390,13 +3729,14 @@ const VIEWS = [
   { id: 'movimientos', label: 'Movimientos', short: 'Gastos' },
   { id: 'cuotas', label: 'Cuotas y fijos', short: 'Cuotas' },
   { id: 'tarjetas', label: 'Tarjetas y pagos', short: 'Tarjetas' },
+  { id: 'cartera', label: 'Cartera', short: 'Cartera' },
   { id: 'plan', label: 'Presupuesto e inversión', short: 'Plan' },
   { id: 'tendencias', label: 'Tendencias', short: 'Tendencias' },
   { id: 'config', label: 'Configuración', short: 'Ajustes' },
 ];
 const VIEW_TITLES = {
   resumen: ['Resumen', 'Cómo viene el mes'], movimientos: ['Movimientos', 'Todo lo que gastaste'], cuotas: ['Cuotas y fijos', 'Lo que ya está comprometido'],
-  tarjetas: ['Tarjetas y pagos', 'Resúmenes y de dónde sale la plata'], plan: ['Presupuesto e inversión', 'Cuánto sobra para invertir'], tendencias: ['Tendencias', 'Patrones y evolución'], config: ['Configuración', 'Tu perfil, tarjetas y datos'],
+  tarjetas: ['Tarjetas y pagos', 'Resúmenes y de dónde sale la plata'], cartera: ['Cartera', 'Tus CEDEARs, valuados hoy'], plan: ['Presupuesto e inversión', 'Cuánto sobra para invertir'], tendencias: ['Tendencias', 'Patrones y evolución'], config: ['Configuración', 'Tu perfil, tarjetas y datos'],
 };
 
 const catChip = (catId) => { const c = L.cat(catId); return `<span class="cat-chip"><i style="background:${L.catColor(catId)}"></i>${esc(c.nombre)}</span>`; };
@@ -3452,7 +3792,7 @@ function viewResumen() {
       ] }), 230)}
       ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, ...(avg.vals ? [{ name: `Promedio (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})`, color: 'var(--line-2)', kind: 'line' }] : []), ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
     </div>
-    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><span class="hint">${D.monthName(ym)}</span></div>${renderMargen(margen, proj)}</div>
+    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><button class="btn ghost sm" data-go="plan">Plan e inversión →</button></div>${renderMargen(margen, proj)}</div>
   </div>`;
 
   // insights + donut
@@ -3805,6 +4145,8 @@ function viewConfig() {
       ${inp('nombre', 'Nombre', s.nombre, 'placeholder="Facu"')}
       ${inp('ingreso', 'Sueldo neto mensual (ARS)', s.ingreso ? fmtARS.format(s.ingreso) : '', 'inputmode="numeric"')}
       ${inp('diaCobro', 'Día de cobro', s.diaCobro, 'inputmode="numeric"')}
+      ${inp('ccl', 'Dólar CCL (ARS por USD)', s.ccl || '', 'inputmode="numeric"', 'Para valuar los CEDEARs en pesos. Se actualiza junto con el MEP.')}
+      ${inp('finnhubKey', 'Clave de Finnhub (precios de acciones)', s.finnhubKey || '', 'placeholder="pegá tu API key" autocomplete="off"', 'Gratis en finnhub.io → Get free API key. Con esto la Cartera trae los precios al abrir la app. <a href="#" data-act="precios-update">Actualizar precios ahora</a>')}
       ${inp('tc', 'Dólar MEP (ARS por USD)', s.tc, 'inputmode="numeric"', `${s.tcFecha ? `Actualizado ${D.fmt(s.tcFecha, { year: true })}${s.tcFuente ? ' · ' + esc(s.tcFuente) : ''}. ` : ''}Se usa para la vista en USD y para gastos en dólares. <a href="#" data-act="tc-update">Actualizar desde dolarapi.com</a>`)}
       ${inp('presupuesto', 'Presupuesto mensual de gasto (ARS)', s.presupuesto ? fmtARS.format(s.presupuesto) : '', 'inputmode="numeric"', `Lo que decidís gastar por mes (fijos + cuotas + compras). El resto del sueldo${s.ingreso && s.presupuesto ? ` (${M.f(s.ingreso - s.presupuesto)})` : ''} es para invertir.`)}
       ${inp('alertaCuotasPct', 'Alerta de cuotas (% del presupuesto)', s.alertaCuotasPct, 'inputmode="numeric"', 'Te aviso cuando fijos + cuotas superan esto')}
@@ -3836,6 +4178,60 @@ function viewConfig() {
       <p class="small muted">${(() => { const b = BUILD; const v = /^\d{12}/.test(b) ? `${b.slice(6, 8)}/${b.slice(4, 6)}/${b.slice(0, 4)} ${b.slice(8, 10)}:${b.slice(10, 12)} UTC` : '—'; const u = state.updatedAt ? new Date(state.updatedAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; return `App actualizada al ${v} · tus datos modificados por última vez el ${u}`; })()}</p>
       <p class="small muted">Estado: ${Persist.status === 'ok' ? 'guardado en la nube (esta página se actualiza sola en todos tus dispositivos).' : Persist.status === 'local' ? 'guardado solo en este dispositivo. Exportá un respaldo cada tanto.' : Persist.status === 'err' ? 'error al guardar: ' + esc(Persist.lastError) : 'sincronizando…'}</p>
     </div>
+  </div>`;
+  return html;
+}
+
+/* ---------- cartera ---------- */
+const fmtU = (v, d = null) => { const a = Math.abs(v); const f = d != null ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }) : (a < 100 ? fmtUSD2 : fmtUSD); return `${v < 0 ? '-' : ''}US$ ${f.format(a)}`; };
+const fmtAcc = q => (Number(q) || 0).toLocaleString('es-AR', { maximumFractionDigits: 4 });
+const gpPill = (gp, pct) => gp == null ? '' : `<span class="pill ${gp >= 0 ? 'good' : 'crit'}">${gp >= 0 ? '+' : ''}${fmtU(gp)}${pct != null ? ` · ${gp >= 0 ? '+' : ''}${M.pct(pct, 1)}` : ''}</span>`;
+const estadoChip = p => p.estado === 'urgente' ? '<span class="pill crit">🔴 comprá</span>' : p.estado === 'mirala' ? '<span class="pill warn">🟡 mirala</span>' : (p.distMirala != null ? `<span class="pill neutral">falta ${M.pct(p.distMirala, 0)}</span>` : '');
+function viewCartera() {
+  const k = E.cartera(); const s = state.settings; const hayKey = !!(s.finnhubKey || '').trim();
+  const fechaP = k.preciosFecha ? new Date(k.preciosFecha) : null;
+  const fechaTxt = fechaP ? `${D.fmt(D.iso(fechaP))} ${pad2(fechaP.getHours())}:${pad2(fechaP.getMinutes())}` : null;
+  const enZona = [...k.posiciones, ...k.watch].filter(p => p.estado);
+  let html = '';
+  if (!k.posiciones.length && !k.ops.length) return `<div class="card"><div class="empty">Todavía no hay operaciones. Cargá tu primera compra con el + (pestaña Cartera) o esperá a que se apliquen tus posiciones.</div></div>`;
+  // estado de precios
+  html += `<div class="card tight" style="margin-bottom:14px"><div class="row between"><div><b style="font-weight:600">${k.conPrecio ? `Precios al ${fechaTxt}` : 'Sin precios todavía'}</b><span class="sub">${hayKey ? `${k.conPrecio}/${k.posiciones.length} posiciones con precio · MEP $ ${fmtARS.format(k.mep)}${s.ccl ? ' · CCL $ ' + fmtARS.format(k.ccl) : ''}` : 'Falta tu clave gratuita de Finnhub en Ajustes → Cartera'}</span></div><button class="btn sm ${hayKey ? 'primary' : ''}" data-act="${hayKey ? 'precios-update' : 'go-config'}">${hayKey ? 'Actualizar' : 'Configurar'}</button></div></div>`;
+  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b>${enZona.some(p => p.estado === 'urgente') ? '🔴 Che, comprá urgente' : '🟡 Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (≤ ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
+  // KPIs
+  const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0);
+  html += `<div class="grid g-kpi">
+    ${kpi({ label: k.valor != null ? 'Valor de la cartera' : 'Cartera a costo', value: valorTxt, sub: k.gp != null ? gpPill(k.gp, k.gpPct) : `<span class="muted">costo · sin precios</span>`, cls: 'hero' })}
+    ${kpi({ label: 'En pesos al MEP', value: M.c(k.valor != null ? k.valorMEP : k.costo * k.mep, { cur: 'ARS' }), sub: `MEP $ ${fmtARS.format(k.mep)}${s.tcFecha ? ' · ' + D.fmt(s.tcFecha) : ''}` })}
+    ${kpi({ label: 'CEDEARs al CCL', value: M.c(k.valor != null ? k.valorCCL : k.costo * k.ccl, { cur: 'ARS' }), sub: s.ccl ? `CCL $ ${fmtARS.format(k.ccl)}${s.cclFecha ? ' · ' + D.fmt(s.cclFecha) : ''}` : 'CCL no cargado — se trae con el MEP' })}
+    ${kpi({ label: 'Dividendos cobrados', value: fmtU(k.dividendos), sub: k.realizado ? `${k.realizado >= 0 ? 'Ganancia' : 'Pérdida'} realizada ${fmtU(k.realizado)}` : `Costo total ${fmtU(k.costo, 0)}` })}
+  </div>`;
+  // composición
+  const slices = k.posiciones.slice(0, 9).map((p, i) => ({ name: p.ticker, value: Math.round(M.toARS(p.valor != null ? p.valor : p.costo, 'USD')), color: `var(--s${(i % 8) + 1})` }));
+  const resto = k.posiciones.slice(9); if (resto.length) slices.push({ name: `Otras (${resto.length})`, value: Math.round(M.toARS(sum(resto.map(p => p.valor != null ? p.valor : p.costo)), 'USD')), color: 'var(--ink-3)' });
+  html += `<div class="grid g-12 section">
+    <div class="card"><div class="card-head"><h2>Composición</h2><span class="hint">${k.posiciones.length} posiciones</span></div>
+      <div class="row" style="align-items:flex-start;gap:16px">${Charts.donut({ slices, size: 150, thick: 22, center: `Total|${valorTxt}` })}<div class="dl">${slices.map(g => `<i class="swatch" style="background:${g.color}"></i><span>${esc(g.name)}</span><b class="mono">${M.pct(g.value / Math.max(1, sum(slices.map(x => x.value))), 1)}</b>`).join('')}</div></div>
+    </div>
+    <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
+      ${k.posiciones.map(p => `<div class="pos-row" data-act="pos" data-id="${esc(p.ticker)}">
+        <div class="pos-l"><b>${esc(p.ticker)}</b><span class="sub">${fmtAcc(p.acciones)} acc · PPC ${fmtU(p.ppc)}</span></div>
+        <div class="pos-m">${p.precio != null ? `<span class="mono">${fmtU(p.precio)}</span><span class="sub ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : ''}">${p.dp != null ? (p.dp > 0 ? '+' : '') + p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' % hoy' : ''}</span>` : `<span class="muted small">sin precio</span>`}</div>
+        <div class="pos-r"><b class="mono">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b><span class="sub">${p.gp != null ? `<span class="${p.gp >= 0 ? 'up' : 'down'}">${p.gp >= 0 ? '+' : ''}${M.pct(p.gpPct, 1)}</span> · ` : ''}${M.pct(p.peso, 1)}${p.estado ? ' · ' + (p.estado === 'urgente' ? '🔴' : '🟡') : ''}</span></div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+  // alertas
+  const conAlerta = [...k.posiciones.filter(p => p.alerta), ...k.watch];
+  html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><span class="hint">🟡 mirala · 🔴 comprá urgente</span><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
+    ${conAlerta.length ? `<div class="table-wrap"><table><thead><tr><th>Ticker</th><th class="r">Precio</th><th class="r">🟡 ≤</th><th class="r">🔴 ≤</th><th class="r">Estado</th></tr></thead><tbody>
+    ${conAlerta.map(p => `<tr data-alerta="${esc(p.ticker)}" style="cursor:pointer"><td><b style="font-weight:600">${esc(p.ticker)}</b>${p.acciones ? '' : '<span class="sub">watchlist</span>'}</td><td class="amount r">${p.precio != null ? fmtU(p.precio) : '—'}</td><td class="amount r">${p.alerta.mirala ? fmtU(p.alerta.mirala) : '—'}</td><td class="amount r">${p.alerta.urgente ? fmtU(p.alerta.urgente) : '—'}</td><td class="r">${estadoChip(p) || '<span class="muted">—</span>'}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">Sin alertas cargadas. Tocá una posición para ponerle niveles.</div>'}
+    <p class="small muted" style="margin-top:8px">Los mismos niveles los vigila el bot cada hora en horario de mercado y te avisa por push. Acá los ves y los editás tocando la fila.</p>
+  </div>`;
+  // operaciones
+  const ops = k.ops.slice().reverse().slice(0, 20);
+  html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} en total${k.cerradasCount ? ` · ${k.cerradasCount} posición${k.cerradasCount > 1 ? 'es' : ''} cerrada${k.cerradasCount > 1 ? 's' : ''}` : ''}</span></div>
+    ${ops.map(o => `<div class="list-item"><div><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b><span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}${o.nota ? ' · ' + esc(o.nota) : ''}</span></div><div class="row" style="gap:4px"><span class="mono ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'down' : ''}">${o.tipo === 'venta' ? '−' : '+'}${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0))}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || '<div class="empty">Sin operaciones</div>'}
   </div>`;
   return html;
 }
@@ -3880,7 +4276,7 @@ function formMov(m = null, opts = {}) {
   const topCats = state.categorias.slice().sort((p, q) => (freq[q.id] || 0) - (freq[p.id] || 0)).slice(0, 8);
   if (!topCats.find(c => c.id === base.catId)) topCats.unshift(L.cat(base.catId));
   const descs = [...new Set(state.movimientos.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(x => x.desc))].slice(0, 60);
-  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Inversión</button></div>` : '';
+  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Aporte</button><button type="button" data-act="switch-op">Cartera</button></div>` : '';
   const body = `<div class="form-grid">
     ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
@@ -4002,7 +4398,7 @@ function formCuenta(c = null) {
 function formInv() {
   const destinos = [...new Set(state.inversiones.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(i => i.destino).filter(Boolean))].slice(0, 6);
   const body = `<div class="form-grid">
-    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Inversión</button></div>
+    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Aporte</button><button type="button" data-act="switch-op">Cartera</button></div>
     <div class="full"><div class="big-amount"><span class="cur" id="i-cursym">$</span><input id="i-monto" inputmode="decimal" autocomplete="off" placeholder="0" autofocus></div><div class="row" style="justify-content:center;gap:6px">${F.choice('i-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], 'ARS')}</div></div>
     ${F.field('Destino', `${destinos.length ? `<div class="chips" style="margin-bottom:6px">${destinos.map(d => `<button type="button" data-act="pick-destino" data-id="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : ''}<input class="input" id="i-destino" placeholder="Balanz · CEDEARs, BTC, plazo fijo…">`, '', 'full')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-inv" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-inv" data-id="ayer">Ayer</button>${F.input('i-fecha', ui.mes === D.thisMonth() ? D.today() : D.dateIn(ui.mes, 1), 'type="date"')}</div>`, '', 'full')}
@@ -4034,6 +4430,69 @@ function formCat(c = null) {
 
 /* ---------- confirm ---------- */
 function confirmar(msg, onOk, label = 'Borrar') { Modal.open({ title: 'Confirmar', body: `<p>${esc(msg)}</p>`, submit: label, onSubmit: () => { onOk(); } }); const b = $('#modal [data-act="submit"]'); if (b && label === 'Borrar') b.classList.add('danger'); }
+
+/* ---------- cartera: operaciones, posiciones, alertas ---------- */
+function formOp(pre = {}) {
+  const k = E.cartera(); const tickers = [...new Set([...k.posiciones.map(p => p.ticker), ...k.watch.map(p => p.ticker)])];
+  const tipo = pre.tipo || 'compra';
+  const body = `<div class="form-grid">
+    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button type="button" data-act="switch-inv">Aporte</button><button class="on" type="button">Cartera</button></div>
+    <div class="full">${F.choice('o-tipo', [['compra', 'Compra'], ['venta', 'Venta'], ['dividendo', 'Dividendo']], tipo)}</div>
+    ${F.field('Ticker', `${tickers.length ? `<div class="chips" style="margin-bottom:6px">${tickers.map(t => `<button type="button" data-act="pick-ticker" data-id="${esc(t)}" class="${t === pre.ticker ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>` : ''}<input class="input" id="o-ticker" value="${esc(pre.ticker || '')}" placeholder="MELI, NVDA, GLD…" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase" ${pre.ticker ? '' : 'autofocus'}>`, 'El ticker de USA (subyacente del CEDEAR), como lo ves en Yahoo/Balanz.', 'full')}
+    <div id="o-campos" class="full form-grid" style="padding:0">${formOpCampos(tipo, pre)}</div>
+    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, '', 'full')}
+    ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
+  </div>`;
+  Modal.open({ title: 'Operación de cartera', body, submit: 'Guardar', onSubmit: () => {
+    const tipo = Modal.choice('o-tipo') || 'compra'; const ticker = Modal.val('o-ticker').trim().toUpperCase().replace(/\s+/g, '');
+    if (!ticker) { toast('Falta el ticker'); return false; }
+    const o = { id: uid(), tipo, ticker, fecha: Modal.val('o-fecha') || D.today(), nota: Modal.val('o-nota').trim() };
+    if (tipo === 'dividendo') { o.monto = M.parse(Modal.val('o-monto')); if (!o.monto) { toast('Falta el monto del dividendo'); return false; } }
+    else { o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); if (!o.acciones || !o.precio) { toast('Faltan acciones o precio'); return false; }
+      if (tipo === 'venta') { const p = E.cartera().posiciones.find(x => x.ticker === ticker); if (!p || p.acciones + 1e-6 < o.acciones) { toast(`No tenés ${fmtAcc(o.acciones)} acciones de ${ticker} para vender`); return false; } } }
+    state.cartera.operaciones.push(o); if (!state.cartera.precios[ticker] && tipo !== 'dividendo') state.cartera.precios[ticker] = { c: o.precio, dp: 0, t: 0, estimado: true };
+    Persist.save(); toast(`${tipo === 'compra' ? 'Compra' : tipo === 'venta' ? 'Venta' : 'Dividendo'} de ${ticker} registrada`); if (ui.view !== 'cartera') ui.view = 'cartera'; render();
+  } });
+  $('#modal').onchange = e => { if (e.target.closest('#o-tipo')) { const t = Modal.choice('o-tipo'); const box = $('#o-campos'); if (box) box.innerHTML = formOpCampos(t, { ticker: Modal.val('o-ticker') }); } };
+}
+function formOpCampos(tipo, pre = {}) {
+  if (tipo === 'dividendo') return F.field('Monto cobrado (USD)', F.input('o-monto', pre.monto || '', 'inputmode="decimal" placeholder="0,00"'), 'Neto, lo que entró en la cuenta.', 'full');
+  const p = pre.ticker ? E.cartera().posiciones.find(x => x.ticker === pre.ticker) : null;
+  return F.field('Acciones', F.input('o-acc', pre.acciones || '', 'inputmode="decimal" placeholder="0,5"'), tipo === 'venta' && p ? `Tenés ${fmtAcc(p.acciones)}` : 'Fracciones con coma: 0,508') + F.field('Precio por acción (USD)', F.input('o-precio', pre.precio || (p && p.precio ? String(p.precio).replace('.', ',') : ''), 'inputmode="decimal" placeholder="0,00"'), tipo === 'venta' && p ? `PPC ${fmtU(p.ppc)}` : '');
+}
+function formPosicion(ticker) {
+  const k = E.cartera(); const p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker); if (!p) return;
+  const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
+  const al = p.alerta || {};
+  const body = `<div class="stack">
+    ${p.acciones ? `<div class="sim-result">
+      <div class="box"><div class="l">Tenés</div><div class="v">${fmtAcc(p.acciones)} acc</div></div>
+      <div class="box"><div class="l">PPC</div><div class="v">${fmtU(p.ppc)}</div></div>
+      <div class="box"><div class="l">Precio hoy</div><div class="v">${p.precio != null ? fmtU(p.precio) : '—'}</div></div>
+      <div class="box"><div class="l">Valor</div><div class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</div></div>
+      <div class="box"><div class="l">Resultado</div><div class="v ${p.gp > 0 ? 'up' : p.gp < 0 ? 'down' : ''}">${p.gp != null ? (p.gp >= 0 ? '+' : '') + fmtU(p.gp, 0) : '—'}</div><div class="l">${p.gpPct != null ? (p.gp >= 0 ? '+' : '') + M.pct(p.gpPct, 1) : ''}</div></div>
+      <div class="box"><div class="l">Peso</div><div class="v">${M.pct(p.peso || 0, 1)}</div></div>
+    </div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
+    <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas de precio (USD)</div></div>
+      ${F.field('🟡 Che, mirala ≤', F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
+      ${F.field('🔴 Comprá urgente ≤', F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
+    </div>
+    <div class="row" style="gap:8px"><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
+    ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones</div>${ops.map(o => `<div class="list-item"><div><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b><span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px"><span class="mono">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0))}</span><button type="button" class="mini-btn" data-act="del-op-modal" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('')}</div>` : ''}
+  </div>`;
+  Modal.open({ title: ticker, body, submit: 'Guardar alertas', onSubmit: () => {
+    const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente'));
+    if (!mirala && !urgente) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null };
+    Persist.save(); toast('Alertas guardadas'); render();
+  } });
+}
+function formWatch() {
+  Modal.open({ title: 'Vigilar un ticker', body: `<div class="form-grid">${F.field('Ticker', F.input('w-ticker', '', 'placeholder="TSM" autofocus autocapitalize="characters" style="text-transform:uppercase"'), 'Sin tenerlo: solo para que la app y el bot te avisen.', 'full')}${F.field('🟡 Che, mirala ≤ (USD)', F.input('w-mirala', '', 'inputmode="decimal"'))}${F.field('🔴 Comprá urgente ≤ (USD)', F.input('w-urgente', '', 'inputmode="decimal"'))}</div>`, submit: 'Guardar', onSubmit: () => {
+    const t = Modal.val('w-ticker').trim().toUpperCase(); const mirala = M.parse(Modal.val('w-mirala')), urgente = M.parse(Modal.val('w-urgente'));
+    if (!t || (!mirala && !urgente)) { toast('Ticker y al menos un nivel'); return false; }
+    state.cartera.alertas[t] = { mirala: mirala || null, urgente: urgente || null }; Persist.save(); render();
+  } });
+}
 
 
 /* ===================== FLUJO — demo data ===================== */
@@ -4101,7 +4560,7 @@ function applyTheme() { /* estética OLED: un solo tema, negro puro */ document.
 function renderNav() {
   const btn = (v, cls) => `<button class="${cls} ${ui.view === v.id ? 'active' : ''}" data-go="${v.id}">${ICONS[v.id]}<span>${cls === 'nav-btn' ? v.label : v.short}</span></button>`;
   $('#rail-nav').innerHTML = VIEWS.map(v => btn(v, 'nav-btn')).join('');
-  $('#tabbar').innerHTML = VIEWS.filter(v => v.id !== 'config').slice(0, 5).map(v => btn(v, '')).join('') + btn(VIEWS[6], '');
+  $('#tabbar').innerHTML = VIEWS.filter(v => v.id !== 'config').slice(0, 5).map(v => btn(v, '')).join('') + btn(VIEWS.find(v => v.id === 'config'), '');
 }
 
 function renderTopbar() {
@@ -4118,7 +4577,7 @@ function render() {
   const viewChanged = lastView !== ui.view; lastView = ui.view;
   const scroller = window.innerWidth <= 900 ? $('.main') : null; const keepY = viewChanged ? 0 : (scroller ? scroller.scrollTop : window.scrollY);
   E.build(); ChartQ.reset(); renderNav();
-  const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
+  const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, cartera: viewCartera, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
   let body = '';
   try { body = fns[ui.view](); } catch (e) { console.error(e); body = `<div class="card"><div class="empty">Algo falló al dibujar esta vista: ${esc(e.message)}. <button class="btn sm" data-act="reload">Recargar</button></div></div>`; }
   $('#view').innerHTML = renderTopbar() + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
@@ -4179,6 +4638,18 @@ const Actions = {
     Modal.open({ title: `Cierre de ${t.nombre}`, body: `<div class="form-grid">${F.field('Fecha de cierre de este período', F.input('cc-fecha', est, 'type="date"'), 'La encontrás en la app del banco, en "próximo cierre"')}</div>`, submit: 'Guardar', onSubmit: () => { const f = Modal.val('cc-fecha'); if (!f) return false; t.cierres = t.cierres || {}; t.cierres[D.ym(f)] = f; Persist.save(); render(); } });
   },
   'switch-inv'() { formInv(); },
+  'switch-op'() { formOp(); },
+  'new-op'() { formOp(); },
+  'op-para'(v) { const [t, tipo] = v.split('|'); formOp({ ticker: t, tipo }); },
+  'pick-ticker'(t) { const el = $('#o-ticker'); if (el) { el.value = t; const box = $('#o-campos'); if (box) box.innerHTML = formOpCampos(Modal.choice('o-tipo') || 'compra', { ticker: t }); } $$('#modal [data-act="pick-ticker"]').forEach(b => b.classList.toggle('on', b.dataset.id === t)); },
+  'set-date-op'(v) { const f = $('#o-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
+  'del-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (!o) return; confirmar(`¿Borrar ${o.tipo} de ${o.ticker} del ${D.fmt(o.fecha, { year: true })}?`, () => { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); render(); }); },
+  'del-op-modal'(id) { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); Modal.close(); render(); toast('Operación borrada'); },
+  pos(t) { formPosicion(t); },
+  'new-watch'() { formWatch(); },
+  'del-alerta'(t) { delete state.cartera.alertas[t]; Persist.save(); Modal.close(); render(); toast(`Alerta de ${t} quitada`); },
+  'precios-update'() { toast('Buscando precios…'); Precios.actualizar(false); },
+  'go-config'() { go('config'); },
   'switch-gasto'() { formMov(); },
   'pick-destino'(d) { const el = $('#i-destino'); if (el) el.value = d; },
   'set-date-inv'(v) { const f = $('#i-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
@@ -4216,7 +4687,8 @@ document.addEventListener('click', e => {
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.trendRange = Number(rg.dataset.range); render(); return; }
-  if (e.target.closest('#fab')) { formMov(); return; }
+  if (e.target.closest('#fab')) { if (ui.view === 'cartera') formOp(); else formMov(); return; }
+  const ta = e.target.closest('tr[data-alerta]'); if (ta && !e.target.closest('button')) { formPosicion(ta.dataset.alerta); return; }
   if (e.target.id === 'overlay') { Modal.close(); return; }
   const act = e.target.closest('[data-act]'); if (act) { e.preventDefault(); const fn = Actions[act.dataset.act]; if (fn) fn(act.dataset.id); return; }
   const tr = e.target.closest('tr[data-id]'); if (tr && !e.target.closest('button,select,input,a,label')) { const id = tr.dataset.id; if (id.startsWith('v:')) Actions.confirmar(id); else Actions.edit(id.split('#')[0]); return; }
@@ -4225,7 +4697,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.filter) { ui.filtros[t.dataset.filter] = t.value; render(); const again = $(`[data-filter="${t.dataset.filter}"]`); if (again && t.dataset.filter === 'q') { again.focus(); again.setSelectionRange(again.value.length, again.value.length); } return; }
-  if (t.dataset.setting) { const k = t.dataset.setting; const v = ['ingreso', 'tc', 'presupuesto'].includes(k) ? M.parse(t.value) : ['diaCobro', 'alertaCuotasPct'].includes(k) ? Number(t.value) || 0 : t.value.trim(); state.settings[k] = v; Persist.save(); if (k !== 'nombre') render(); return; }
+  if (t.dataset.setting) { const k = t.dataset.setting; const v = ['ingreso', 'tc', 'presupuesto', 'ccl'].includes(k) ? M.parse(t.value) : ['diaCobro', 'alertaCuotasPct'].includes(k) ? Number(t.value) || 0 : t.value.trim(); state.settings[k] = v; Persist.save(); if (k !== 'nombre') render(); return; }
   if (t.dataset.budget) { const c = state.categorias.find(c => c.id === t.dataset.budget); if (c) { c.presupuesto = M.parse(t.value); Persist.save(); render(); } return; }
   if (t.dataset.pago) { const [tarjetaId, mes] = t.dataset.pago.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.cuentaId = t.value; Persist.save(); render(); return; }
   if (t.dataset.pagado) { const [tarjetaId, mes] = t.dataset.pagado.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.pagado = t.checked; Persist.save(); render(); return; }
@@ -4271,6 +4743,7 @@ function importarCSV(txt) {
   await Persist.init();
   render();
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
+  if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();
 

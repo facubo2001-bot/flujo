@@ -5,13 +5,14 @@ const VIEWS = [
   { id: 'movimientos', label: 'Movimientos', short: 'Gastos' },
   { id: 'cuotas', label: 'Cuotas y fijos', short: 'Cuotas' },
   { id: 'tarjetas', label: 'Tarjetas y pagos', short: 'Tarjetas' },
+  { id: 'cartera', label: 'Cartera', short: 'Cartera' },
   { id: 'plan', label: 'Presupuesto e inversión', short: 'Plan' },
   { id: 'tendencias', label: 'Tendencias', short: 'Tendencias' },
   { id: 'config', label: 'Configuración', short: 'Ajustes' },
 ];
 const VIEW_TITLES = {
   resumen: ['Resumen', 'Cómo viene el mes'], movimientos: ['Movimientos', 'Todo lo que gastaste'], cuotas: ['Cuotas y fijos', 'Lo que ya está comprometido'],
-  tarjetas: ['Tarjetas y pagos', 'Resúmenes y de dónde sale la plata'], plan: ['Presupuesto e inversión', 'Cuánto sobra para invertir'], tendencias: ['Tendencias', 'Patrones y evolución'], config: ['Configuración', 'Tu perfil, tarjetas y datos'],
+  tarjetas: ['Tarjetas y pagos', 'Resúmenes y de dónde sale la plata'], cartera: ['Cartera', 'Tus CEDEARs, valuados hoy'], plan: ['Presupuesto e inversión', 'Cuánto sobra para invertir'], tendencias: ['Tendencias', 'Patrones y evolución'], config: ['Configuración', 'Tu perfil, tarjetas y datos'],
 };
 
 const catChip = (catId) => { const c = L.cat(catId); return `<span class="cat-chip"><i style="background:${L.catColor(catId)}"></i>${esc(c.nombre)}</span>`; };
@@ -67,7 +68,7 @@ function viewResumen() {
       ] }), 230)}
       ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, ...(avg.vals ? [{ name: `Promedio (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})`, color: 'var(--line-2)', kind: 'line' }] : []), ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
     </div>
-    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><span class="hint">${D.monthName(ym)}</span></div>${renderMargen(margen, proj)}</div>
+    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><button class="btn ghost sm" data-go="plan">Plan e inversión →</button></div>${renderMargen(margen, proj)}</div>
   </div>`;
 
   // insights + donut

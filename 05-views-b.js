@@ -179,6 +179,8 @@ function viewConfig() {
       ${inp('nombre', 'Nombre', s.nombre, 'placeholder="Facu"')}
       ${inp('ingreso', 'Sueldo neto mensual (ARS)', s.ingreso ? fmtARS.format(s.ingreso) : '', 'inputmode="numeric"')}
       ${inp('diaCobro', 'Día de cobro', s.diaCobro, 'inputmode="numeric"')}
+      ${inp('ccl', 'Dólar CCL (ARS por USD)', s.ccl || '', 'inputmode="numeric"', 'Para valuar los CEDEARs en pesos. Se actualiza junto con el MEP.')}
+      ${inp('finnhubKey', 'Clave de Finnhub (precios de acciones)', s.finnhubKey || '', 'placeholder="pegá tu API key" autocomplete="off"', 'Gratis en finnhub.io → Get free API key. Con esto la Cartera trae los precios al abrir la app. <a href="#" data-act="precios-update">Actualizar precios ahora</a>')}
       ${inp('tc', 'Dólar MEP (ARS por USD)', s.tc, 'inputmode="numeric"', `${s.tcFecha ? `Actualizado ${D.fmt(s.tcFecha, { year: true })}${s.tcFuente ? ' · ' + esc(s.tcFuente) : ''}. ` : ''}Se usa para la vista en USD y para gastos en dólares. <a href="#" data-act="tc-update">Actualizar desde dolarapi.com</a>`)}
       ${inp('presupuesto', 'Presupuesto mensual de gasto (ARS)', s.presupuesto ? fmtARS.format(s.presupuesto) : '', 'inputmode="numeric"', `Lo que decidís gastar por mes (fijos + cuotas + compras). El resto del sueldo${s.ingreso && s.presupuesto ? ` (${M.f(s.ingreso - s.presupuesto)})` : ''} es para invertir.`)}
       ${inp('alertaCuotasPct', 'Alerta de cuotas (% del presupuesto)', s.alertaCuotasPct, 'inputmode="numeric"', 'Te aviso cuando fijos + cuotas superan esto')}
@@ -210,6 +212,60 @@ function viewConfig() {
       <p class="small muted">${(() => { const b = BUILD; const v = /^\d{12}/.test(b) ? `${b.slice(6, 8)}/${b.slice(4, 6)}/${b.slice(0, 4)} ${b.slice(8, 10)}:${b.slice(10, 12)} UTC` : '—'; const u = state.updatedAt ? new Date(state.updatedAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; return `App actualizada al ${v} · tus datos modificados por última vez el ${u}`; })()}</p>
       <p class="small muted">Estado: ${Persist.status === 'ok' ? 'guardado en la nube (esta página se actualiza sola en todos tus dispositivos).' : Persist.status === 'local' ? 'guardado solo en este dispositivo. Exportá un respaldo cada tanto.' : Persist.status === 'err' ? 'error al guardar: ' + esc(Persist.lastError) : 'sincronizando…'}</p>
     </div>
+  </div>`;
+  return html;
+}
+
+/* ---------- cartera ---------- */
+const fmtU = (v, d = null) => { const a = Math.abs(v); const f = d != null ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }) : (a < 100 ? fmtUSD2 : fmtUSD); return `${v < 0 ? '-' : ''}US$ ${f.format(a)}`; };
+const fmtAcc = q => (Number(q) || 0).toLocaleString('es-AR', { maximumFractionDigits: 4 });
+const gpPill = (gp, pct) => gp == null ? '' : `<span class="pill ${gp >= 0 ? 'good' : 'crit'}">${gp >= 0 ? '+' : ''}${fmtU(gp)}${pct != null ? ` · ${gp >= 0 ? '+' : ''}${M.pct(pct, 1)}` : ''}</span>`;
+const estadoChip = p => p.estado === 'urgente' ? '<span class="pill crit">🔴 comprá</span>' : p.estado === 'mirala' ? '<span class="pill warn">🟡 mirala</span>' : (p.distMirala != null ? `<span class="pill neutral">falta ${M.pct(p.distMirala, 0)}</span>` : '');
+function viewCartera() {
+  const k = E.cartera(); const s = state.settings; const hayKey = !!(s.finnhubKey || '').trim();
+  const fechaP = k.preciosFecha ? new Date(k.preciosFecha) : null;
+  const fechaTxt = fechaP ? `${D.fmt(D.iso(fechaP))} ${pad2(fechaP.getHours())}:${pad2(fechaP.getMinutes())}` : null;
+  const enZona = [...k.posiciones, ...k.watch].filter(p => p.estado);
+  let html = '';
+  if (!k.posiciones.length && !k.ops.length) return `<div class="card"><div class="empty">Todavía no hay operaciones. Cargá tu primera compra con el + (pestaña Cartera) o esperá a que se apliquen tus posiciones.</div></div>`;
+  // estado de precios
+  html += `<div class="card tight" style="margin-bottom:14px"><div class="row between"><div><b style="font-weight:600">${k.conPrecio ? `Precios al ${fechaTxt}` : 'Sin precios todavía'}</b><span class="sub">${hayKey ? `${k.conPrecio}/${k.posiciones.length} posiciones con precio · MEP $ ${fmtARS.format(k.mep)}${s.ccl ? ' · CCL $ ' + fmtARS.format(k.ccl) : ''}` : 'Falta tu clave gratuita de Finnhub en Ajustes → Cartera'}</span></div><button class="btn sm ${hayKey ? 'primary' : ''}" data-act="${hayKey ? 'precios-update' : 'go-config'}">${hayKey ? 'Actualizar' : 'Configurar'}</button></div></div>`;
+  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b>${enZona.some(p => p.estado === 'urgente') ? '🔴 Che, comprá urgente' : '🟡 Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (≤ ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
+  // KPIs
+  const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0);
+  html += `<div class="grid g-kpi">
+    ${kpi({ label: k.valor != null ? 'Valor de la cartera' : 'Cartera a costo', value: valorTxt, sub: k.gp != null ? gpPill(k.gp, k.gpPct) : `<span class="muted">costo · sin precios</span>`, cls: 'hero' })}
+    ${kpi({ label: 'En pesos al MEP', value: M.c(k.valor != null ? k.valorMEP : k.costo * k.mep, { cur: 'ARS' }), sub: `MEP $ ${fmtARS.format(k.mep)}${s.tcFecha ? ' · ' + D.fmt(s.tcFecha) : ''}` })}
+    ${kpi({ label: 'CEDEARs al CCL', value: M.c(k.valor != null ? k.valorCCL : k.costo * k.ccl, { cur: 'ARS' }), sub: s.ccl ? `CCL $ ${fmtARS.format(k.ccl)}${s.cclFecha ? ' · ' + D.fmt(s.cclFecha) : ''}` : 'CCL no cargado — se trae con el MEP' })}
+    ${kpi({ label: 'Dividendos cobrados', value: fmtU(k.dividendos), sub: k.realizado ? `${k.realizado >= 0 ? 'Ganancia' : 'Pérdida'} realizada ${fmtU(k.realizado)}` : `Costo total ${fmtU(k.costo, 0)}` })}
+  </div>`;
+  // composición
+  const slices = k.posiciones.slice(0, 9).map((p, i) => ({ name: p.ticker, value: Math.round(M.toARS(p.valor != null ? p.valor : p.costo, 'USD')), color: `var(--s${(i % 8) + 1})` }));
+  const resto = k.posiciones.slice(9); if (resto.length) slices.push({ name: `Otras (${resto.length})`, value: Math.round(M.toARS(sum(resto.map(p => p.valor != null ? p.valor : p.costo)), 'USD')), color: 'var(--ink-3)' });
+  html += `<div class="grid g-12 section">
+    <div class="card"><div class="card-head"><h2>Composición</h2><span class="hint">${k.posiciones.length} posiciones</span></div>
+      <div class="row" style="align-items:flex-start;gap:16px">${Charts.donut({ slices, size: 150, thick: 22, center: `Total|${valorTxt}` })}<div class="dl">${slices.map(g => `<i class="swatch" style="background:${g.color}"></i><span>${esc(g.name)}</span><b class="mono">${M.pct(g.value / Math.max(1, sum(slices.map(x => x.value))), 1)}</b>`).join('')}</div></div>
+    </div>
+    <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
+      ${k.posiciones.map(p => `<div class="pos-row" data-act="pos" data-id="${esc(p.ticker)}">
+        <div class="pos-l"><b>${esc(p.ticker)}</b><span class="sub">${fmtAcc(p.acciones)} acc · PPC ${fmtU(p.ppc)}</span></div>
+        <div class="pos-m">${p.precio != null ? `<span class="mono">${fmtU(p.precio)}</span><span class="sub ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : ''}">${p.dp != null ? (p.dp > 0 ? '+' : '') + p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' % hoy' : ''}</span>` : `<span class="muted small">sin precio</span>`}</div>
+        <div class="pos-r"><b class="mono">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b><span class="sub">${p.gp != null ? `<span class="${p.gp >= 0 ? 'up' : 'down'}">${p.gp >= 0 ? '+' : ''}${M.pct(p.gpPct, 1)}</span> · ` : ''}${M.pct(p.peso, 1)}${p.estado ? ' · ' + (p.estado === 'urgente' ? '🔴' : '🟡') : ''}</span></div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+  // alertas
+  const conAlerta = [...k.posiciones.filter(p => p.alerta), ...k.watch];
+  html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><span class="hint">🟡 mirala · 🔴 comprá urgente</span><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
+    ${conAlerta.length ? `<div class="table-wrap"><table><thead><tr><th>Ticker</th><th class="r">Precio</th><th class="r">🟡 ≤</th><th class="r">🔴 ≤</th><th class="r">Estado</th></tr></thead><tbody>
+    ${conAlerta.map(p => `<tr data-alerta="${esc(p.ticker)}" style="cursor:pointer"><td><b style="font-weight:600">${esc(p.ticker)}</b>${p.acciones ? '' : '<span class="sub">watchlist</span>'}</td><td class="amount r">${p.precio != null ? fmtU(p.precio) : '—'}</td><td class="amount r">${p.alerta.mirala ? fmtU(p.alerta.mirala) : '—'}</td><td class="amount r">${p.alerta.urgente ? fmtU(p.alerta.urgente) : '—'}</td><td class="r">${estadoChip(p) || '<span class="muted">—</span>'}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">Sin alertas cargadas. Tocá una posición para ponerle niveles.</div>'}
+    <p class="small muted" style="margin-top:8px">Los mismos niveles los vigila el bot cada hora en horario de mercado y te avisa por push. Acá los ves y los editás tocando la fila.</p>
+  </div>`;
+  // operaciones
+  const ops = k.ops.slice().reverse().slice(0, 20);
+  html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} en total${k.cerradasCount ? ` · ${k.cerradasCount} posición${k.cerradasCount > 1 ? 'es' : ''} cerrada${k.cerradasCount > 1 ? 's' : ''}` : ''}</span></div>
+    ${ops.map(o => `<div class="list-item"><div><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b><span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}${o.nota ? ' · ' + esc(o.nota) : ''}</span></div><div class="row" style="gap:4px"><span class="mono ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'down' : ''}">${o.tipo === 'venta' ? '−' : '+'}${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0))}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || '<div class="empty">Sin operaciones</div>'}
   </div>`;
   return html;
 }

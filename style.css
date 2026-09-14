@@ -440,3 +440,13 @@ tr.day td{background:var(--surface)}
 .kpi.amber{background:linear-gradient(140deg,var(--amber-soft),var(--surface) 72%)}
 .tcard{box-shadow:none}
 @media (max-width:520px){.kpi .value{font-size:clamp(14px,5vw,21px)}.kpi.hero .value{font-size:clamp(16px,5.6vw,23px)}}
+
+/* cartera */
+.pos-row{display:grid;grid-template-columns:1.2fr 1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.pos-row:last-child{border-bottom:0}
+.pos-row .sub{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.pos-row .pos-m{text-align:right;font-size:13px}
+.pos-row .pos-r{text-align:right}
+.pos-row .pos-r b{display:block}
+.pos-row .up{color:var(--good-text)} .pos-row .down{color:var(--crit-text)}
+.sim-result .box .v.up{color:var(--good-text)} .sim-result .box .v.down{color:var(--crit-text)}

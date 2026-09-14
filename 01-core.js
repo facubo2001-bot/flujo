@@ -135,6 +135,7 @@ function defaultState() {
     inversiones: [],
     pagos: [],
     aprendido: {},
+    cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null },
   };
 }
 const BUILD = '__BUILD__';
@@ -205,6 +206,12 @@ const Persist = {
     for (const g of p.pagos || []) if (!state.pagos.find(x => x.tarjetaId === g.tarjetaId && x.mes === g.mes)) state.pagos.push(g);
     if (p.limpiarInversionesExcepto) { const keep = p.limpiarInversionesExcepto.map(norm); state.inversiones = state.inversiones.filter(i => keep.some(t => norm(i.desc || '').includes(t) || norm(i.destino || '').includes(t))); }
     for (const i of p.inversiones || []) if (!byId(state.inversiones).has(i.id)) state.inversiones.push(i);
+    if (p.cartera) {
+      const c = state.cartera;
+      for (const id of p.cartera.removeInversiones || []) state.inversiones = state.inversiones.filter(x => x.id !== id);
+      for (const o of p.cartera.operaciones || []) if (!byId(c.operaciones).has(o.id)) c.operaciones.push(o);
+      for (const [t, a] of Object.entries(p.cartera.alertas || {})) if (!c.alertas[t]) c.alertas[t] = a;
+    }
     if (p.settings) for (const [k, v] of Object.entries(p.settings)) if (p.forceSettings || !state.settings[k]) state.settings[k] = v;
     for (const u of p.updates || []) { const m = state.movimientos.find(x => x.id === u.id); if (m) Object.assign(m, u); }
     state.presets.push(p.id);
@@ -215,6 +222,9 @@ const Persist = {
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
     for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
+    if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
+    for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
+    for (const k of ['alertas', 'precios']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
@@ -327,12 +337,37 @@ const TC = {
       if (!r.ok) throw new Error(r.status);
       const j = await r.json(); const v = Number(j.venta) || Number(j.compra); if (!v) throw new Error('sin valor');
       state.settings.tc = Math.round(v); state.settings.tcFecha = D.today(); state.settings.tcFuente = 'dolarapi.com (MEP venta)';
-      Persist.save(); if (!silencioso) { toast(`Dólar MEP actualizado: $ ${fmtARS.format(state.settings.tc)}`); render(); }
+      try { const r2 = await fetch('https://dolarapi.com/v1/dolares/contadoconliqui', { cache: 'no-store' }); if (r2.ok) { const j2 = await r2.json(); const v2 = Number(j2.venta) || Number(j2.compra); if (v2) { state.settings.ccl = Math.round(v2); state.settings.cclFecha = D.today(); } } } catch (e2) {}
+      Persist.save(); if (!silencioso) { toast(`Dólar actualizado · MEP $ ${fmtARS.format(state.settings.tc)}${state.settings.ccl ? ' · CCL $ ' + fmtARS.format(state.settings.ccl) : ''}`); render(); }
       return true;
     } catch (e) {
       if (!silencioso) toast('No se pudo consultar la cotización desde acá (la versión publicada no puede salir a internet). Cargalo a mano o pedímelo en el chat.', 5000);
       return false;
     }
+  },
+};
+
+/* ---------- precios de acciones (Finnhub, clave gratuita en Ajustes) ---------- */
+const Precios = {
+  simbolo(t) { return t.replace('-', '.'); },
+  tickers() { const c = state.cartera; const set = new Set(); for (const o of c.operaciones) set.add(o.ticker); for (const t of Object.keys(c.alertas)) set.add(t); return [...set]; },
+  async actualizar(silencioso = false) {
+    const key = (state.settings.finnhubKey || '').trim();
+    if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes → Cartera para traer precios.', 5000); return false; }
+    const tickers = Precios.tickers(); if (!tickers.length) return false;
+    let ok = 0;
+    for (const t of tickers) {
+      try {
+        const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' });
+        if (r.status === 429) { await new Promise(res => setTimeout(res, 1200)); continue; }
+        if (!r.ok) continue;
+        const j = await r.json(); if (!j || !Number(j.c)) continue;
+        state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; ok++;
+      } catch (e) {}
+    }
+    if (ok) { state.cartera.preciosFecha = new Date().toISOString(); Persist.save(); }
+    if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${tickers.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
+    return ok > 0;
   },
 };
 
@@ -347,6 +382,7 @@ const ICONS = {
   cuotas: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 15h3"/></svg>',
   tarjetas: '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 10.5h20M6 15h4"/></svg>',
   plan: '<svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg>',
+  cartera: '<svg viewBox="0 0 24 24"><path d="M21.2 15.1A9 9 0 1 1 8.9 2.8"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg>',
   tendencias: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   config: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   edit: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
