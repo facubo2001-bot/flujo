@@ -1,7 +1,8 @@
 const fs = require('fs'), path = require('path');
 const src = p => fs.readFileSync(path.join(__dirname, 'src', p), 'utf8');
 const css = src('style.css');
-const js = ['01-core.js', '02-engine.js', '03-charts.js', '04-insights.js', '05-views-a.js', '05-views-b.js', '06-forms.js', '07-demo.js', '08-main.js'].map(src).join('\n\n');
+const dataJs = `/* ===== datos embebidos (generados por build.js desde /data) ===== */\nconst CEDEARS_EMBED = ${fs.readFileSync(path.join(__dirname, 'data', 'cedears.json'), 'utf8')};\nconst SPY_HIST = ${fs.readFileSync(path.join(__dirname, 'data', 'spy-hist.json'), 'utf8')};\n`;
+const js = [dataJs].concat(['01-core.js', '02-engine.js', '03-charts.js', '04-insights.js', '05-views-a.js', '05-views-b.js', '06-forms.js', '07-demo.js', '08-main.js'].map(src)).join('\n\n');
 const preset = fs.existsSync(path.join(__dirname, 'src', 'preset.json')) ? src('preset.json').replace(/<\//g, '<\\/') : 'null';
 const version0 = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
 const html = src('shell.html').replace('/*__CSS__*/', () => css).replace('/*__JS__*/', () => js).replace('/*__PRESET__*/', () => preset).replace("'__BUILD__'", `'${version0}'`);
@@ -25,6 +26,7 @@ if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navi
 </script>`;
 const pwaHtml = `<!doctype html>\n<html lang="es"><head>\n${pwaHead}\n</head><body>\n${html.replace('/*__PRESET__*/', () => preset)}\n${swReg}\n</body></html>`;
 fs.mkdirSync(path.join(__dirname, 'pwa'), { recursive: true });
+fs.copyFileSync(path.join(__dirname, 'data', 'cedears.json'), path.join(__dirname, 'pwa', 'cedears.json'));
 fs.writeFileSync(path.join(__dirname, 'pwa', 'index.html'), pwaHtml);
 const swSrc = fs.readFileSync(path.join(__dirname, 'pwa', 'sw.js'), 'utf8').replace(/const VERSION = '.*?';/, `const VERSION = '${version}';`);
 fs.writeFileSync(path.join(__dirname, 'pwa', 'sw.js'), swSrc);

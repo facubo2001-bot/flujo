@@ -2207,5 +2207,1392 @@
     }
    }
   }
+ },
+ {
+  "id": "cartera-lotes-2026-09-16",
+  "cartera": {
+   "removeOperaciones": [
+    "op0-meli",
+    "op0-msft",
+    "op0-nvda",
+    "op0-mcd",
+    "op0-nu",
+    "op0-ibm",
+    "op0-meta",
+    "op0-googl",
+    "op0-asml",
+    "op0-amzn",
+    "op0-pfe",
+    "op0-brkb",
+    "op0-unh",
+    "op0-gld",
+    "op0-vist",
+    "op0-ceg"
+   ],
+   "operaciones": [
+    {
+     "id": "yh-092",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.109589,
+     "precio": 722.07,
+     "fecha": "2025-03-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-120",
+     "tipo": "compra",
+     "ticker": "BRK-B",
+     "acciones": 0.363636,
+     "precio": 468.18,
+     "fecha": "2025-08-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-050",
+     "tipo": "compra",
+     "ticker": "ALUA",
+     "acciones": 33.0,
+     "precio": 0.44,
+     "fecha": "2025-12-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-131",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.175,
+     "precio": 2215.0,
+     "fecha": "2025-12-10",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-068",
+     "tipo": "compra",
+     "ticker": "PBR",
+     "acciones": 3.0,
+     "precio": 12.52,
+     "fecha": "2025-12-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-098",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 1.5,
+     "precio": 160.81,
+     "fecha": "2025-12-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-105",
+     "tipo": "compra",
+     "ticker": "TS",
+     "acciones": 1.0,
+     "precio": 40.56,
+     "fecha": "2025-12-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-119",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 7.5,
+     "precio": 14.43,
+     "fecha": "2025-12-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-059",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.091,
+     "precio": 326.12,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-063",
+     "tipo": "compra",
+     "ticker": "SPY",
+     "acciones": 0.15,
+     "precio": 629.27,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-065",
+     "tipo": "compra",
+     "ticker": "NKE",
+     "acciones": 0.5,
+     "precio": 59.76,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-067",
+     "tipo": "compra",
+     "ticker": "PBR",
+     "acciones": 2.0,
+     "precio": 11.73,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-081",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.233333,
+     "precio": 494.45,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-087",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.166667,
+     "precio": 633.45,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-100",
+     "tipo": "compra",
+     "ticker": "COST",
+     "acciones": 0.083333,
+     "precio": 976.59,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-101",
+     "tipo": "compra",
+     "ticker": "GLD",
+     "acciones": 0.36,
+     "precio": 329.97,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-103",
+     "tipo": "compra",
+     "ticker": "MA",
+     "acciones": 0.060606,
+     "precio": 547.69,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-107",
+     "tipo": "compra",
+     "ticker": "VIST",
+     "acciones": 1.0,
+     "precio": 48.97,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-109",
+     "tipo": "compra",
+     "ticker": "HSY",
+     "acciones": 0.285714,
+     "precio": 176.02,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-135",
+     "tipo": "compra",
+     "ticker": "AMZN",
+     "acciones": 0.6875,
+     "precio": 223.75,
+     "fecha": "2026-01-02",
+     "origen": "yahoo",
+     "legado": true,
+     "nota": "Posición previa, cargada al armar el portfolio (fecha real desconocida)"
+    },
+    {
+     "id": "yh-058",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.090909,
+     "precio": 335.45,
+     "fecha": "2026-01-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-060",
+     "tipo": "venta",
+     "ticker": "TGT",
+     "acciones": 0.375,
+     "precio": 102.8,
+     "fecha": "2026-01-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-061",
+     "tipo": "compra",
+     "ticker": "TGT",
+     "acciones": 0.375,
+     "precio": 94.0,
+     "fecha": "2026-01-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-080",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.066666,
+     "precio": 484.0,
+     "fecha": "2026-01-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-047",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.229167,
+     "precio": 90.0,
+     "fecha": "2026-01-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-048",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.395833,
+     "precio": 90.89,
+     "fecha": "2026-01-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-049",
+     "tipo": "venta",
+     "ticker": "ALUA",
+     "acciones": 33.0,
+     "precio": 0.67,
+     "fecha": "2026-01-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-102",
+     "tipo": "venta",
+     "ticker": "MA",
+     "acciones": 0.060606,
+     "precio": 576.22,
+     "fecha": "2026-01-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-040",
+     "tipo": "compra",
+     "ticker": "RACE",
+     "acciones": 0.192771,
+     "precio": 362.92,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-046",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.166667,
+     "precio": 89.78,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-057",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.045455,
+     "precio": 315.37,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-079",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.166667,
+     "precio": 469.72,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-086",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.125,
+     "precio": 626.51,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-118",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 1.0,
+     "precio": 16.5,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-130",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.008333,
+     "precio": 2059.566,
+     "fecha": "2026-01-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-039",
+     "tipo": "compra",
+     "ticker": "RACE",
+     "acciones": 0.060241,
+     "precio": 339.62,
+     "fecha": "2026-01-20",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-056",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.068182,
+     "precio": 291.0,
+     "fecha": "2026-01-20",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-078",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.033333,
+     "precio": 452.17,
+     "fecha": "2026-01-20",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-085",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.041667,
+     "precio": 606.816,
+     "fecha": "2026-01-20",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-097",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 0.083333,
+     "precio": 180.87,
+     "fecha": "2026-01-20",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-044",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.145833,
+     "precio": 83.7,
+     "fecha": "2026-01-21",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-045",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.333333,
+     "precio": 84.67,
+     "fecha": "2026-01-21",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-055",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.022727,
+     "precio": 289.17,
+     "fecha": "2026-01-21",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-077",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.1,
+     "precio": 441.45,
+     "fecha": "2026-01-21",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-108",
+     "tipo": "venta",
+     "ticker": "HSY",
+     "acciones": 0.285714,
+     "precio": 195.765,
+     "fecha": "2026-01-21",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-026",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.151515,
+     "precio": 292.85,
+     "fecha": "2026-01-28",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-027",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.272727,
+     "precio": 290.218,
+     "fecha": "2026-01-28",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-038",
+     "tipo": "compra",
+     "ticker": "RACE",
+     "acciones": 0.048193,
+     "precio": 335.34,
+     "fecha": "2026-01-28",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-043",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.25,
+     "precio": 84.408,
+     "fecha": "2026-01-28",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-054",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.068182,
+     "precio": 298.71,
+     "fecha": "2026-01-28",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-053",
+     "tipo": "compra",
+     "ticker": "ADBE",
+     "acciones": 0.090909,
+     "precio": 285.93,
+     "fecha": "2026-01-29",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-076",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.366667,
+     "precio": 433.0,
+     "fecha": "2026-01-29",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-031",
+     "tipo": "compra",
+     "ticker": "SATL",
+     "acciones": 3.0,
+     "precio": 3.67,
+     "fecha": "2026-02-02",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-032",
+     "tipo": "compra",
+     "ticker": "SATL",
+     "acciones": 3.0,
+     "precio": 3.8,
+     "fecha": "2026-02-02",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-075",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.033333,
+     "precio": 414.85,
+     "fecha": "2026-02-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-074",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.033333,
+     "precio": 402.91,
+     "fecha": "2026-02-05",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-073",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.1,
+     "precio": 397.48,
+     "fecha": "2026-02-06",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-099",
+     "tipo": "venta",
+     "ticker": "COST",
+     "acciones": 0.083333,
+     "precio": 996.26,
+     "fecha": "2026-02-06",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-129",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.016667,
+     "precio": 1979.4,
+     "fecha": "2026-02-06",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-134",
+     "tipo": "compra",
+     "ticker": "AMZN",
+     "acciones": 0.138889,
+     "precio": 205.25,
+     "fecha": "2026-02-06",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-025",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.090909,
+     "precio": 281.405,
+     "fecha": "2026-02-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-037",
+     "tipo": "venta",
+     "ticker": "RACE",
+     "acciones": 0.301205,
+     "precio": 386.7,
+     "fecha": "2026-02-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-042",
+     "tipo": "compra",
+     "ticker": "NFLX",
+     "acciones": 0.416667,
+     "precio": 75.96,
+     "fecha": "2026-02-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-133",
+     "tipo": "compra",
+     "ticker": "AMZN",
+     "acciones": 0.159722,
+     "precio": 199.75,
+     "fecha": "2026-02-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-117",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 0.5,
+     "precio": 16.68,
+     "fecha": "2026-02-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-128",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.008333,
+     "precio": 2000.0,
+     "fecha": "2026-02-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-132",
+     "tipo": "compra",
+     "ticker": "AMZN",
+     "acciones": 0.006944,
+     "precio": 199.79,
+     "fecha": "2026-02-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-064",
+     "tipo": "venta",
+     "ticker": "NKE",
+     "acciones": 0.5,
+     "precio": 63.72,
+     "fecha": "2026-02-25",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-127",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.016667,
+     "precio": 1767.3,
+     "fecha": "2026-02-25",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-072",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.166667,
+     "precio": 393.5188,
+     "fecha": "2026-02-27",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-106",
+     "tipo": "compra",
+     "ticker": "VIST",
+     "acciones": 0.333333,
+     "precio": 56.59,
+     "fecha": "2026-02-27",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-116",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 5.0,
+     "precio": 14.89,
+     "fecha": "2026-02-27",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-126",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.1,
+     "precio": 1768.187,
+     "fecha": "2026-02-27",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-096",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 0.083333,
+     "precio": 179.0,
+     "fecha": "2026-03-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-125",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.008333,
+     "precio": 1692.77,
+     "fecha": "2026-03-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-062",
+     "tipo": "venta",
+     "ticker": "SPY",
+     "acciones": 0.15,
+     "precio": 675.17,
+     "fecha": "2026-03-11",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-115",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 4.0,
+     "precio": 14.447,
+     "fecha": "2026-03-11",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-124",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.025,
+     "precio": 1688.95,
+     "fecha": "2026-03-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-066",
+     "tipo": "venta",
+     "ticker": "PBR",
+     "acciones": 5.0,
+     "precio": 19.8,
+     "fecha": "2026-03-19",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-071",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.133333,
+     "precio": 389.74,
+     "fecha": "2026-03-19",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-114",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 3.5,
+     "precio": 13.73,
+     "fecha": "2026-03-19",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-024",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.090909,
+     "precio": 269.84,
+     "fecha": "2026-03-25",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-030",
+     "tipo": "venta",
+     "ticker": "SATL",
+     "acciones": 6.0,
+     "precio": 6.24,
+     "fecha": "2026-03-25",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-113",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 1.0,
+     "precio": 14.518,
+     "fecha": "2026-03-25",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-023",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.151515,
+     "precio": 256.93,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-036",
+     "tipo": "compra",
+     "ticker": "GOOGL",
+     "acciones": 0.431034,
+     "precio": 276.1,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-070",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.133333,
+     "precio": 360.2,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-091",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.027397,
+     "precio": 1321.2,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-095",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 0.25,
+     "precio": 169.65,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-112",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 3.5,
+     "precio": 13.796,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-123",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.025,
+     "precio": 1599.52,
+     "fecha": "2026-03-30",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-022",
+     "tipo": "compra",
+     "ticker": "UNH",
+     "acciones": 0.090909,
+     "precio": 270.28,
+     "fecha": "2026-04-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-104",
+     "tipo": "venta",
+     "ticker": "TS",
+     "acciones": 1.0,
+     "precio": 58.17,
+     "fecha": "2026-04-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-069",
+     "tipo": "compra",
+     "ticker": "MSFT",
+     "acciones": 0.1,
+     "precio": 371.17,
+     "fecha": "2026-04-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-111",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 2.0,
+     "precio": 13.986,
+     "fecha": "2026-04-07",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-021",
+     "tipo": "venta",
+     "ticker": "UNH",
+     "acciones": 0.424242,
+     "precio": 378.1,
+     "fecha": "2026-05-11",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-122",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.1,
+     "precio": 1584.0,
+     "fecha": "2026-05-11",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-029",
+     "tipo": "compra",
+     "ticker": "SATL",
+     "acciones": 5.0,
+     "precio": 7.1,
+     "fecha": "2026-05-12",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-028",
+     "tipo": "venta",
+     "ticker": "SATL",
+     "acciones": 5.0,
+     "precio": 9.68,
+     "fecha": "2026-05-20",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-020",
+     "tipo": "compra",
+     "ticker": "CEG",
+     "acciones": 0.222222,
+     "precio": 286.04,
+     "fecha": "2026-05-21",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-094",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 0.375,
+     "precio": 217.22,
+     "fecha": "2026-05-22",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-013",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 2.25,
+     "precio": 25.76,
+     "fecha": "2026-05-26",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-018",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 0.533333,
+     "precio": 250.74,
+     "fecha": "2026-05-26",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-052",
+     "tipo": "venta",
+     "ticker": "ADBE",
+     "acciones": 0.318182,
+     "precio": 242.06,
+     "fecha": "2026-05-26",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-093",
+     "tipo": "compra",
+     "ticker": "NVDA",
+     "acciones": 0.333333,
+     "precio": 214.25,
+     "fecha": "2026-05-28",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-012",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 1.25,
+     "precio": 25.24,
+     "fecha": "2026-06-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-035",
+     "tipo": "compra",
+     "ticker": "GOOGL",
+     "acciones": 0.224138,
+     "precio": 363.9,
+     "fecha": "2026-06-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-110",
+     "tipo": "compra",
+     "ticker": "NU",
+     "acciones": 4.0,
+     "precio": 12.0,
+     "fecha": "2026-06-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-017",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 0.066667,
+     "precio": 290.0,
+     "fecha": "2026-06-05",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-011",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 0.75,
+     "precio": 25.86,
+     "fecha": "2026-06-08",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-019",
+     "tipo": "compra",
+     "ticker": "CEG",
+     "acciones": 0.111111,
+     "precio": 252.98,
+     "fecha": "2026-06-08",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-008",
+     "tipo": "compra",
+     "ticker": "MRVL",
+     "acciones": 0.428571,
+     "precio": 261.79,
+     "fecha": "2026-06-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-041",
+     "tipo": "venta",
+     "ticker": "NFLX",
+     "acciones": 1.9375,
+     "precio": 81.755,
+     "fecha": "2026-06-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-051",
+     "tipo": "venta",
+     "ticker": "ADBE",
+     "acciones": 0.1592,
+     "precio": 245.47,
+     "fecha": "2026-06-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-084",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.041667,
+     "precio": 588.48,
+     "fecha": "2026-06-09",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-034",
+     "tipo": "compra",
+     "ticker": "GOOGL",
+     "acciones": 0.172414,
+     "precio": 350.47,
+     "fecha": "2026-06-11",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-010",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 2.25,
+     "precio": 25.08,
+     "fecha": "2026-06-18",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-016",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 0.4,
+     "precio": 245.1,
+     "fecha": "2026-06-18",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-009",
+     "tipo": "compra",
+     "ticker": "PFE",
+     "acciones": 1.75,
+     "precio": 25.107,
+     "fecha": "2026-08-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-015",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 0.533333,
+     "precio": 224.94,
+     "fecha": "2026-08-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-090",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.047945,
+     "precio": 1610.212,
+     "fecha": "2026-08-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-121",
+     "tipo": "compra",
+     "ticker": "MELI",
+     "acciones": 0.025,
+     "precio": 1855.36,
+     "fecha": "2026-08-13",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-006",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 0.708333,
+     "precio": 269.63,
+     "fecha": "2026-08-18",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-005",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 0.375,
+     "precio": 271.5,
+     "fecha": "2026-08-25",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-004",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 0.208333,
+     "precio": 261.63,
+     "fecha": "2026-09-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-007",
+     "tipo": "venta",
+     "ticker": "MRVL",
+     "acciones": 0.428571,
+     "precio": 209.13,
+     "fecha": "2026-09-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-014",
+     "tipo": "compra",
+     "ticker": "IBM",
+     "acciones": 0.133333,
+     "precio": 231.32,
+     "fecha": "2026-09-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-033",
+     "tipo": "compra",
+     "ticker": "GOOGL",
+     "acciones": 0.258621,
+     "precio": 336.37,
+     "fecha": "2026-09-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-083",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.125,
+     "precio": 582.0,
+     "fecha": "2026-09-01",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-003",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 0.5,
+     "precio": 256.6844,
+     "fecha": "2026-09-03",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-082",
+     "tipo": "compra",
+     "ticker": "META",
+     "acciones": 0.083333,
+     "precio": 614.0,
+     "fecha": "2026-09-04",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-089",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.041096,
+     "precio": 1634.0,
+     "fecha": "2026-09-04",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-div-asml",
+     "tipo": "dividendo",
+     "ticker": "ASML",
+     "monto": 1.57,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-ceg",
+     "tipo": "dividendo",
+     "ticker": "CEG",
+     "monto": 0.14,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-cost",
+     "tipo": "dividendo",
+     "ticker": "COST",
+     "monto": 0.11,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-googl",
+     "tipo": "dividendo",
+     "ticker": "GOOGL",
+     "monto": 0.14,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-ibm",
+     "tipo": "dividendo",
+     "ticker": "IBM",
+     "monto": 2.59,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-meta",
+     "tipo": "dividendo",
+     "ticker": "META",
+     "monto": 0.37,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-msft",
+     "tipo": "dividendo",
+     "ticker": "MSFT",
+     "monto": 4.06,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-nvda",
+     "tipo": "dividendo",
+     "ticker": "NVDA",
+     "monto": 0.67,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-pfe",
+     "tipo": "dividendo",
+     "ticker": "PFE",
+     "monto": 2.8,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-div-unh",
+     "tipo": "dividendo",
+     "ticker": "UNH",
+     "monto": 1.19,
+     "fecha": "2026-09-14",
+     "origen": "yahoo",
+     "nota": "Dividendos acumulados según Yahoo al 14-sep (fecha aproximada)"
+    },
+    {
+     "id": "yh-001",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 0.166667,
+     "precio": 250.0,
+     "fecha": "2026-09-16",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-002",
+     "tipo": "compra",
+     "ticker": "MCD",
+     "acciones": 0.25,
+     "precio": 249.66,
+     "fecha": "2026-09-16",
+     "origen": "yahoo"
+    },
+    {
+     "id": "yh-088",
+     "tipo": "compra",
+     "ticker": "ASML",
+     "acciones": 0.047945,
+     "precio": 1592.0,
+     "fecha": "2026-09-16",
+     "origen": "yahoo"
+    }
+   ],
+   "inicio": {
+    "fecha": "2025-12-31",
+    "spy": 681.92,
+    "precios": {
+     "ASML": 1069.86,
+     "BRK-B": 502.65,
+     "NVDA": 186.5,
+     "NU": 16.74,
+     "PBR": 11.85,
+     "TS": 38.45,
+     "MELI": 2014.26,
+     "SPY": 681.92,
+     "MSFT": 483.62,
+     "AMZN": 230.82,
+     "META": 660.09,
+     "GLD": 396.31,
+     "ADBE": 349.99,
+     "VIST": 48.66,
+     "NKE": 63.71,
+     "COST": 862.34,
+     "MA": 570.88,
+     "HSY": 181.98,
+     "ALUA": 0.653
+    },
+    "nota": "Arranque de la medición contra el S&P 500: todo lo que había al 31-dic-2025 (incluidas las posiciones previas sin fecha real) valuado a cierre de ese día."
+   }
+  }
+ },
+ {
+  "id": "cobro-ultimo-dia",
+  "settings": {
+   "diaCobro": 31
+  },
+  "forceSettings": true
  }
 ]

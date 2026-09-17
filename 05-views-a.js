@@ -22,6 +22,18 @@ const deltaPill = (cur, prev, invert = false) => { if (!prev) return ''; const d
 const kpi = ({ label, value, sub = '', cls = '', spark = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div><div class="delta">${sub}</div>${spark}</div>`;
 
 /* ---------- RESUMEN ---------- */
+/** Día de cobro: la app pregunta cuánto cobraste (hasta registrar el mes; "Después" lo posterga hasta mañana) */
+function renderCobroBanner() {
+  const pend = E.cobroPendiente(); if (!pend.length || Cobro.pospuestoHoy()) return '';
+  const ym = pend[pend.length - 1]; const prev = E.sueldo(D.addMonths(ym, -1)); const mes = D.monthName(ym).split(' ')[0];
+  return `<div class="callout" style="margin-bottom:14px"><b>¿Cuánto cobraste el ${D.fmt(E.fechaCobro(ym))}?</b><br><span class="small muted">Sueldo de ${mes} · con el número real se recalcula todo.</span><div class="row" style="margin-top:10px;gap:8px"><button class="btn sm primary" data-act="cobro-cargar" data-id="${ym}">Cargar</button>${prev.monto ? `<button class="btn sm" data-act="cobro-igual" data-id="${ym}">Igual: ${M.f(prev.monto)}</button>` : ''}<button class="btn sm ghost" data-act="cobro-later" data-id="${ym}">Después</button></div></div>`;
+}
+/** Fijos del mes cuyo día ya pasó y no están confirmados: ¿quedaron igual o cambiaron? */
+function renderFijosBanner() {
+  const ym = D.thisMonth(); const pend = E.fijosPendientes(ym); if (!pend.length || !state.settings.ingreso) return '';
+  const tot = sum(pend.map(v => M.toARS(v.monto, v.moneda)));
+  return `<div class="callout amber" style="margin-bottom:14px"><b>Fijos de ${D.monthName(ym).split(' ')[0]}: ${pend.length} por confirmar</b><br><span class="small muted">${pend.slice(0, 4).map(v => esc(v.desc)).join(', ')}${pend.length > 4 ? '…' : ''} · ${M.f(tot)} estimados</span><div class="row" style="margin-top:10px;gap:8px"><button class="btn sm primary" data-act="fijos-revisar" data-id="${ym}">Revisar</button></div></div>`;
+}
 function renderCierreBanner() {
   if (ui.cierreDismiss) return '';
   const hoy = D.today();
@@ -44,7 +56,7 @@ function viewResumen() {
   const margen = E.margen(ym); const mesN = D.monthName(ym).split(' ')[0];
   const projPct = margen.presupuesto ? proj.total / margen.presupuesto : 0; const pres = margen.presupuesto; const comp = margen.fijos + c.cuotas;
 
-  let html = renderCierreBanner();
+  let html = renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
   html += `<div class="grid g-kpi">`;
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${avgToDate ? deltaPill(c.total, avgToDate) : ''} <span>${avgToDate ? `vs promedio${isCur ? ' al mismo día' : ''} (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})` : ''} · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
   html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: M.f(proj.total), sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
@@ -59,9 +71,13 @@ function viewResumen() {
   const avgVals = avg.vals ? avg.vals.slice(0, days) : labels.map(() => null);
   let projVals = labels.map(() => null);
   if (isCur && proj.pace != null) { const base = curVals[dia - 1] || 0; const fijosRest = Math.max(0, proj.fijo - c.fijo); for (let i = dia - 1; i < days; i++) projVals[i] = base + (proj.pace + fijosRest / Math.max(1, proj.restantes)) * (i + 1 - dia); }
+  // cruce del presupuesto: el día en que el acumulado real lo pasó, o el día en que lo pasaría al ritmo actual (marca sutil en el gráfico)
+  let cruce = null;
+  if (pres) { const iReal = curVals.findIndex(v => v != null && v >= pres); const iProj = iReal < 0 ? projVals.findIndex(v => v != null && v >= pres) : -1;
+    if (iReal >= 0) cruce = { i: iReal, label: String(iReal + 1), color: 'var(--crit)', pasado: true }; else if (iProj >= 0) cruce = { i: iProj, label: String(iProj + 1), color: 'var(--warn)', pasado: false }; }
   html += `<div class="grid g-21 section">
-    <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">Acumulado por día de compra</span></div>
-      ${ChartQ.reg(w => Charts.line({ w, labels, h: 230, tipTitle: i => `Día ${labels[i]}`, refY: margen.presupuesto || null, refLabel: margen.presupuesto ? 'Presupuesto' : '', series: [
+    <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : 'Acumulado por día de compra'}</span></div>
+      ${ChartQ.reg(w => Charts.line({ w, labels, h: 230, cruce, tipTitle: i => `Día ${labels[i]}`, refY: margen.presupuesto || null, refLabel: margen.presupuesto ? 'Presupuesto' : '', series: [
         ...(avg.vals ? [{ name: `Promedio ${avg.n} ${avg.n === 1 ? 'mes' : 'meses'}`, color: 'var(--line-2)', values: avgVals }] : []),
         { name: D.monthName(ym).split(' ')[0], color: 'var(--accent)', values: curVals, area: true, strong: true },
         ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', values: projVals, dashed: true }] : []),

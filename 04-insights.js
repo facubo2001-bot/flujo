@@ -18,6 +18,13 @@ const Insights = {
       else if (ratio > 0.85) out.push({ level: 'warn', icon: 'alert', title: `Proyección ajustada: ${M.pct(ratio)} del presupuesto`, text: `Vas a cerrar el mes cerca de ${M.f(proj.total)}. Queda poco margen si no bajás las compras (${M.f(proj.pace)} por día).` });
       else out.push({ level: 'good', icon: 'check', title: `Proyección de cierre: ${M.f(proj.total)} (${M.pct(ratio)} del presupuesto)`, text: `Si mantenés el ritmo, te sobran ${M.f(mg.quedaProj)} del presupuesto, además de los ${M.f(mg.ahorro)} que ya separás para invertir.` });
     }
+    // 1b. sueldo registrado del mes: adónde va la diferencia (presupuesto quieto → todo el aumento a inversión)
+    const su = E.sueldo(ym), suPrev = E.sueldo(D.addMonths(ym, -1));
+    if (su.registrado && suPrev.monto && pres && (suPrev.registrado || (suPrev.ref && suPrev.ref < ym))) {
+      const d = su.monto / suPrev.monto - 1; const ant = suPrev.registrado ? D.monthName(D.addMonths(ym, -1)).split(' ')[0] : 'el sueldo anterior';
+      if (d >= 0.005) out.push({ level: 'good', icon: 'trend', title: `Cobraste ${M.f(su.monto)}: +${M.pct(d)} vs ${ant}`, text: `Con el presupuesto quieto en ${M.f(pres)}, los ${M.f(su.monto - suPrev.monto)} de más van derecho a inversión: ${M.f(su.monto - pres)} este mes.`, view: 'plan' });
+      else if (d <= -0.005) out.push({ level: 'warn', icon: 'down', title: `Cobraste ${M.f(su.monto)}: ${M.pct(d)} vs ${ant}`, text: `Quedan ${M.f(su.monto - pres)} para invertir con el presupuesto en ${M.f(pres)}. Para sostener el objetivo anterior habría que recortar ${M.f(suPrev.monto - su.monto)} de gastos.`, view: 'plan' });
+    }
     // 2. vs previous month
     if (prev.count && c.count) {
       const d = (c.total - prev.total) / (prev.total || 1);

@@ -1,5 +1,5 @@
 /* Flujo — service worker: la app funciona offline. Cambiar VERSION al publicar una versión nueva. */
-const VERSION = '202609142313';
+const VERSION = '202609172204';
 const SHELL = `flujo-shell-${VERSION}`;
 const RUNTIME = 'flujo-runtime';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
@@ -18,6 +18,11 @@ self.addEventListener('fetch', e => {
   // fuentes: cache con actualización en segundo plano
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(caches.open(RUNTIME).then(async c => { const hit = await c.match(e.request); const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit); return hit || net; }));
+    return;
+  }
+  // tabla de CEDEARs: red primero (se actualiza en el repo sin recompilar la app), cache como respaldo
+  if (url.origin === location.origin && url.pathname.endsWith('cedears.json')) {
+    e.respondWith(fetch(e.request).then(r => { if (r.ok) caches.open(RUNTIME).then(c => c.put(e.request, r.clone())); return r; }).catch(() => caches.match(e.request, { ignoreSearch: true })));
     return;
   }
   // app: cache primero, red como respaldo (y actualiza el cache)

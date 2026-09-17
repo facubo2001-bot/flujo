@@ -38,7 +38,24 @@ const D = {
     return `${d.getDate()} ${names[d.getMonth()]}${opts.year ? ' ' + String(d.getFullYear()).slice(2) : ''}`;
   },
   range(fromYm, n) { return Array.from({ length: n }, (_, i) => D.addMonths(fromYm, i)); },
+  /** Día hábil de mercado (NYSE) más cercano hacia atrás: fines de semana y feriados van al hábil anterior.
+      Hasta donde llega el histórico de SPY se usa el calendario real; después, regla de fin de semana + feriados NYSE. */
+  habil(fecha) {
+    if (!fecha) return fecha;
+    const hist = typeof SPY_HIST !== 'undefined' ? SPY_HIST.spy : null;
+    if (hist) { const keys = D._spyKeys || (D._spyKeys = Object.keys(hist).sort()); const first = keys[0], last = keys[keys.length - 1];
+      if (fecha >= first && fecha <= last) { if (hist[fecha]) return fecha; let lo = 0, hi = keys.length - 1, best = null; while (lo <= hi) { const m = (lo + hi) >> 1; if (keys[m] <= fecha) { best = keys[m]; lo = m + 1; } else hi = m - 1; } return best || fecha; } }
+    let f = fecha;
+    for (let i = 0; i < 12; i++) { const d = D.dow(f); if (d === 0 || d === 6 || FERIADOS_NYSE.has(f)) f = D.addDays(f, -1); else return f; }
+    return f;
+  },
 };
+/** Feriados NYSE (fechas observadas). Ampliar cada año. */
+const FERIADOS_NYSE = new Set([
+  '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
+  '2027-01-01', '2027-01-18', '2027-02-15', '2027-03-26', '2027-05-31', '2027-06-18', '2027-07-05', '2027-09-06', '2027-11-25', '2027-12-24',
+  '2028-01-17', '2028-02-21', '2028-04-14', '2028-05-29', '2028-06-19', '2028-07-04', '2028-09-04', '2028-11-23', '2028-12-25',
+]);
 
 /* ---------- money ---------- */
 const fmtARS = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
@@ -134,8 +151,9 @@ function defaultState() {
     ingresos: [],
     inversiones: [],
     pagos: [],
+    sueldos: {},
     aprendido: {},
-    cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null },
+    cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null },
   };
 }
 const BUILD = '__BUILD__';
@@ -211,6 +229,8 @@ const Persist = {
       for (const id of p.cartera.removeInversiones || []) state.inversiones = state.inversiones.filter(x => x.id !== id);
       for (const o of p.cartera.operaciones || []) if (!byId(c.operaciones).has(o.id)) c.operaciones.push(o);
       for (const [t, a] of Object.entries(p.cartera.alertas || {})) if (!c.alertas[t]) c.alertas[t] = a;
+      for (const id of p.cartera.removeOperaciones || []) c.operaciones = c.operaciones.filter(x => x.id !== id);
+      if (p.cartera.inicio) c.inicio = p.cartera.inicio;
     }
     if (p.settings) for (const [k, v] of Object.entries(p.settings)) if (p.forceSettings || !state.settings[k]) state.settings[k] = v;
     for (const u of p.updates || []) { const m = state.movimientos.find(x => x.id === u.id); if (m) Object.assign(m, u); }
@@ -222,9 +242,11 @@ const Persist = {
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
     for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
+    if (!s.sueldos || typeof s.sueldos !== 'object' || Array.isArray(s.sueldos)) s.sueldos = {};
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
     for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
-    for (const k of ['alertas', 'precios']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
+    for (const k of ['alertas', 'precios', 'historial', 'spy']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
+    for (const o of s.cartera.operaciones) if (o && o.fecha) { const h = D.habil(o.fecha); if (h !== o.fecha) o.fecha = h; }
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
@@ -331,13 +353,24 @@ const Gist = {
 
 /* ---------- dólar MEP (dolarapi.com; only works outside the artifact sandbox) ---------- */
 const TC = {
+  /** CCL fresco (para cargar operaciones): guarda valor + hora; devuelve {ccl, hora} o null */
+  async ccl(maxEdadMin = 10) {
+    const s = state.settings; const edad = s.cclHora ? (Date.now() - new Date(s.cclHora).getTime()) / 60000 : Infinity;
+    if (s.ccl && edad < maxEdadMin) return { ccl: s.ccl, hora: s.cclHora, cache: true };
+    try {
+      const r = await fetch('https://dolarapi.com/v1/dolares/contadoconliqui', { cache: 'no-store' }); if (!r.ok) throw new Error(r.status);
+      const j = await r.json(); const v = Number(j.venta) || Number(j.compra); if (!v) throw new Error('sin valor');
+      s.ccl = Math.round(v); s.cclFecha = D.today(); s.cclHora = j.fechaActualizacion || new Date().toISOString(); Persist.save();
+      return { ccl: s.ccl, hora: s.cclHora, cache: false };
+    } catch (e) { return s.ccl ? { ccl: s.ccl, hora: s.cclHora, cache: true, error: true } : null; }
+  },
   async actualizar(silencioso = false) {
     try {
       const r = await fetch('https://dolarapi.com/v1/dolares/bolsa', { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
       const j = await r.json(); const v = Number(j.venta) || Number(j.compra); if (!v) throw new Error('sin valor');
       state.settings.tc = Math.round(v); state.settings.tcFecha = D.today(); state.settings.tcFuente = 'dolarapi.com (MEP venta)';
-      try { const r2 = await fetch('https://dolarapi.com/v1/dolares/contadoconliqui', { cache: 'no-store' }); if (r2.ok) { const j2 = await r2.json(); const v2 = Number(j2.venta) || Number(j2.compra); if (v2) { state.settings.ccl = Math.round(v2); state.settings.cclFecha = D.today(); } } } catch (e2) {}
+      try { const r2 = await fetch('https://dolarapi.com/v1/dolares/contadoconliqui', { cache: 'no-store' }); if (r2.ok) { const j2 = await r2.json(); const v2 = Number(j2.venta) || Number(j2.compra); if (v2) { state.settings.ccl = Math.round(v2); state.settings.cclFecha = D.today(); state.settings.cclHora = j2.fechaActualizacion || new Date().toISOString(); } } } catch (e2) {}
       Persist.save(); if (!silencioso) { toast(`Dólar actualizado · MEP $ ${fmtARS.format(state.settings.tc)}${state.settings.ccl ? ' · CCL $ ' + fmtARS.format(state.settings.ccl) : ''}`); render(); }
       return true;
     } catch (e) {
@@ -347,11 +380,56 @@ const TC = {
   },
 };
 
+/* ---------- CEDEARs (tabla BYMA embebida + copia online en el repo: cedears.json) ---------- */
+const Cedears = {
+  _src: null, byCode: {}, byUs: {},
+  tabla() { try { const r = JSON.parse(localStorage.getItem('flujo.cedears') || 'null'); if (r && r.cedears && r.cedears.length && r.actualizado >= CEDEARS_EMBED.actualizado) return r; } catch (e) {} return CEDEARS_EMBED; },
+  lista() { return Cedears.tabla().cedears; },
+  actualizado() { return Cedears.tabla().actualizado; },
+  index() { const l = Cedears.lista(); if (Cedears._src === l) return; Cedears.byCode = {}; Cedears.byUs = {}; for (const c of l) { Cedears.byCode[c.code] = c; Cedears.byUs[c.us || c.code] = c; } Cedears._src = l; },
+  /** entrada de la tabla para un ticker interno (US) o código BYMA */
+  de(t) { if (!t) return null; Cedears.index(); return Cedears.byUs[t] || Cedears.byCode[t] || null; },
+  ticker(c) { return c.us || c.code; },
+  ratioTxt(c) { return `${c.ratio[0]}:${c.ratio[1]}`; },
+  /** N CEDEARs = M acciones → acciones = cedears × M / N */
+  aAcciones(cedears, c) { return cedears * c.ratio[1] / c.ratio[0]; },
+  aCedears(acciones, c) { return acciones * c.ratio[0] / c.ratio[1]; },
+  /** precio USD por acción = precio ARS del CEDEAR × N/M ÷ CCL */
+  precioUSD(precioARS, c, ccl) { return ccl ? precioARS * c.ratio[0] / c.ratio[1] / ccl : 0; },
+  buscar(q, limite = 8) {
+    q = norm(q || '').replace(/\s+/g, ''); if (!q) return [];
+    const l = Cedears.lista(); const a = [], b = [];
+    for (const c of l) { const code = norm(c.code), us = norm(c.us || ''); if (code.startsWith(q) || us.startsWith(q)) a.push(c); else if (norm(c.nombre).replace(/\s+/g, '').includes(q) || code.includes(q)) b.push(c); }
+    return a.concat(b).slice(0, limite);
+  },
+  async actualizar() {
+    try { const r = await fetch(`cedears.json?v=${Date.now()}`, { cache: 'no-store' }); if (!r.ok) return false; const j = await r.json(); if (j && Array.isArray(j.cedears) && j.actualizado && j.actualizado > Cedears.actualizado()) { localStorage.setItem('flujo.cedears', JSON.stringify(j)); Cedears._src = null; return true; } } catch (e) {}
+    return false;
+  },
+};
+
+/* ---------- SPY histórico (embebido hasta la fecha de build + cierres que la app va guardando) ---------- */
+const Spy = {
+  _keys: null, _map: null,
+  tabla() { const dyn = state.cartera.spy || {}; if (Spy._map && Spy._dyn === dyn && Spy._n === Object.keys(dyn).length) return Spy._map; Spy._map = { ...SPY_HIST.spy, ...dyn }; Spy._keys = Object.keys(Spy._map).sort(); Spy._dyn = dyn; Spy._n = Object.keys(dyn).length; return Spy._map; },
+  fechas() { Spy.tabla(); return Spy._keys; },
+  /** último cierre conocido ≤ fecha */
+  /** fecha del último cierre conocido ≤ fecha (null si no hay) */
+  fechaDe(fecha) { const m = Spy.tabla(); if (m[fecha]) return fecha; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best; },
+  at(fecha) { const m = Spy.tabla(); if (m[fecha]) return m[fecha]; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best ? m[best] : null; },
+};
+
 /* ---------- precios de acciones (Finnhub, clave gratuita en Ajustes) ---------- */
 const Precios = {
   simbolo(t) { return t.replace('-', '.'); },
-  tickers() { const c = state.cartera; const set = new Set(); for (const o of c.operaciones) set.add(o.ticker); for (const t of Object.keys(c.alertas)) set.add(t); return [...set]; },
+  /** una cotización puntual (para el form de operación); devuelve el precio o null */
+  async quote(t) {
+    const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
+    try { const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); if (!j || !Number(j.c)) return null; state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; return Number(j.c); } catch (e) { return null; }
+  },
+  tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) set.add(t); set.add('SPY'); return [...set]; },
   async actualizar(silencioso = false) {
+    try { await TC.actualizar(true); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes → Cartera para traer precios.', 5000); return false; }
     const tickers = Precios.tickers(); if (!tickers.length) return false;
@@ -365,7 +443,15 @@ const Precios = {
         state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; ok++;
       } catch (e) {}
     }
-    if (ok) { state.cartera.preciosFecha = new Date().toISOString(); Persist.save(); }
+    if (ok) {
+      state.cartera.preciosFecha = new Date().toISOString();
+      const hoy = D.today(); const spy = state.cartera.precios.SPY;
+      if (spy && spy.c && D.habil(hoy) === hoy) state.cartera.spy[hoy] = spy.c;
+      if (spy && spy.pc && D.habil(hoy) === hoy) { const ayer = D.habil(D.addDays(hoy, -1)); const m = Spy.tabla(); if (!m[ayer] && Math.abs(spy.c / spy.pc - 1) < 0.07) state.cartera.spy[ayer] = spy.pc; }
+      // valuación del día solo si el refresco fue (casi) completo y trajo SPY: un snapshot con precios viejos ensuciaría la serie y el TWR
+      try { const k = E.cartera(); if (k.valor != null && spy && spy.c && ok >= Math.ceil(tickers.length * 0.85)) { const h = state.cartera.historial; const vi = k.ventanas.inicio, va = k.ventanas.anio; h[hoy] = { v: Math.round(k.valor * 100) / 100, c: Math.round(k.costo * 100) / 100, s: vi.disponible ? Math.round(vi.sombraValor * 100) / 100 : null, sa: va.disponible ? Math.round(va.sombraValor * 100) / 100 : null, spy: k.spyHoy, mep: k.mep, ccl: k.ccl }; const ks = Object.keys(h).sort(); if (ks.length > 1500) for (const old of ks.slice(0, ks.length - 1500)) delete h[old]; } } catch (e) {}
+      Persist.save();
+    }
     if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${tickers.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
     return ok > 0;
   },
@@ -383,6 +469,7 @@ const ICONS = {
   tarjetas: '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 10.5h20M6 15h4"/></svg>',
   plan: '<svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg>',
   cartera: '<svg viewBox="0 0 24 24"><path d="M21.2 15.1A9 9 0 1 1 8.9 2.8"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
   tendencias: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   config: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   edit: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',

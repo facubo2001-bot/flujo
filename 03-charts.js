@@ -11,7 +11,8 @@ const tipRow = (color, name, val) => `<div class="row"><span>${color ? `<i style
 
 const Charts = {
   /** Multi-series line/area on categorical x. series: [{name,color,values:[num|null],dashed,area,strong}] */
-  line({ w = 640, series, labels, h = 220, yFmt = axisFmt, tipTitle = i => labels[i], tipFmt = v => M.f(v), marker = true, refY = null, refLabel = '' }) {
+  /** cruce: {i, label, color} marca sutil donde una serie cruza refY (guía punteada hasta el eje + día resaltado) */
+  line({ w = 640, series, labels, h = 220, yFmt = axisFmt, tipTitle = i => labels[i], tipFmt = v => M.f(v), marker = true, refY = null, refLabel = '', xSparse = false, cruce = null }) {
     const padL = 44, padR = 16, padT = 14, padB = 26;
     const iw = w - padL - padR, ih = h - padT - padB;
     const all = series.flatMap(s => s.values.filter(v => v != null)); if (refY != null) all.push(refY);
@@ -22,17 +23,21 @@ const Charts = {
     g += '</g>';
     const every = Math.max(1, Math.ceil(30 / (n > 1 ? iw / (n - 1) : iw)));
     let xl = '';
-    labels.forEach((l, i) => { if (i % every === 0 || i === n - 1) xl += `<text x="${x(i)}" y="${h - 8}" text-anchor="middle">${esc(l)}</text>`; });
+    const ci = cruce && cruce.i != null && refY != null ? cruce.i : null;
+    labels.forEach((l, i) => { if (ci != null && Math.abs(i - ci) <= 1) return; if (xSparse ? !!l : (i % every === 0 || (i === n - 1 && (n - 1) % every >= 2))) xl += `<text x="${x(i)}" y="${h - 8}" text-anchor="middle">${esc(l)}</text>`; });
     let paths = '', dots = '';
     for (const s of series) {
       let d = '', started = false, lastIdx = -1;
-      s.values.forEach((v, i) => { if (v == null) { started = false; return; } d += (started ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); started = true; lastIdx = i; });
+      s.values.forEach((v, i) => { if (v == null) { if (!s.connect) started = false; return; } d += (started ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); started = true; lastIdx = i; });
+      if (s.dots) s.values.forEach((v, i) => { if (v != null) dots += `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${s.color}" stroke="var(--surface)" stroke-width="1.5"/>`; });
       if (s.area && d) { const first = s.values.findIndex(v => v != null); paths += `<path d="${d} L${x(lastIdx)} ${y(0)} L${x(first)} ${y(0)} Z" fill="${s.color}" opacity=".1"/>`; }
       paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.strong ? 2.5 : 2}" stroke-linecap="round" stroke-linejoin="round" ${s.dashed ? 'stroke-dasharray="5 5"' : ''}/>`;
       if (marker && lastIdx >= 0 && !s.dashed) dots += `<circle cx="${x(lastIdx)}" cy="${y(s.values[lastIdx])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`;
     }
     let ref = '';
     if (refY != null) ref = `<line x1="${padL}" x2="${w - padR}" y1="${y(refY)}" y2="${y(refY)}" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="3 4"/><text x="${w - padR}" y="${y(refY) - 4}" text-anchor="end" class="lbl">${esc(refLabel)}</text>`;
+    let cr = '';
+    if (ci != null) { const cx = x(ci), cy = y(refY), col = cruce.color || 'var(--warn)'; cr = `<line x1="${cx}" x2="${cx}" y1="${cy}" y2="${y(0)}" stroke="${col}" stroke-width="1" stroke-dasharray="2 3" opacity=".75"/><circle cx="${cx}" cy="${cy}" r="4" fill="var(--surface)" stroke="${col}" stroke-width="2"/><text x="${cx}" y="${h - 8}" text-anchor="middle" style="fill:${col};font-weight:700">${esc(cruce.label || labels[ci])}</text>`; }
     let hits = '';
     const bw = n > 1 ? iw / (n - 1) : iw;
     labels.forEach((l, i) => {
@@ -40,7 +45,7 @@ const Charts = {
       hits += `<rect class="hit" x="${x(i) - bw / 2}" y="${padT}" width="${bw}" height="${ih}" data-tip="${esc(`<b>${esc(tipTitle(i))}</b>${rows}`)}"/>`;
     });
     const guide = `<line class="guide" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" stroke="var(--ink-3)" stroke-width="1" opacity="0"/>`;
-    return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${g}<g class="axis"><line x1="${padL}" x2="${w - padR}" y1="${y(0)}" y2="${y(0)}"/></g>${ref}${paths}${dots}${xl}${hits}</svg>`;
+    return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${g}<g class="axis"><line x1="${padL}" x2="${w - padR}" y1="${y(0)}" y2="${y(0)}"/></g>${ref}${paths}${cr}${dots}${xl}${hits}</svg>`;
   },
 
   /** Stacked columns. series: [{name,color,values}] ; optional line overlay {name,values,color} on the SAME axis */

@@ -33,6 +33,16 @@ function render() {
 }
 function go(view) { ui.view = view; render(); }
 
+/** setea el ticker elegido en el form de operación y refresca campos/cálculo */
+function formOpSet(t) {
+  const c = Cedears.de(t); const tk = $('#o-tk'), inp = $('#o-ticker'); if (!tk) return;
+  tk.value = t; if (inp) inp.value = c ? `${c.code} · ${c.nombre}` : t; const sug = $('#o-sug'); if (sug) sug.innerHTML = '';
+  $$('#modal [data-act="pick-ticker"]').forEach(b => b.classList.toggle('on', b.dataset.id === t));
+  const info = $('#o-info'); if (info) info.innerHTML = formOpInfo(t);
+  const box = $('#o-campos'); if (box) { const tipo = Modal.choice('o-tipo') || 'compra'; const modo = Modal.choice('o-modo') || 'usd'; const vals = { ced: Modal.val('o-ced'), pxars: Modal.val('o-pxars'), ccl: Modal.val('o-ccl'), acc: Modal.val('o-acc'), precio: Modal.val('o-precio'), monto: Modal.val('o-monto') }; box.innerHTML = formOpCampos(tipo, modo, { ticker: t, cedears: vals.ced, precioCedear: vals.pxars, ccl: vals.ccl, acciones: vals.acc, precio: vals.precio, monto: vals.monto }); }
+  formOpCalc();
+}
+
 /* ---------- actions ---------- */
 const Actions = {
   new() { formMov(); },
@@ -78,6 +88,14 @@ const Actions = {
   async 'gist-pull'() { const ch = await Gist.refrescar(true); toast(ch ? 'Datos actualizados' : 'Ya estabas al día'); if (ch) { lastView = null; render(); } },
   'cierre-ok'(v) { const [tid, ym, fecha] = v.split('|'); const t = L.tarjeta(tid); if (!t) return; t.cierres = t.cierres || {}; t.cierres[ym] = fecha; Persist.save(); toast(`${t.nombre}: cierre ${D.fmt(fecha)} confirmado`); render(); },
   'cierre-later'() { ui.cierreDismiss = true; render(); },
+  'cobro-cargar'(ym) { formCobro(ym || undefined); },
+  'sueldo-edit'(ym) { formCobro(ym); },
+  'cobro-igual'(ym) { const prev = E.sueldo(D.addMonths(ym, -1)); if (!prev.monto) return; const r = E.registrarSueldo(ym, prev.monto, E.fechaCobro(ym)); Persist.save(); render(); Cobro.avisar(ym, r); },
+  'cobro-later'() { Cobro.posponer(); render(); },
+  'fijos-revisar'(ym) { formFijos(ym || D.thisMonth()); },
+  'fijo-omitir'(id) { const row = $(`.fijo-row[data-rec="${id}"]`); if (!row) return; row.classList.toggle('omitido'); const inp = row.querySelector('input'); inp.disabled = row.classList.contains('omitido'); },
+  'conciliar'() { formConciliar(); },
+  'del-sueldo'(ym) { confirmar(`¿Borrar el sueldo registrado de ${D.monthName(ym)}?`, () => { delete state.sueldos[ym]; const ultimo = Object.keys(state.sueldos).sort().pop(); if (ultimo) state.settings.ingreso = Number(state.sueldos[ultimo].monto) || state.settings.ingreso; Persist.save(); render(); }); },
   'cierre-edit'(v) {
     const [tid, ym, est] = v.split('|'); const t = L.tarjeta(tid); if (!t) return;
     Modal.open({ title: `Cierre de ${t.nombre}`, body: `<div class="form-grid">${F.field('Fecha de cierre de este período', F.input('cc-fecha', est, 'type="date"'), 'La encontrás en la app del banco, en "próximo cierre"')}</div>`, submit: 'Guardar', onSubmit: () => { const f = Modal.val('cc-fecha'); if (!f) return false; t.cierres = t.cierres || {}; t.cierres[D.ym(f)] = f; Persist.save(); render(); } });
@@ -86,7 +104,18 @@ const Actions = {
   'switch-op'() { formOp(); },
   'new-op'() { formOp(); },
   'op-para'(v) { const [t, tipo] = v.split('|'); formOp({ ticker: t, tipo }); },
-  'pick-ticker'(t) { const el = $('#o-ticker'); if (el) { el.value = t; const box = $('#o-campos'); if (box) box.innerHTML = formOpCampos(Modal.choice('o-tipo') || 'compra', { ticker: t }); } $$('#modal [data-act="pick-ticker"]').forEach(b => b.classList.toggle('on', b.dataset.id === t)); },
+  'pick-ticker'(t) { formOpSet(t); },
+  'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
+  'cartera-chart'(v) { ui.carteraChart = v; render(); },
+  'cartera-info'(v) { infoEvolucion(v); },
+  'cartera-ventana'(v) { const k = E.cartera(); const w = k.ventanas[v]; if (w && !w.disponible) { toast(w.motivo || 'Rango no disponible todavía', 4500); return; } ui.carteraVentana = v; render(); },
+  'edit-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (o) formOp({ ...o }); },
+  'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
+  'export-claude'() { formExportar(); },
+  'import-claude'() { formImportar(); },
+  'export-copy'() { const t = $('#export-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo en un chat del proyecto Inversiones.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
+  async 'export-share'() { const t = $('#export-md'); if (!t) return; try { const file = new File([t.value], Intercambio.nombreArchivo(), { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Cartera para Claude' }); else await navigator.share({ title: 'Cartera para Claude', text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') toast('No se pudo compartir; usá Copiar texto'); } },
+  'import-apply'() { const d = Intercambio._pendiente; if (!d) return; Intercambio.aplicar(d); Intercambio._pendiente = null; Modal.close(); toast(`${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''} aplicado${d.cambios.length > 1 ? 's' : ''}`); render(); },
   'set-date-op'(v) { const f = $('#o-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
   'del-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (!o) return; confirmar(`¿Borrar ${o.tipo} de ${o.ticker} del ${D.fmt(o.fecha, { year: true })}?`, () => { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); render(); }); },
   'del-op-modal'(id) { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); Modal.close(); render(); toast('Operación borrada'); },
@@ -187,7 +216,13 @@ function importarCSV(txt) {
   renderNav(); $('#view').innerHTML = '<div class="empty">Cargando…</div>';
   await Persist.init();
   render();
+  if (!window.claude && !$('#overlay').classList.contains('open')) {
+    const pend = E.cobroPendiente();
+    if (pend.length && !Cobro.pospuestoHoy()) setTimeout(() => formCobro(pend[pend.length - 1]), 400);
+    else if (state.settings.ingreso && E.fijosPendientes().length && !Fijos.yaMostrado(D.thisMonth())) setTimeout(() => formFijos(D.thisMonth()), 400);
+  }
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
+  if (!window.claude) Cedears.actualizar().then(ch => { if (ch) console.log('Tabla de CEDEARs actualizada:', Cedears.actualizado()); });
   if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();

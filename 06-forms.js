@@ -4,7 +4,7 @@ const Modal = {
   onSubmit: null,
   open({ title, body, submit = 'Guardar', extra = '', onSubmit, wide = false }) {
     Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null;
-    $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">Cancelar</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
+    $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">${submit ? 'Cancelar' : 'Cerrar'}</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
     $('#modal').style.width = wide ? 'min(820px,100%)' : '';
     $('#overlay').classList.add('open');
     const first = $('#modal .m-body [autofocus]'); if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
@@ -37,7 +37,7 @@ function formMov(m = null, opts = {}) {
   const topCats = state.categorias.slice().sort((p, q) => (freq[q.id] || 0) - (freq[p.id] || 0)).slice(0, 8);
   if (!topCats.find(c => c.id === base.catId)) topCats.unshift(L.cat(base.catId));
   const descs = [...new Set(state.movimientos.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(x => x.desc))].slice(0, 60);
-  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Aporte</button><button type="button" data-act="switch-op">Cartera</button></div>` : '';
+  const tipoBar = isNew && !virtual ? `<div class="seg full" style="width:fit-content;margin:0 auto 4px"><button class="on" type="button">Gasto</button><button type="button" data-act="switch-inv">Aporte a inversión</button></div>` : '';
   const body = `<div class="form-grid">
     ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
@@ -155,11 +155,71 @@ function formCuenta(c = null) {
   } });
 }
 
+/* ---------- cobro del sueldo: el día de cobro la app pregunta cuánto cobraste y recalcula todo ---------- */
+const Cobro = {
+  key: 'flujo.cobroPospuesto',
+  pospuestoHoy() { try { return localStorage.getItem(Cobro.key) === D.today(); } catch (e) { return false; } },
+  posponer() { try { localStorage.setItem(Cobro.key, D.today()); } catch (e) {} },
+  /** Resultado de registrar: toast con variación y lo que queda para invertir */
+  avisar(ym, r) {
+    const mes = D.monthName(ym).split(' ')[0]; const pres = E.presupuesto(ym);
+    const delta = r.delta != null && Math.abs(r.delta) >= 0.001 ? ` (${r.delta > 0 ? '+' : ''}${(r.delta * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} % vs ${r.prevRegistrado ? D.monthName(D.addMonths(ym, -1)).split(' ')[0] : 'el anterior'})` : '';
+    toast(`Sueldo de ${mes}: ${M.f(r.monto)}${delta}${pres ? ` · para invertir ${M.f(r.monto - pres)}` : ''}`, 5000);
+  },
+};
+function formCobro(ym = D.thisMonth()) {
+  const prevYm = D.addMonths(ym, -1); const prev = E.sueldo(prevYm); const act = E.sueldo(ym);
+  const mes = D.monthName(ym).split(' ')[0]; const fechaDef = act.registrado && act.fecha ? act.fecha : E.fechaCobro(ym);
+  const body = `<div class="form-grid">
+    ${F.field(`Sueldo neto de ${mes} (ARS)`, F.input('sc-monto', act.registrado ? fmtARS.format(act.monto) : (prev.monto ? fmtARS.format(prev.monto) : ''), 'inputmode="numeric" autofocus'), prev.monto ? `${prev.registrado ? D.monthName(prevYm).split(' ')[0] : 'Sueldo actual'}: ${M.f(prev.monto)}` : '', 'full')}
+    ${F.field('Fecha de cobro', F.input('sc-fecha', fechaDef, 'type="date"'))}
+  </div>`;
+  Modal.open({ title: act.registrado || E.fechaCobro(ym) > D.today() ? `Sueldo de ${mes}` : '¿Cuánto cobraste?', body, submit: 'Guardar', extra: act.registrado ? `<button type="button" class="btn danger" data-act="del-sueldo" data-id="${ym}">Borrar</button>` : '', onSubmit: () => {
+    const monto = M.parse(Modal.val('sc-monto')); if (!monto) { toast('Falta el monto'); return false; }
+    const r = E.registrarSueldo(ym, monto, Modal.val('sc-fecha') || E.fechaCobro(ym)); Persist.save(); render(); setTimeout(() => Cobro.avisar(ym, r), 250);
+  } });
+}
+
+/* ---------- fijos del mes: cuando llega el día de cada gasto fijo, la app pregunta si quedó igual o cambió ---------- */
+const Fijos = {
+  key: 'flujo.fijosVisto',
+  firma(ym) { return `${ym}:${E.fijosPendientes(ym).map(v => v.recId).sort().join(',')}`; },
+  yaMostrado(ym) { try { return localStorage.getItem(Fijos.key) === Fijos.firma(ym); } catch (e) { return false; } },
+  marcar(ym) { try { localStorage.setItem(Fijos.key, Fijos.firma(ym)); } catch (e) {} },
+};
+function formFijos(ym = D.thisMonth()) {
+  const pend = E.fijosPendientes(ym); if (!pend.length) { toast('No hay fijos pendientes'); return; }
+  const mes = D.monthName(ym).split(' ')[0]; Fijos.marcar(ym);
+  const rows = pend.map(v => `<div class="fijo-row" data-rec="${esc(v.recId)}"><div style="min-width:0"><b>${esc(v.desc)}</b><span class="sub">día ${Number(v.fecha.slice(8, 10))} · antes ${M.f(M.toARS(v.monto, v.moneda))}</span></div><div class="amount-input"><span class="cur">${v.moneda === 'USD' ? 'US$' : '$'}</span><input class="input sm mono" inputmode="decimal" data-fijo="${esc(v.recId)}" value="${v.moneda === 'USD' ? String(v.monto).replace('.', ',') : fmtARS.format(v.monto)}"></div><button type="button" class="mini-btn" data-act="fijo-omitir" data-id="${esc(v.recId)}" aria-label="Este mes no va">${ICONS.x}</button></div>`).join('');
+  Modal.open({ title: `Fijos de ${mes}`, submit: 'Confirmar', body: `<div class="stack"><div class="small muted">Dejá el monto si quedó igual, corregilo si cambió, ✕ si este mes no va.</div><div class="fijos">${rows}</div></div>`, onSubmit: () => {
+    const montos = {}; const omit = [];
+    $$('.fijo-row').forEach(row => { const id = row.dataset.rec; if (row.classList.contains('omitido')) { omit.push(id); return; } montos[id] = M.parse(row.querySelector('input').value); });
+    if (Object.values(montos).some(m => !(m > 0))) { toast('Hay un fijo sin monto: corregilo o marcalo con ✕'); return false; }
+    const r = E.confirmarFijos(ym, montos, omit); Persist.save(); render();
+    const camb = r.cambios.map(c => `${c.desc} ${c.d > 0 ? '+' : ''}${M.pct(c.d, 0)}`).join(', ');
+    setTimeout(() => toast(`${r.n} fijo${r.n === 1 ? '' : 's'} de ${mes} confirmado${r.n === 1 ? '' : 's'}${r.cambios.length ? ` · cambiaron: ${camb}` : r.n ? ' · sin cambios' : ''}${r.omitidos ? ` · ${r.omitidos} omitido${r.omitidos > 1 ? 's' : ''}` : ''}`, 5000), 250);
+  } });
+}
+
+/* ---------- conciliación con Balanz: la verdad es la tenencia del broker ---------- */
+function formConciliar() {
+  const k = E.cartera(); const prev = state.cartera.conciliacion || null;
+  if (!k.posiciones.length) { toast('Sin posiciones para conciliar'); return; }
+  const rows = k.posiciones.map(p => { const c = p.cedear; const app = c ? Cedears.aCedears(p.acciones, c) : p.acciones; const pv = prev && prev.items && prev.items[p.ticker]; return `<div class="conc-row"><div style="min-width:0"><b>${esc(p.ticker)}</b><span class="sub">${fmtAcc(Math.round(app * 1000) / 1000)} ${c ? 'CEDEARs' : 'acc'} según la app</span></div><input class="input sm mono" inputmode="decimal" data-conc="${esc(p.ticker)}" placeholder="Balanz" value="${pv && pv.balanz != null ? String(pv.balanz).replace('.', ',') : ''}"></div>`; }).join('');
+  Modal.open({ title: 'Conciliar con Balanz', submit: 'Guardar', body: `<div class="stack"><div class="small muted">Balanz → Tenencia: copiá la cantidad de cada ${k.posiciones.some(p => p.cedear) ? 'CEDEAR' : 'activo'}. Vacío = no lo revisaste.${prev ? ` Última conciliación: ${D.fmt(prev.fecha, { year: true })}.` : ''}</div><div class="conc">${rows}</div></div>`, onSubmit: () => {
+    const items = {}; let ok = 0, dif = 0, n = 0;
+    for (const p of k.posiciones) { const el = $(`[data-conc="${p.ticker}"]`); if (!el || !el.value.trim()) continue; const v = M.parse(el.value); const c = p.cedear; const app = c ? Cedears.aCedears(p.acciones, c) : p.acciones; n++; const coincide = Math.abs(v - app) <= Math.max(0.01, app * 0.002); items[p.ticker] = { app: Math.round(app * 1000) / 1000, balanz: v, ok: coincide }; if (coincide) ok++; else dif++; }
+    if (!n) { toast('Cargá al menos una cantidad'); return false; }
+    state.cartera.conciliacion = { fecha: D.today(), items, ok, dif, n }; Persist.save(); render();
+    setTimeout(() => toast(dif ? `${dif} diferencia${dif > 1 ? 's' : ''} con Balanz: revisá las operaciones de esas posiciones` : `Conciliación OK: ${ok} posición${ok === 1 ? '' : 'es'} coinciden con Balanz`, 4500), 250);
+  } });
+}
+
 /* ---------- inversión / ingreso extra ---------- */
 function formInv() {
   const destinos = [...new Set(state.inversiones.slice().sort((p, q) => q.fecha.localeCompare(p.fecha)).map(i => i.destino).filter(Boolean))].slice(0, 6);
   const body = `<div class="form-grid">
-    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Aporte</button><button type="button" data-act="switch-op">Cartera</button></div>
+    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button class="on" type="button">Aporte a inversión</button></div>
     <div class="full"><div class="big-amount"><span class="cur" id="i-cursym">$</span><input id="i-monto" inputmode="decimal" autocomplete="off" placeholder="0" autofocus></div><div class="row" style="justify-content:center;gap:6px">${F.choice('i-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], 'ARS')}</div></div>
     ${F.field('Destino', `${destinos.length ? `<div class="chips" style="margin-bottom:6px">${destinos.map(d => `<button type="button" data-act="pick-destino" data-id="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : ''}<input class="input" id="i-destino" placeholder="Balanz · CEDEARs, BTC, plazo fijo…">`, '', 'full')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-inv" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-inv" data-id="ayer">Ayer</button>${F.input('i-fecha', ui.mes === D.thisMonth() ? D.today() : D.dateIn(ui.mes, 1), 'type="date"')}</div>`, '', 'full')}
@@ -193,58 +253,242 @@ function formCat(c = null) {
 function confirmar(msg, onOk, label = 'Borrar') { Modal.open({ title: 'Confirmar', body: `<p>${esc(msg)}</p>`, submit: label, onSubmit: () => { onOk(); } }); const b = $('#modal [data-act="submit"]'); if (b && label === 'Borrar') b.classList.add('danger'); }
 
 /* ---------- cartera: operaciones, posiciones, alertas ---------- */
+/* ---------- control de calidad de una operación: cada número se contrasta con una fuente independiente antes de guardar ---------- */
+const Verif = {
+  /** Lee el form de operación y arma la operación candidata (sin validar campos vacíos) */
+  candidata(pre = {}) {
+    const tipo = Modal.choice('o-tipo') || 'compra'; const ticker = formOpTicker(); const modo = tipo === 'dividendo' ? null : (Modal.choice('o-modo') || 'usd');
+    const fRaw = Modal.val('o-fecha') || D.today(); const o = { id: pre.id || null, tipo, ticker, fecha: D.habil(fRaw), fechaRaw: fRaw, modo };
+    if (tipo === 'dividendo') o.monto = M.parse(Modal.val('o-monto'));
+    else if (modo === 'cedear') { const c = formOpCedear(ticker); o.c = c; o.cedears = M.parse(Modal.val('o-ced')); o.precioCedear = M.parse(Modal.val('o-pxars')); o.ccl = M.parse(Modal.val('o-ccl')); if (c && o.cedears && o.precioCedear && o.ccl) { o.acciones = Cedears.aAcciones(o.cedears, c); o.precio = Cedears.precioUSD(o.precioCedear, c, o.ccl); } }
+    else { o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); }
+    return o;
+  },
+  /** Chequeos: [{nivel:'ok'|'info'|'warn'|'block', txt}] + trazabilidad de las fuentes usadas */
+  evaluar(o, k) {
+    const items = []; const add = (nivel, txt) => items.push({ nivel, txt });
+    const hoy = D.today(); const hoyH = D.habil(hoy); const s = state.settings; const pr = o.ticker ? state.cartera.precios[o.ticker] : null; const spy = state.cartera.precios.SPY;
+    const min = t => t ? Math.round((Date.now() - t) / 60000) : null; const hace = m => m == null ? '' : m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
+    const traza = { en: new Date().toISOString() };
+    if (o.fechaRaw > hoy) add('block', `Fecha futura (${D.fmt(o.fechaRaw, { year: true })}).`);
+    else if (o.fecha !== o.fechaRaw) add('info', `${D.fmt(o.fechaRaw)} no es día hábil: se guarda el ${D.fmt(o.fecha, { year: true })}.`);
+    if (o.tipo === 'dividendo') {
+      const p = k.posiciones.find(x => x.ticker === o.ticker);
+      if (!p) add('warn', `No tenés ${o.ticker || 'ese ticker'} en cartera: ¿dividendo de una posición cerrada?`);
+      else if (o.monto && p.valor && o.monto > p.valor * 0.1) add('warn', `Dividendo de ${fmtU(o.monto)} = ${M.pct(o.monto / p.valor, 1)} de la posición: inusualmente alto, revisá que sea neto en USD.`);
+      return { items, nivel: Verif.nivel(items), traza };
+    }
+    // ratio
+    if (o.modo === 'cedear') {
+      if (!o.c) add('block', 'Sin ratio: no puedo convertir CEDEARs a acciones.');
+      else if (o.c.manual) { add('warn', `Ratio manual ${Cedears.ratioTxt(o.c)}: verificalo en Balanz o BYMA.`); traza.ratio = { txt: Cedears.ratioTxt(o.c), fuente: 'manual' }; }
+      else { add('ok', `Ratio ${Cedears.ratioTxt(o.c)} · tabla BYMA ${D.fmt(Cedears.actualizado(), { year: true })}.`); traza.ratio = { txt: Cedears.ratioTxt(o.c), fuente: `BYMA ${Cedears.actualizado()}` }; }
+    }
+    // precio en USD vs NY (independiente de lo que tipeaste): el chequeo que atrapa errores de precio, cantidad, ratio o ticker
+    if (o.precio) {
+      const ny = pr && pr.c ? pr : null;
+      if (!ny) add('warn', `Sin precio de ${o.ticker} en NY para contrastar (cargá la clave de Finnhub en Ajustes).`);
+      else {
+        const gap = o.precio / ny.c - 1; const ag = Math.abs(gap); const pasada = o.fecha < hoyH; const txt = `${fmtU(o.precio)} por acción vs ${fmtU(ny.c)} en NY ${pasada ? 'hoy' : hace(min(ny.t))} (${gap >= 0 ? '+' : ''}${(gap * 100).toFixed(1)} %)`;
+        traza.ny = { precio: ny.c, hora: ny.t ? new Date(ny.t).toISOString() : null, gap: Math.round(gap * 10000) / 10000 };
+        if (pasada) add(ag > 0.35 ? 'warn' : 'info', `${txt}${ag > 0.35 ? ': muy lejos del precio actual, revisá' : ' · fecha pasada, sin verificación exacta'}.`);
+        else if (ag <= 0.03) add('ok', `Precio coherente con NY: ${txt}.`);
+        else if (ag <= 0.12) add('warn', `Precio ${txt}: puede ser el premium del CEDEAR o un error de precio, cantidad o ratio.`);
+        else add('block', `Precio ${txt}: casi seguro hay un error (precio, cantidad, ratio o ticker).`);
+      }
+    }
+    // CCL
+    if (o.modo === 'cedear' && o.ccl) {
+      const el = $('#o-ccl'); const fuente = el && el.dataset.fuente ? el.dataset.fuente : 'mercado'; const edad = s.cclHora ? min(new Date(s.cclHora).getTime()) : null;
+      traza.ccl = { valor: o.ccl, fuente, mercado: s.ccl || null, hora: s.cclHora || null };
+      if (o.c && pr && pr.c && o.precioCedear) traza.ccl.implicito = Math.round(o.precioCedear * o.c.ratio[0] / o.c.ratio[1] / pr.c);
+      if (o.fecha < hoyH) add('info', `CCL $ ${fmtARS.format(o.ccl)} (${fuente === 'manual' ? 'manual' : fuente}) · fecha pasada: tiene que ser el CCL de ese día.`);
+      else if (fuente === 'implicito') add('ok', `CCL implícito $ ${fmtARS.format(o.ccl)}: tu precio queda igual al de NY${s.ccl ? ` (mercado $ ${fmtARS.format(s.ccl)})` : ''}.`);
+      else if (fuente === 'manual') add('warn', `CCL manual $ ${fmtARS.format(o.ccl)}${s.ccl ? ` · mercado $ ${fmtARS.format(s.ccl)} ${hace(edad)}` : ''}.`);
+      else if (edad == null || edad > 30) add('warn', `CCL de mercado $ ${fmtARS.format(o.ccl)} ${edad == null ? 'sin hora' : hace(edad)}: refrescalo antes de guardar.`);
+      else add('ok', `CCL de mercado $ ${fmtARS.format(o.ccl)} · dolarapi ${hace(edad)}.`);
+    }
+    // sombra S&P 500
+    if (o.fecha === hoyH) {
+      const fresco = spy && spy.c && spy.t && D.iso(new Date(spy.t)) === hoy && (!spy.pc || Math.abs(spy.c / spy.pc - 1) < 0.07);
+      if (fresco) { const m = min(spy.t); add('ok', `Sombra: SPY ${m <= 20 ? 'en vivo' : 'del día'} ${fmtU(spy.c)} ${hace(m)}.`); traza.spy = { valor: spy.c, fuente: m <= 20 ? 'vivo' : 'dia', hora: new Date(spy.t).toISOString() }; }
+      else { const cl = Spy.at(o.fecha); const fd = Spy.fechaDe(o.fecha); add('warn', `Sin SPY en vivo: la sombra usa el cierre ${fd ? `del ${D.fmt(fd)}` : ''} ${cl ? fmtU(cl) : 's/d'}.`); traza.spy = { valor: cl, fuente: 'cierre', fecha: fd }; }
+    } else {
+      const fd = Spy.fechaDe(o.fecha); const cl = Spy.at(o.fecha); traza.spy = { valor: cl, fuente: 'cierre', fecha: fd };
+      if (!cl) add('warn', 'Sin cierre de SPY para esa fecha: la sombra no puede replicar la operación.');
+      else if (fd !== o.fecha) add('warn', `Sin cierre de SPY del ${D.fmt(o.fecha)}: la sombra usa el del ${D.fmt(fd)} (${fmtU(cl)}).`);
+      else add('ok', `Sombra: cierre de SPY del ${D.fmt(o.fecha)} ${fmtU(cl)}.`);
+    }
+    // venta > tenencia
+    if (o.tipo === 'venta' && o.acciones) { const p = k.posiciones.find(x => x.ticker === o.ticker); const tengo = p ? p.acciones + (o.id ? (k.ops.find(x => x.id === o.id) || {}).acciones || 0 : 0) : 0; if (tengo + 1e-6 < o.acciones) add('block', `Vendés ${fmtAcc(o.acciones)} acciones y tenés ${fmtAcc(tengo)}.`); }
+    // duplicado
+    const dup = state.cartera.operaciones.find(x => x.id !== o.id && x.ticker === o.ticker && x.fecha === o.fecha && x.tipo === o.tipo && o.acciones && Math.abs((x.acciones || 0) - o.acciones) < 1e-6);
+    if (dup) add('warn', `Ya hay una ${o.tipo} igual de ${o.ticker} el ${D.fmt(o.fecha)}: ¿duplicada?`);
+    // monto inusual
+    if (o.acciones && o.precio) { const total = o.acciones * o.precio; const prev = state.cartera.operaciones.filter(x => x.id !== o.id && x.tipo !== 'dividendo').map(x => (x.acciones || 0) * (x.precio || 0)); const mx = prev.length ? Math.max(...prev) : 0; if (mx && total > 3 * mx && total > 500) add('warn', `Total ${fmtU(total)}: muy por encima de tu operación más grande (${fmtU(mx)}).`); }
+    return { items, nivel: Verif.nivel(items), traza };
+  },
+  nivel(items) { return items.some(i => i.nivel === 'block') ? 'block' : items.some(i => i.nivel === 'warn') ? 'warn' : 'ok'; },
+  html(ev) {
+    const ic = { ok: '✓', info: '·', warn: '⚠', block: '✕' };
+    return `<ul class="verif">${ev.items.map(i => `<li class="${i.nivel}"><i>${ic[i.nivel]}</i><span>${i.txt}</span></li>`).join('')}</ul>${ev.nivel === 'block' ? `<label class="switch verif-force"><input type="checkbox" id="o-force"><span>Lo revisé, guardar igual</span></label>` : ''}`;
+  },
+  /** Texto corto de trazabilidad para el detalle de una operación guardada */
+  trazaTxt(v) {
+    if (!v || !v.traza) return ''; const t = v.traza; const parts = [];
+    if (t.ratio) parts.push(`ratio ${t.ratio.txt} (${t.ratio.fuente})`);
+    if (t.ccl) parts.push(`CCL $ ${fmtARS.format(t.ccl.valor)} ${t.ccl.fuente === 'implicito' ? 'implícito' : t.ccl.fuente}${t.ccl.implicito && t.ccl.fuente !== 'implicito' ? ` · implícito $ ${fmtARS.format(t.ccl.implicito)}` : ''}${t.ccl.mercado && t.ccl.fuente !== 'mercado' ? ` · mercado $ ${fmtARS.format(t.ccl.mercado)}` : ''}`);
+    if (t.ny) parts.push(`NY ${fmtU(t.ny.precio)} (${t.ny.gap >= 0 ? '+' : ''}${(t.ny.gap * 100).toFixed(1)} %)`);
+    if (t.spy) parts.push(`SPY ${t.spy.valor ? fmtU(t.spy.valor) : 's/d'} ${t.spy.fuente === 'vivo' ? 'en vivo' : t.spy.fuente === 'dia' ? 'del día' : `cierre${t.spy.fecha ? ' ' + D.fmt(t.spy.fecha) : ''}`}`);
+    return `${parts.join(' · ')}${t.en ? ` · guardada ${new Date(t.en).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}` : ''}`;
+  },
+};
 function formOp(pre = {}) {
-  const k = E.cartera(); const tickers = [...new Set([...k.posiciones.map(p => p.ticker), ...k.watch.map(p => p.ticker)])];
-  const tipo = pre.tipo || 'compra';
+  const k = E.cartera(); const mios = k.posiciones.map(p => p.ticker);
+  const editando = !!pre.id; const tipo = pre.tipo || 'compra';
+  const modo = pre.modo || (editando ? 'usd' : (state.settings.modoOp || 'cedear'));
+  const ced = pre.ticker ? Cedears.de(pre.ticker) : null;
   const body = `<div class="form-grid">
-    <div class="seg full" style="width:fit-content;margin:0 auto 4px"><button type="button" data-act="switch-gasto">Gasto</button><button type="button" data-act="switch-inv">Aporte</button><button class="on" type="button">Cartera</button></div>
     <div class="full">${F.choice('o-tipo', [['compra', 'Compra'], ['venta', 'Venta'], ['dividendo', 'Dividendo']], tipo)}</div>
-    ${F.field('Ticker', `${tickers.length ? `<div class="chips" style="margin-bottom:6px">${tickers.map(t => `<button type="button" data-act="pick-ticker" data-id="${esc(t)}" class="${t === pre.ticker ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>` : ''}<input class="input" id="o-ticker" value="${esc(pre.ticker || '')}" placeholder="MELI, NVDA, GLD…" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase" ${pre.ticker ? '' : 'autofocus'}>`, 'El ticker de USA (subyacente del CEDEAR), como lo ves en Yahoo/Balanz.', 'full')}
-    <div id="o-campos" class="full form-grid" style="padding:0">${formOpCampos(tipo, pre)}</div>
-    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, '', 'full')}
+    ${F.field('Ticker', `${mios.length ? `<div class="chips" style="margin-bottom:6px">${mios.map(t => `<button type="button" data-act="pick-ticker" data-id="${esc(t)}" class="${t === pre.ticker ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>` : ''}
+      <input type="hidden" id="o-tk" value="${esc(pre.ticker || '')}">
+      <input class="input" id="o-ticker" value="${esc(ced ? `${ced.code} · ${ced.nombre}` : (pre.ticker || ''))}" placeholder="Buscá entre los ${Cedears.lista().length} CEDEARs: MELI, Apple, Nvidia…" autocomplete="off" autocapitalize="characters" ${pre.ticker ? '' : 'autofocus'}>
+      <div class="sug-list" id="o-sug"></div>
+      <div class="small muted" id="o-info" style="margin-top:4px">${formOpInfo(pre.ticker)}</div>`, '', 'full')}
+    <div class="full" id="o-modo-box" ${tipo === 'dividendo' ? 'hidden' : ''}>${F.field('Cómo lo cargás', F.choice('o-modo', [['cedear', 'CEDEARs en pesos'], ['usd', 'Acciones en USD']], modo), 'En pesos: cantidad de CEDEARs y precio en $; la app convierte con el ratio y el CCL.')}</div>
+    <div id="o-campos" class="full form-grid" style="padding:0">${formOpCampos(tipo, modo, pre)}</div>
+    <div class="full callout" id="o-calc" style="padding:8px 12px;font-size:13px"></div>
+    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? '⚠️ Fecha estimada (posición previa cargada el 3-4/1/26). Poné la fecha real de compra para afinar la comparación contra el S&P.' : '', 'full')}
     ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
+    ${editando && pre.verif ? `<div class="full small muted traza"><b class="${pre.verif.nivel === 'ok' ? 'up' : 'warn-text'}">${pre.verif.nivel === 'ok' ? '✓ verificada' : pre.verif.nivel === 'block' ? '✕ guardada con errores' : '⚠ con advertencias'}</b> · ${esc(Verif.trazaTxt(pre.verif))}</div>` : ''}
   </div>`;
-  Modal.open({ title: 'Operación de cartera', body, submit: 'Guardar', onSubmit: () => {
-    const tipo = Modal.choice('o-tipo') || 'compra'; const ticker = Modal.val('o-ticker').trim().toUpperCase().replace(/\s+/g, '');
-    if (!ticker) { toast('Falta el ticker'); return false; }
-    const o = { id: uid(), tipo, ticker, fecha: Modal.val('o-fecha') || D.today(), nota: Modal.val('o-nota').trim() };
+  Modal.open({ title: editando ? 'Editar operación' : 'Operación de cartera', body, submit: editando ? 'Guardar cambios' : 'Guardar', extra: editando ? `<button type="button" class="btn danger" data-act="del-op-modal" data-id="${pre.id}">Borrar</button>` : '', onSubmit: () => {
+    const tipo = Modal.choice('o-tipo') || 'compra';
+    const ticker = formOpTicker(); if (!ticker) { toast('Falta el ticker'); return false; }
+    const fRaw = Modal.val('o-fecha') || D.today(); const fH = D.habil(fRaw);
+    const o = { id: pre.id || uid(), tipo, ticker, fecha: fH, nota: Modal.val('o-nota').trim() };
+    if (fH !== fRaw) setTimeout(() => toast(`Fecha movida al día hábil anterior: ${D.fmt(fH, { year: true })}`, 3500), 400);
+    if (pre.origen) o.origen = pre.origen;
+    if (pre.legado && o.fecha === pre.fecha) o.legado = true;  // sigue sin fecha real
+    const spy = state.cartera.precios.SPY; const spyDelDia = spy && spy.c && spy.t && D.iso(new Date(spy.t)) === D.today() && (!spy.pc || Math.abs(spy.c / spy.pc - 1) < 0.07);
+    if (spyDelDia && o.fecha === D.habil(D.today())) o.spy = spy.c; else if (pre.spy && o.fecha === pre.fecha) o.spy = pre.spy;
     if (tipo === 'dividendo') { o.monto = M.parse(Modal.val('o-monto')); if (!o.monto) { toast('Falta el monto del dividendo'); return false; } }
-    else { o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); if (!o.acciones || !o.precio) { toast('Faltan acciones o precio'); return false; }
-      if (tipo === 'venta') { const p = E.cartera().posiciones.find(x => x.ticker === ticker); if (!p || p.acciones + 1e-6 < o.acciones) { toast(`No tenés ${fmtAcc(o.acciones)} acciones de ${ticker} para vender`); return false; } } }
-    state.cartera.operaciones.push(o); if (!state.cartera.precios[ticker] && tipo !== 'dividendo') state.cartera.precios[ticker] = { c: o.precio, dp: 0, t: 0, estimado: true };
-    Persist.save(); toast(`${tipo === 'compra' ? 'Compra' : tipo === 'venta' ? 'Venta' : 'Dividendo'} de ${ticker} registrada`); if (ui.view !== 'cartera') ui.view = 'cartera'; render();
+    else {
+      const modo = Modal.choice('o-modo') || 'usd'; if (!editando) state.settings.modoOp = modo;
+      if (modo === 'cedear') {
+        const c = formOpCedear(ticker); const ced = M.parse(Modal.val('o-ced')), px = M.parse(Modal.val('o-pxars')), ccl = M.parse(Modal.val('o-ccl'));
+        if (!c) { toast('No conozco el ratio de ese CEDEAR: cargalo en el campo Ratio o usá "Acciones en USD"'); return false; }
+        if (!ced || !px || !ccl) { toast('Faltan cantidad, precio o CCL'); return false; }
+        Object.assign(o, { modo: 'cedear', cedears: ced, precioCedear: px, ccl, ratio: Cedears.ratioTxt(c), acciones: Cedears.aAcciones(ced, c), precio: Cedears.precioUSD(px, c, ccl), montoARS: ced * px });
+      } else { o.modo = 'usd'; o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); if (!o.acciones || !o.precio) { toast('Faltan acciones o precio'); return false; } }
+    }
+    // control de calidad: contrasta precio, CCL, ratio, SPY, fecha, duplicados y tenencia; lo rojo bloquea salvo que lo confirmes
+    const ev = Verif.evaluar(Verif.candidata(pre), k); const force = $('#o-force') && $('#o-force').checked;
+    if (ev.nivel === 'block' && !force) { toast('Hay puntos en rojo: revisalos o marcá "Lo revisé, guardar igual"', 4000); const box = $('#o-calc'); if (box) box.scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
+    o.verif = { nivel: ev.nivel, items: ev.items.filter(i => i.nivel !== 'ok' && i.nivel !== 'info').map(i => i.txt), traza: ev.traza, forzada: ev.nivel === 'block' && force ? true : undefined };
+    const ops = state.cartera.operaciones; const idx = ops.findIndex(x => x.id === o.id);
+    if (idx >= 0) ops[idx] = o; else ops.push(o);
+    if (tipo !== 'dividendo' && !state.cartera.precios[ticker]) state.cartera.precios[ticker] = { c: o.precio, dp: 0, t: 0, estimado: true };
+    Persist.save(); toast(editando ? 'Operación actualizada' : `${tipo === 'compra' ? 'Compra' : tipo === 'venta' ? 'Venta' : 'Dividendo'} de ${ticker} registrada`); if (ui.view !== 'cartera') ui.view = 'cartera'; render();
   } });
-  $('#modal').onchange = e => { if (e.target.closest('#o-tipo')) { const t = Modal.choice('o-tipo'); const box = $('#o-campos'); if (box) box.innerHTML = formOpCampos(t, { ticker: Modal.val('o-ticker') }); } };
+  const refresh = () => { const t = Modal.choice('o-tipo') || 'compra'; const m = Modal.choice('o-modo') || 'usd'; const box = $('#o-campos'); const mb = $('#o-modo-box'); if (mb) mb.hidden = t === 'dividendo'; if (box) box.innerHTML = formOpCampos(t, m, { ticker: formOpTicker() }); formOpCalc(); formOpCclInfo(); };
+  $('#modal').onchange = e => { if (e.target.closest('#o-tipo') || e.target.closest('#o-modo')) refresh(); else formOpCalc(); };
+  $('#modal').oninput = e => {
+    if (e.target.id === 'o-ticker') { const q = e.target.value.trim(); $('#o-tk').value = q.toUpperCase().replace(/[^A-Z0-9.\-]/g, ''); const res = Cedears.buscar(q); const sug = $('#o-sug'); sug.innerHTML = res.map(c => `<button type="button" data-act="pick-ced" data-id="${esc(c.code)}"><b>${esc(c.code)}</b><span>${esc(c.nombre)}</span><i>${Cedears.ratioTxt(c)}</i></button>`).join(''); $('#o-info').innerHTML = formOpInfo(formOpTicker()); formOpCalc(); return; }
+    if (e.target.id === 'o-ccl') { const el = $('#o-ccl'); if (el) { el.dataset.manual = '1'; el.dataset.fuente = 'manual'; } }
+    formOpCalc();
+  };
+  formOpCalc._pre = pre; formOpCalc(); formOpCclFresh();
 }
-function formOpCampos(tipo, pre = {}) {
+/** CCL fresco al abrir el form (dolarapi, ≤10 min) + precio del subyacente en vivo para el CCL implícito */
+async function formOpCclFresh() {
+  const r = await TC.ccl(10);
+  const el = $('#o-ccl'); if (el && r && r.ccl && !el.dataset.manual && !el.value) { el.value = r.ccl; el.dataset.fuente = 'mercado'; }
+  if (el && r && r.ccl && !el.dataset.manual && Number(el.value) !== r.ccl && !r.cache) { el.value = r.ccl; el.dataset.fuente = 'mercado'; }
+  formOpCclInfo(); formOpCalc();
+  const t = formOpTicker(); if (t && (Modal.choice('o-modo') || 'usd') === 'cedear') { const pr = state.cartera.precios[t]; if (!pr || !pr.t || Date.now() - pr.t > 10 * 60000) { await Precios.quote(t); formOpCclInfo(); } }
+  const sp = state.cartera.precios.SPY; if (!sp || !sp.t || Date.now() - sp.t > 10 * 60000) await Precios.quote('SPY');  // SPY en vivo: la sombra compra al precio del momento
+}
+function formOpCclInfo() {
+  const box = $('#o-ccl-info'); if (!box) return;
+  const s = state.settings; const t = formOpTicker(); const c = formOpCedear(t); const pr = t ? state.cartera.precios[t] : null;
+  const hora = s.cclHora ? new Date(s.cclHora) : null; const edad = hora ? Math.round((Date.now() - hora.getTime()) / 60000) : null;
+  const px = M.parse(Modal.val('o-pxars'));
+  let imp = null; if (c && pr && pr.c && px) imp = px * c.ratio[0] / c.ratio[1] / pr.c;
+  box.innerHTML = `<span>Mercado: <b>$ ${s.ccl ? fmtARS.format(s.ccl) : 's/d'}</b>${edad != null ? ` <small class="muted">(${edad < 1 ? 'recién' : edad < 60 ? `hace ${edad} min` : edad < 1440 ? `hace ${Math.round(edad / 60)} h` : D.fmt(D.iso(hora))})</small>` : ''} <button type="button" class="btn ghost sm" data-act="op-ccl-usar" data-id="${s.ccl || ''}|mercado" style="padding:2px 8px;min-height:26px">usar</button></span>`
+    + (imp ? `<span>Implícito en tu compra: <b>$ ${fmtARS.format(imp)}</b> <small class="muted">(${esc(t)} a ${fmtU(pr.c)} ${pr.t ? 'ahora' : 'estimado'})</small> <button type="button" class="btn ghost sm" data-act="op-ccl-usar" data-id="${Math.round(imp)}|implicito" style="padding:2px 8px;min-height:26px">usar</button></span>` : (c && px ? `<span class="muted">Implícito: falta el precio en USD de ${esc(t)} (cargá la clave de Finnhub)</span>` : ''));
+}
+/** ticker interno (US) elegido en el form de operación */
+function formOpTicker() { const el = $('#o-tk'); return el ? el.value.trim().toUpperCase() : ''; }
+function formOpCedear(ticker) { const c = Cedears.de(ticker); if (c) return c; const r = $('#o-ratio'); if (r) { const m = String(r.value).match(/(\d+)\s*:\s*(\d+)/); if (m) return { code: ticker, nombre: ticker, ratio: [Number(m[1]), Number(m[2])], manual: true }; } return null; }
+function formOpInfo(ticker) {
+  if (!ticker) return 'Elegí de tus posiciones o escribí para buscar.';
+  const c = Cedears.de(ticker); const p = E.cartera().posiciones.find(x => x.ticker === ticker);
+  return `${c ? `<b>${esc(c.code)}</b> · ${esc(c.nombre)} · ratio <b>${Cedears.ratioTxt(c)}</b> (${c.ratio[0]} CEDEAR${c.ratio[0] > 1 ? 's' : ''} = ${c.ratio[1]} acción${c.ratio[1] > 1 ? 'es' : ''})` : `<b>${esc(ticker)}</b> · no está en la tabla de CEDEARs de BYMA`}${p ? ` · tenés ${fmtAcc(p.acciones)} acc (PPC ${fmtU(p.ppc)})` : ''}`;
+}
+function formOpCampos(tipo, modo, pre = {}) {
   if (tipo === 'dividendo') return F.field('Monto cobrado (USD)', F.input('o-monto', pre.monto || '', 'inputmode="decimal" placeholder="0,00"'), 'Neto, lo que entró en la cuenta.', 'full');
-  const p = pre.ticker ? E.cartera().posiciones.find(x => x.ticker === pre.ticker) : null;
-  return F.field('Acciones', F.input('o-acc', pre.acciones || '', 'inputmode="decimal" placeholder="0,5"'), tipo === 'venta' && p ? `Tenés ${fmtAcc(p.acciones)}` : 'Fracciones con coma: 0,508') + F.field('Precio por acción (USD)', F.input('o-precio', pre.precio || (p && p.precio ? String(p.precio).replace('.', ',') : ''), 'inputmode="decimal" placeholder="0,00"'), tipo === 'venta' && p ? `PPC ${fmtU(p.ppc)}` : '');
+  const p = pre.ticker ? E.cartera().posiciones.find(x => x.ticker === pre.ticker) : null; const c = pre.ticker ? Cedears.de(pre.ticker) : null;
+  if (modo === 'cedear') {
+    const ccl = pre.ccl || Number(state.settings.ccl) || Number(state.settings.tc) || '';
+    return F.field('Cantidad de CEDEARs', F.input('o-ced', pre.cedears || '', 'inputmode="numeric" placeholder="4"'), tipo === 'venta' && p && c ? `Tenés ~${fmtAcc(Cedears.aCedears(p.acciones, c))} CEDEARs` : '')
+      + F.field('Precio por CEDEAR ($)', F.input('o-pxars', pre.precioCedear || '', 'inputmode="decimal" placeholder="15.250"'), 'Lo que pagaste/cobraste por cada uno en pesos')
+      + F.field('Dólar CCL de la operación', F.input('o-ccl', ccl, 'inputmode="decimal"') + `<div class="ccl-info" id="o-ccl-info"></div>`, 'Se usa para pasar tu precio en pesos a dólares. El de mercado se refresca solo; el implícito sale de tu precio y del precio en USD del subyacente ahora.')
+      + (pre.ticker && !c ? F.field('Ratio del CEDEAR', F.input('o-ratio', '', 'placeholder="24:1"'), 'No está en la tabla BYMA: cargalo a mano (N CEDEARs : M acciones)') : '');
+  }
+  return F.field('Acciones', F.input('o-acc', pre.acciones || '', 'inputmode="decimal" placeholder="0,5"'), tipo === 'venta' && p ? `Tenés ${fmtAcc(p.acciones)}` : 'Fracciones con coma: 0,508')
+    + F.field('Precio por acción (USD)', F.input('o-precio', pre.precio || (p && p.precio ? String(p.precio).replace('.', ',') : ''), 'inputmode="decimal" placeholder="0,00"'), tipo === 'venta' && p ? `PPC ${fmtU(p.ppc)}` : '');
+}
+function formOpCalc() {
+  const box = $('#o-calc'); if (!box) return;
+  const tipo = Modal.choice('o-tipo') || 'compra'; const ticker = formOpTicker(); const modo = Modal.choice('o-modo') || 'usd';
+  if (!ticker) { box.hidden = true; return; }
+  const c = formOpCedear(ticker); const ccl = M.parse(Modal.val('o-ccl')) || Number(state.settings.ccl) || Number(state.settings.tc) || 0;
+  let html = '';
+  if (tipo === 'dividendo') html = '';
+  else if (modo === 'cedear') {
+    const ced = M.parse(Modal.val('o-ced')), px = M.parse(Modal.val('o-pxars'));
+    if (!c) html = 'Cargá el ratio para poder convertir.';
+    else if (ced && px && ccl) { const acc = Cedears.aAcciones(ced, c); const pu = Cedears.precioUSD(px, c, ccl); html = `= <b>${fmtAcc(acc)} acciones</b> de ${esc(ticker)} · <b>${fmtU(pu)}</b> por acción · total <b>${fmtU(acc * pu)}</b> (${M.f(ced * px, { cur: 'ARS' })} al CCL $ ${fmtARS.format(ccl)})`; }
+    else html = 'Completá cantidad y precio para ver el equivalente en acciones y dólares.';
+    formOpCclInfo();
+  } else {
+    const acc = M.parse(Modal.val('o-acc')), pu = M.parse(Modal.val('o-precio'));
+    if (acc && pu) html = `= total <b>${fmtU(acc * pu)}</b>${c && ccl ? ` · equivale a <b>${fmtAcc(Cedears.aCedears(acc, c))} CEDEARs</b> a ~$ ${fmtARS.format(pu * ccl * c.ratio[1] / c.ratio[0])} c/u al CCL` : ''}`;
+    else html = 'Completá acciones y precio.';
+  }
+  let ver = '', nivel = 'ok'; try { const k = E.cartera(); const o = Verif.candidata(formOpCalc._pre || {}); const ev = Verif.evaluar(o, k); ver = Verif.html(ev); nivel = ev.nivel; } catch (err) { ver = ''; }
+  box.hidden = false; box.innerHTML = html + ver; box.classList.toggle('crit', nivel === 'block'); box.classList.toggle('amber', nivel === 'warn');
 }
 function formPosicion(ticker) {
   const k = E.cartera(); const p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker); if (!p) return;
   const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
   const al = p.alerta || {};
   const body = `<div class="stack">
+    ${p.cedear ? `<div class="small muted">CEDEAR <b>${esc(p.cedear.code)}</b> · ratio ${Cedears.ratioTxt(p.cedear)}${p.acciones ? ` · tenés ~<b>${fmtAcc(Cedears.aCedears(p.acciones, p.cedear))} CEDEARs</b>` : ''}${p.lotes && p.lotes.length ? ` · ${p.lotes.length} lote${p.lotes.length > 1 ? 's' : ''} abierto${p.lotes.length > 1 ? 's' : ''} (FIFO)` : ''}</div>` : ''}
     ${p.acciones ? `<div class="sim-result">
       <div class="box"><div class="l">Tenés</div><div class="v">${fmtAcc(p.acciones)} acc</div></div>
       <div class="box"><div class="l">PPC</div><div class="v">${fmtU(p.ppc)}</div></div>
       <div class="box"><div class="l">Precio hoy</div><div class="v">${p.precio != null ? fmtU(p.precio) : '—'}</div></div>
       <div class="box"><div class="l">Valor</div><div class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</div></div>
-      <div class="box"><div class="l">Resultado</div><div class="v ${p.gp > 0 ? 'up' : p.gp < 0 ? 'down' : ''}">${p.gp != null ? (p.gp >= 0 ? '+' : '') + fmtU(p.gp, 0) : '—'}</div><div class="l">${p.gpPct != null ? (p.gp >= 0 ? '+' : '') + M.pct(p.gpPct, 1) : ''}</div></div>
-      <div class="box"><div class="l">Peso</div><div class="v">${M.pct(p.peso || 0, 1)}</div></div>
+      <div class="box"><div class="l">Resultado</div><div class="v ${p.gp > 0 ? 'up' : p.gp < 0 ? 'down' : ''}">${p.gp != null ? (p.gp >= 0 ? '+' : '−') + fmtU(Math.abs(p.gp), 0) : '—'}</div><div class="l">${p.gpPct != null ? pctS(p.gpPct) : ''}${p.dividendos ? ` · div ${fmtU(p.dividendos)}` : ''}</div></div>
+      <div class="box"><div class="l">vs S&P 500</div><div class="v ${p.alfaUSD > 0 ? 'up' : p.alfaUSD < 0 ? 'down' : ''}">${p.alfaUSD != null ? (p.alfaUSD >= 0 ? '+' : '−') + fmtU(Math.abs(p.alfaUSD), 0) : '—'}</div><div class="l">${p.alfaUSD != null ? 'mismas compras en SPY' : ''}</div></div>
     </div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
-    <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas de precio (USD)</div></div>
+    ${p.objetivo ? `<div class="small"><b>Precio objetivo:</b> ${fmtU(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside)} desde hoy)` : ''}</div>` : ''}
+    ${al.nota ? `<div class="callout" style="font-size:13px"><b>Tesis / nota:</b> ${esc(al.nota)}</div>` : ''}
+    <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas y objetivo (USD)</div></div>
       ${F.field('🟡 Che, mirala ≤', F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
       ${F.field('🔴 Comprá urgente ≤', F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
+      ${F.field('Precio objetivo 12 m', F.input('a-objetivo', al.objetivo || '', 'inputmode="decimal" placeholder="opcional"'))}
+      ${F.field('Tesis / nota', F.input('a-nota', al.nota || '', 'placeholder="por qué la tenés, qué mirar"'))}
     </div>
     <div class="row" style="gap:8px"><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
-    ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones</div>${ops.map(o => `<div class="list-item"><div><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b><span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px"><span class="mono">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0))}</span><button type="button" class="mini-btn" data-act="del-op-modal" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('')}</div>` : ''}
+    ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(tocá para editar)</span></div>${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><span class="mono op-amt">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0), 2)}</span></div>`).join('')}</div>` : ''}
   </div>`;
-  Modal.open({ title: ticker, body, submit: 'Guardar alertas', onSubmit: () => {
-    const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente'));
-    if (!mirala && !urgente) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null };
-    Persist.save(); toast('Alertas guardadas'); render();
+  Modal.open({ title: ticker, body, submit: 'Guardar', onSubmit: () => {
+    const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), nota = Modal.val('a-nota').trim();
+    if (!mirala && !urgente && !objetivo && !nota) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, nota: nota || null };
+    Persist.save(); toast('Guardado'); render();
   } });
 }
 function formWatch() {
@@ -253,4 +497,151 @@ function formWatch() {
     if (!t || (!mirala && !urgente)) { toast('Ticker y al menos un nivel'); return false; }
     state.cartera.alertas[t] = { mirala: mirala || null, urgente: urgente || null }; Persist.save(); render();
   } });
+}
+
+/* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
+const Intercambio = {
+  FORMATO: 'gestor-gastos-cambios', VERSION: 1,
+  nombreArchivo() { return `cartera-${D.today()}.md`; },
+  /** Markdown legible (tablas) + bloque JSON exacto + instrucciones y esquema de respuesta */
+  exportar() {
+    const k = E.cartera(); const s = state.settings; const hoy = D.today(); const hora = new Date();
+    const n = v => v == null ? '' : Number(v).toFixed(2); const pct = v => v == null ? '' : (v * 100).toFixed(1) + ' %';
+    const pctO = v => v == null ? 's/d' : pct(v);
+    const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : `- **${nombre}**: no disponible`;
+    const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
+    const posRows = k.posiciones.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${fmtAcc(p.acciones)} | ${n(p.ppc)} | ${n(p.precio)} | ${n(p.valor)} | ${pct(p.gpPct)} | ${pct(p.peso)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
+    const watchRows = k.watch.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${n(p.precio)} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
+    const cerrRows = k.cerradas.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${n(p.dividendos)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} |`).join('\n');
+    const ops = k.ops.slice().reverse().slice(0, 40).map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
+    const json = {
+      tipo: 'gestor-gastos-cartera', version: Intercambio.VERSION, generado: hora.toISOString(), app: BUILD,
+      dolar: { mep: k.mep, ccl: k.ccl, spy: k.spyHoy, preciosAl: k.preciosFecha },
+      resumen: { valorUSD: k.valor, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, posiciones: k.posiciones.length },
+      rendimiento: Object.fromEntries(E.VENTANAS.map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
+      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
+      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
+      cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
+    };
+    const md = `# Cartera de ${esc(s.nombre || 'Facu')} — exportada el ${D.fmt(hoy, { year: true })} ${pad2(hora.getHours())}:${pad2(hora.getMinutes())}
+
+App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR') : 's/d'} · MEP $ ${fmtARS.format(k.mep)} · CCL $ ${fmtARS.format(k.ccl)} · SPY ${n(k.spyHoy)}.
+
+## Resumen
+- Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)})
+- Dividendos cobrados US$ ${n(k.dividendos)} · resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
+${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operación)' : l)).join('\n')}
+- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas.
+
+## Posiciones (${k.posiciones.length})
+| Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo % | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Tesis / nota |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+${posRows}
+
+## Watchlist (alertas sin posición) (${k.watch.length})
+| Ticker | CEDEAR (ratio) | Precio | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Nota |
+|---|---|---|---|---|---|---|
+${watchRows || '| — | | | | | | |'}
+
+## Posiciones cerradas
+| Ticker | Realizado USD | Dividendos | Alfa vs SPY |
+|---|---|---|---|
+${cerrRows || '| — | | | |'}
+
+## Últimas operaciones (${Math.min(40, k.ops.length)} de ${k.ops.length})
+| Fecha | Tipo | Ticker | Acciones | Precio USD (o monto) | Detalle |
+|---|---|---|---|---|---|
+${ops}
+
+## Datos exactos (JSON)
+\`\`\`json
+${JSON.stringify(json, null, 1)}
+\`\`\`
+
+## Instrucciones para Claude
+Sos mi asesor de inversiones (perfil: largo plazo, value/growth de calidad, Buffett y Lynch, objetivo: ganarle al S&P 500). Con los datos de arriba:
+1. Analizá la cartera: concentración y pesos, calidad de cada tesis, qué posiciones aportan alfa y cuáles lo destruyen, riesgos, qué falta y qué sobra. Sé directo y objetivo.
+2. Revisá las alertas: proponé niveles **🟡 mirala** (zona de acumulación razonable) y **🔴 comprá urgente** (descuento profundo, margen de seguridad) en **USD del subyacente**, y un **precio objetivo a 12 meses** por ticker, con una línea de tesis. Podés agregar tickers a la watchlist (CEDEARs disponibles en BYMA) o quitar los que no tengan sentido.
+3. Al final de tu respuesta, devolvé **un solo bloque \`\`\`json** con este formato exacto para que la app lo importe (solo los tickers que cambian; \`null\` en un ticker lo saca de las alertas/watchlist; los campos que no mandás no se tocan):
+\`\`\`json
+{ "tipo": "${Intercambio.FORMATO}", "version": ${Intercambio.VERSION}, "fecha": "${hoy}",
+  "alertas": {
+    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "nota": "líder e-commerce/fintech LatAm; comprar en caídas" },
+    "TSM": null
+  },
+  "comentario": "resumen en una línea de lo que cambiaste y por qué" }
+\`\`\`
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+`;
+    return md;
+  },
+  /** extrae el JSON de cambios de un texto pegado (bloque \`\`\`json o primer objeto {...}) */
+  parsear(texto) {
+    if (!texto) throw new Error('No hay nada para cargar.');
+    let t = String(texto);
+    const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/g);
+    const candidatos = fence ? fence.map(f => f.replace(/```(?:json)?/g, '').trim()) : [];
+    candidatos.push(t.trim());
+    // último recurso: primer objeto balanceado
+    const i = t.indexOf('{'); if (i >= 0) { let d = 0; for (let j = i; j < t.length; j++) { if (t[j] === '{') d++; else if (t[j] === '}') { d--; if (d === 0) { candidatos.push(t.slice(i, j + 1)); break; } } } }
+    let obj = null, err = null;
+    for (const c of candidatos) { try { const o = JSON.parse(c); if (o && typeof o === 'object' && (o.alertas || o.tipo === Intercambio.FORMATO)) { obj = o; break; } } catch (e) { err = e; } }
+    if (!obj) throw new Error('No encontré un bloque JSON válido con "alertas". ' + (err ? 'Error: ' + err.message : ''));
+    if (obj.tipo && obj.tipo !== Intercambio.FORMATO) throw new Error(`El archivo es de tipo "${obj.tipo}", esperaba "${Intercambio.FORMATO}".`);
+    return obj;
+  },
+  /** diff contra las alertas actuales */
+  diff(obj) {
+    const cur = state.cartera.alertas; const k = E.cartera(); const tengo = new Set(k.posiciones.map(p => p.ticker));
+    const cambios = [], avisos = [];
+    for (const [tk0, v] of Object.entries(obj.alertas || {})) {
+      const tk = String(tk0).toUpperCase().trim(); const ced = Cedears.de(tk); const ticker = ced ? Cedears.ticker(ced) : tk;
+      if (!ced && !tengo.has(ticker)) avisos.push(`${ticker}: no está en la tabla de CEDEARs de BYMA (se carga igual).`);
+      const antes = cur[ticker] || null;
+      if (v === null) { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; }
+      if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
+      const num = x => x == null || x === '' ? null : (Number(x) || null);
+      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, 300) : null) : (antes ? antes.nota : null) };
+      if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'nota'].every(f => (antes[f] || null) === (despues[f] || null));
+      if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
+    }
+    return { cambios, avisos, comentario: obj.comentario || '' };
+  },
+  aplicar(d) {
+    for (const c of d.cambios) { if (c.tipo === 'quitar') delete state.cartera.alertas[c.ticker]; else state.cartera.alertas[c.ticker] = c.despues; }
+    Persist.save();
+  },
+};
+function formExportar() {
+  const md = Intercambio.exportar(); const nombre = Intercambio.nombreArchivo();
+  const puedeCompartir = !!(navigator.share);
+  Modal.open({ title: 'Exportar para Claude', submit: '', body: `<div class="stack">
+    <p class="small muted">Un archivo con tu cartera, rendimiento vs S&P 500, alertas, watchlist y operaciones, más las instrucciones para que Claude lo analice y te devuelva un bloque de cambios que la app puede importar.</p>
+    <div class="row" style="gap:8px">${puedeCompartir ? `<button type="button" class="btn primary" data-act="export-share">Compartir archivo</button>` : ''}<button type="button" class="btn ${puedeCompartir ? '' : 'primary'}" data-act="export-copy">Copiar texto</button></div>
+    <p class="small muted">Pegalo en un chat del proyecto <b>Inversiones</b> (o adjuntá el archivo). Cuando Claude responda, copiá su bloque JSON y usá "Cargar actualizaciones".</p>
+    <textarea class="input textarea" id="export-md" readonly style="min-height:200px">${esc(md)}</textarea>
+  </div>` });
+}
+function formImportar() {
+  Modal.open({ title: 'Cargar actualizaciones de Claude', submit: 'Analizar', body: `<div class="stack">
+    <p class="small muted">Pegá la respuesta de Claude (o solo su bloque JSON). Vas a ver qué cambia antes de aplicar nada.</p>
+    <textarea class="input textarea" id="import-txt" placeholder='{ "tipo": "gestor-gastos-cambios", ... }' style="min-height:160px" autofocus></textarea>
+    <label class="btn sm" style="width:fit-content">Elegir archivo… <input type="file" id="import-file" accept=".json,.md,.txt" hidden></label>
+    <div id="import-out"></div>
+  </div>`, onSubmit: () => {
+    try {
+      const obj = Intercambio.parsear($('#import-txt').value); const d = Intercambio.diff(obj);
+      const out = $('#import-out');
+      if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
+      Intercambio._pendiente = d;
+      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}` : '—';
+      out.innerHTML = `<div class="stack">${d.comentario ? `<div class="callout" style="font-size:13px"><b>Claude:</b> ${esc(d.comentario)}</div>` : ''}
+        ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
+        ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
+        <button type="button" class="btn primary" data-act="import-apply">Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}</button></div>`;
+      return false;
+    } catch (e) { $('#import-out').innerHTML = `<div class="callout crit small">${esc(e.message)}</div>`; return false; }
+  } });
+  $('#modal').onchange = e => { if (e.target.id === 'import-file' && e.target.files[0]) { const fr = new FileReader(); fr.onload = () => { $('#import-txt').value = fr.result; }; fr.readAsText(e.target.files[0]); } };
 }
