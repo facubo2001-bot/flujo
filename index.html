@@ -4333,7 +4333,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null },
   };
 }
-const BUILD = '202609172303';
+const BUILD = '202609172326';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -7080,6 +7080,6 @@ function importarCSV(txt) {
 </script>
 
 <script>
-if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => { reg.addEventListener('updatefound', () => { const nw = reg.installing; nw && nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) { try { toast('Hay una versión nueva. Cerrá y volvé a abrir la app.', 5000); } catch (e) {} } }); }); }).catch(() => {}); }); }
+if ('serviceWorker' in navigator) { let recargando = false; navigator.serviceWorker.addEventListener('controllerchange', () => { if (recargando) return; recargando = true; try { toast('Actualizando a la versión nueva…', 2000); } catch (e) {} setTimeout(() => location.reload(), 600); }); window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => { try { reg.update(); } catch (e) {} setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000); }).catch(() => {}); }); }
 </script>
 </body></html>

@@ -22,7 +22,7 @@ const pwaHead = `<meta charset="utf-8">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">`;
 const swReg = `<script>
-if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => { reg.addEventListener('updatefound', () => { const nw = reg.installing; nw && nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) { try { toast('Hay una versión nueva. Cerrá y volvé a abrir la app.', 5000); } catch (e) {} } }); }); }).catch(() => {}); }); }
+if ('serviceWorker' in navigator) { let recargando = false; navigator.serviceWorker.addEventListener('controllerchange', () => { if (recargando) return; recargando = true; try { toast('Actualizando a la versión nueva…', 2000); } catch (e) {} setTimeout(() => location.reload(), 600); }); window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => { try { reg.update(); } catch (e) {} setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000); }).catch(() => {}); }); }
 </script>`;
 const pwaHtml = `<!doctype html>\n<html lang="es"><head>\n${pwaHead}\n</head><body>\n${html.replace('/*__PRESET__*/', () => preset)}\n${swReg}\n</body></html>`;
 fs.mkdirSync(path.join(__dirname, 'pwa'), { recursive: true });
