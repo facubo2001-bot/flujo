@@ -19,7 +19,7 @@ const catChip = (catId) => { const c = L.cat(catId); return `<span class="cat-ch
 const necBadge = (n) => `<span class="nec nec-${n || 1}" title="${NECESIDAD[n || 1]}">${n || 1}</span>`;
 const medioLabel = (m) => m.medio === 'tarjeta' ? (L.tarjeta(m.tarjetaId) ? L.tarjeta(m.tarjetaId).nombre : 'Tarjeta') : (MEDIOS[m.medio] || m.medio || '—').split(' /')[0];
 const deltaPill = (cur, prev, invert = false) => { if (!prev) return ''; const d = (cur - prev) / prev; const up = d > 0; const good = invert ? up : !up; return `<b class="${Math.abs(d) < 0.02 ? 'neutral' : good ? 'down' : 'up'}">${up ? '+' : ''}${M.pct(d)}</b>`; };
-const kpi = ({ label, value, sub = '', cls = '', spark = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div><div class="delta">${sub}</div>${spark}</div>`;
+const kpi = ({ label, value, sub = '', cls = '', spark = '', stats = null, foot = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div>${stats ? `<div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>` : ''}${sub ? `<div class="delta">${sub}</div>` : ''}${foot ? `<div class="foot">${foot}</div>` : ''}${spark}</div>`;
 
 /* ---------- RESUMEN ---------- */
 /** Día de cobro: la app pregunta cuánto cobraste (hasta registrar el mes; "Después" lo posterga hasta mañana) */

@@ -414,6 +414,12 @@ const Spy = {
   tabla() { const dyn = state.cartera.spy || {}; if (Spy._map && Spy._dyn === dyn && Spy._n === Object.keys(dyn).length) return Spy._map; Spy._map = { ...SPY_HIST.spy, ...dyn }; Spy._keys = Object.keys(Spy._map).sort(); Spy._dyn = dyn; Spy._n = Object.keys(dyn).length; return Spy._map; },
   fechas() { Spy.tabla(); return Spy._keys; },
   /** último cierre conocido ≤ fecha */
+  /** Dividendos de SPY (ex-fecha → USD por acción), para que la sombra sea S&P 500 *total return*: se reinvierten al cierre de la ex-fecha */
+  divs() { if (!Spy._divs) { const d = typeof SPY_DIVS !== 'undefined' && SPY_DIVS.divs ? SPY_DIVS.divs : {}; Spy._divs = Object.keys(d).sort().map(f => ({ fecha: f, monto: Number(d[f]) || 0 })); } return Spy._divs; },
+  /** factor de reinversión de dividendos de SPY para acciones tenidas desde `desde` (exclusive) hasta `hasta` (inclusive): Π (1 + div / cierre ex-fecha) */
+  /** Decisión de Facu (17-sep-2026): la comparación contra el S&P 500 es precio contra precio, sin dividendos de ningún lado → TR apagado (los datos quedan por si algún día se quiere total return) */
+  TR: false,
+  factor(desde, hasta) { if (!Spy.TR) return 1; let f = 1; for (const d of Spy.divs()) { if (d.fecha <= desde) continue; if (d.fecha > hasta) break; const c = Spy.at(d.fecha); if (c && d.monto) f *= 1 + d.monto / c; } return f; },
   /** fecha del último cierre conocido ≤ fecha (null si no hay) */
   fechaDe(fecha) { const m = Spy.tabla(); if (m[fecha]) return fecha; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best; },
   at(fecha) { const m = Spy.tabla(); if (m[fecha]) return m[fecha]; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best ? m[best] : null; },

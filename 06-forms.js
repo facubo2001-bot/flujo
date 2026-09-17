@@ -358,6 +358,7 @@ function formOp(pre = {}) {
     <div class="full" id="o-modo-box" ${tipo === 'dividendo' ? 'hidden' : ''}>${F.field('Cómo lo cargás', F.choice('o-modo', [['cedear', 'CEDEARs en pesos'], ['usd', 'Acciones en USD']], modo), 'En pesos: cantidad de CEDEARs y precio en $; la app convierte con el ratio y el CCL.')}</div>
     <div id="o-campos" class="full form-grid" style="padding:0">${formOpCampos(tipo, modo, pre)}</div>
     <div class="full callout" id="o-calc" style="padding:8px 12px;font-size:13px"></div>
+    ${(k.caja || 0) + (pre.deDividendos || 0) > 0.005 ? `<div class="full" id="o-dediv-box" ${tipo === 'compra' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-de-div" ${pre.deDividendos > 0 ? 'checked' : ''}><span>Pagada con dividendos <small class="muted">(tenés ${fmtU((k.caja || 0) + (pre.deDividendos || 0), 2)} sin usar)</small></span></label></div>` : ''}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? '⚠️ Fecha estimada (posición previa cargada el 3-4/1/26). Poné la fecha real de compra para afinar la comparación contra el S&P.' : '', 'full')}
     ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
     ${editando && pre.verif ? `<div class="full small muted traza"><b class="${pre.verif.nivel === 'ok' ? 'up' : 'warn-text'}">${pre.verif.nivel === 'ok' ? '✓ verificada' : pre.verif.nivel === 'block' ? '✕ guardada con errores' : '⚠ con advertencias'}</b> · ${esc(Verif.trazaTxt(pre.verif))}</div>` : ''}
@@ -374,6 +375,8 @@ function formOp(pre = {}) {
     if (spyDelDia && o.fecha === D.habil(D.today())) o.spy = spy.c; else if (pre.spy && o.fecha === pre.fecha) o.spy = pre.spy;
     if (tipo === 'dividendo') { o.monto = M.parse(Modal.val('o-monto')); if (!o.monto) { toast('Falta el monto del dividendo'); return false; } }
     else {
+      // compra pagada con dividendos: consume la caja de dividendos (el dividendo sigue contando como ganancia; la caja baja para no contar dos veces)
+      const deDiv = tipo === 'compra' && $('#o-de-div') && $('#o-de-div').checked;
       const modo = Modal.choice('o-modo') || 'usd'; if (!editando) state.settings.modoOp = modo;
       if (modo === 'cedear') {
         const c = formOpCedear(ticker); const ced = M.parse(Modal.val('o-ced')), px = M.parse(Modal.val('o-pxars')), ccl = M.parse(Modal.val('o-ccl'));
@@ -381,6 +384,7 @@ function formOp(pre = {}) {
         if (!ced || !px || !ccl) { toast('Faltan cantidad, precio o CCL'); return false; }
         Object.assign(o, { modo: 'cedear', cedears: ced, precioCedear: px, ccl, ratio: Cedears.ratioTxt(c), acciones: Cedears.aAcciones(ced, c), precio: Cedears.precioUSD(px, c, ccl), montoARS: ced * px });
       } else { o.modo = 'usd'; o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); if (!o.acciones || !o.precio) { toast('Faltan acciones o precio'); return false; } }
+      if (deDiv) o.deDividendos = Math.round(Math.min((k.caja || 0) + (pre.deDividendos || 0), o.acciones * o.precio) * 100) / 100;
     }
     // control de calidad: contrasta precio, CCL, ratio, SPY, fecha, duplicados y tenencia; lo rojo bloquea salvo que lo confirmes
     const ev = Verif.evaluar(Verif.candidata(pre), k); const force = $('#o-force') && $('#o-force').checked;
@@ -391,7 +395,7 @@ function formOp(pre = {}) {
     if (tipo !== 'dividendo' && !state.cartera.precios[ticker]) state.cartera.precios[ticker] = { c: o.precio, dp: 0, t: 0, estimado: true };
     Persist.save(); toast(editando ? 'Operación actualizada' : `${tipo === 'compra' ? 'Compra' : tipo === 'venta' ? 'Venta' : 'Dividendo'} de ${ticker} registrada`); if (ui.view !== 'cartera') ui.view = 'cartera'; render();
   } });
-  const refresh = () => { const t = Modal.choice('o-tipo') || 'compra'; const m = Modal.choice('o-modo') || 'usd'; const box = $('#o-campos'); const mb = $('#o-modo-box'); if (mb) mb.hidden = t === 'dividendo'; if (box) box.innerHTML = formOpCampos(t, m, { ticker: formOpTicker() }); formOpCalc(); formOpCclInfo(); };
+  const refresh = () => { const t = Modal.choice('o-tipo') || 'compra'; const m = Modal.choice('o-modo') || 'usd'; const box = $('#o-campos'); const mb = $('#o-modo-box'); if (mb) mb.hidden = t === 'dividendo'; const dd = $('#o-dediv-box'); if (dd) dd.hidden = t !== 'compra'; if (box) box.innerHTML = formOpCampos(t, m, { ticker: formOpTicker() }); formOpCalc(); formOpCclInfo(); };
   $('#modal').onchange = e => { if (e.target.closest('#o-tipo') || e.target.closest('#o-modo')) refresh(); else formOpCalc(); };
   $('#modal').oninput = e => {
     if (e.target.id === 'o-ticker') { const q = e.target.value.trim(); $('#o-tk').value = q.toUpperCase().replace(/[^A-Z0-9.\-]/g, ''); const res = Cedears.buscar(q); const sug = $('#o-sug'); sug.innerHTML = res.map(c => `<button type="button" data-act="pick-ced" data-id="${esc(c.code)}"><b>${esc(c.code)}</b><span>${esc(c.nombre)}</span><i>${Cedears.ratioTxt(c)}</i></button>`).join(''); $('#o-info').innerHTML = formOpInfo(formOpTicker()); formOpCalc(); return; }
@@ -471,7 +475,7 @@ function formPosicion(ticker) {
       <div class="box"><div class="l">PPC</div><div class="v">${fmtU(p.ppc)}</div></div>
       <div class="box"><div class="l">Precio hoy</div><div class="v">${p.precio != null ? fmtU(p.precio) : '—'}</div></div>
       <div class="box"><div class="l">Valor</div><div class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</div></div>
-      <div class="box"><div class="l">Resultado</div><div class="v ${p.gp > 0 ? 'up' : p.gp < 0 ? 'down' : ''}">${p.gp != null ? (p.gp >= 0 ? '+' : '−') + fmtU(Math.abs(p.gp), 0) : '—'}</div><div class="l">${p.gpPct != null ? pctS(p.gpPct) : ''}${p.dividendos ? ` · div ${fmtU(p.dividendos)}` : ''}</div></div>
+      <div class="box"><div class="l">Resultado total</div><div class="v ${p.gpTotal > 0 ? 'up' : p.gpTotal < 0 ? 'down' : ''}">${p.gpTotal != null ? (p.gpTotal >= 0 ? '+' : '−') + fmtU(Math.abs(p.gpTotal), 0) : '—'}</div><div class="l">${p.rendTotal != null ? pctS(p.rendTotal) : ''}${p.dividendos && p.rendPrecio != null ? ` = precio ${pctS(p.rendPrecio)} + div ${pctS(p.rendDiv)}` : ''}${p.realizado ? ` · realizado ${p.realizado >= 0 ? '+' : '−'}${fmtU(Math.abs(p.realizado), 0)}` : ''}</div></div>
       <div class="box"><div class="l">vs S&P 500</div><div class="v ${p.alfaUSD > 0 ? 'up' : p.alfaUSD < 0 ? 'down' : ''}">${p.alfaUSD != null ? (p.alfaUSD >= 0 ? '+' : '−') + fmtU(Math.abs(p.alfaUSD), 0) : '—'}</div><div class="l">${p.alfaUSD != null ? 'mismas compras en SPY' : ''}</div></div>
     </div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
     ${p.objetivo ? `<div class="small"><b>Precio objetivo:</b> ${fmtU(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside)} desde hoy)` : ''}</div>` : ''}
@@ -508,18 +512,18 @@ const Intercambio = {
     const k = E.cartera(); const s = state.settings; const hoy = D.today(); const hora = new Date();
     const n = v => v == null ? '' : Number(v).toFixed(2); const pct = v => v == null ? '' : (v * 100).toFixed(1) + ' %';
     const pctO = v => v == null ? 's/d' : pct(v);
-    const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : `- **${nombre}**: no disponible`;
-    const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
-    const posRows = k.posiciones.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${fmtAcc(p.acciones)} | ${n(p.ppc)} | ${n(p.precio)} | ${n(p.valor)} | ${pct(p.gpPct)} | ${pct(p.peso)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
+    const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera con dividendos ${pctO(v.rend.realDiv)} · precio contra precio: cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : `- **${nombre}**: no disponible`;
+    const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, carteraConDividendos: { acumulado: v.rend.realDiv, tirAnual: v.rend.tirRealDiv, dividendosUSD: +v.rend.dividendosVentana.toFixed(2) }, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
+    const posRows = k.posiciones.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${fmtAcc(p.acciones)} | ${n(p.ppc)} | ${n(p.precio)} | ${n(p.valor)} | ${pct(p.rendTotal)}${p.dividendos ? ` (precio ${pct(p.rendPrecio)} + div ${n(p.dividendos)} USD)` : ''} | ${pct(p.peso)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
     const watchRows = k.watch.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${n(p.precio)} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
     const cerrRows = k.cerradas.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${n(p.dividendos)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} |`).join('\n');
     const ops = k.ops.slice().reverse().slice(0, 40).map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
     const json = {
       tipo: 'gestor-gastos-cartera', version: Intercambio.VERSION, generado: hora.toISOString(), app: BUILD,
       dolar: { mep: k.mep, ccl: k.ccl, spy: k.spyHoy, preciosAl: k.preciosFecha },
-      resumen: { valorUSD: k.valor, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, posiciones: k.posiciones.length },
+      resumen: { valorUSD: k.valor, valorTotalUSD: k.valorTotal != null ? +k.valorTotal.toFixed(2) : null, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
       rendimiento: Object.fromEntries(E.VENTANAS.map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
-      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
+      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
       watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
@@ -528,13 +532,13 @@ const Intercambio = {
 App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR') : 's/d'} · MEP $ ${fmtARS.format(k.mep)} · CCL $ ${fmtARS.format(k.ccl)} · SPY ${n(k.spyHoy)}.
 
 ## Resumen
-- Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)})
+- Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) · **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD · rendimiento total sobre el costo de lo que tenés ${pct(k.rendTotal)} · valor total (acciones + caja de dividendos sin usar US$ ${n(k.caja)}${k.dividendosUsados ? `; ${n(k.dividendosUsados)} ya reinvertidos` : ''}) US$ ${n(k.valorTotal)}
 - Dividendos cobrados US$ ${n(k.dividendos)} · resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
 ${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operación)' : l)).join('\n')}
-- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas.
+- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los de Facu ni los del S&P (decisión de Facu). Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
 
 ## Posiciones (${k.posiciones.length})
-| Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo % | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Tesis / nota |
+| Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo total % (precio + dividendos) | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Tesis / nota |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${posRows}
 

@@ -271,11 +271,11 @@ const E = {
     const spyHoy = (c.precios.SPY && c.precios.SPY.c) || Spy.at(hoy) || null;
     const pos = {};
     const get = t => pos[t] || (pos[t] = { ticker: t, acciones: 0, costo: 0, dividendos: 0, realizado: 0, nOps: 0, lotes: [], spyShares: 0, flujoNeto: 0 });
-    const flujos = []; let dividendos = 0;
+    const flujos = []; let dividendos = 0, dividendosUsados = 0;
     for (const o of ops) {
       const p = get(o.ticker); p.nOps++;
       const q = Number(o.acciones) || 0, px = Number(o.precio) || 0;
-      if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; }
+      if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; if (o.deDividendos > 0) dividendosUsados += Math.min(Number(o.deDividendos) || 0, q * px); }
       else if (o.tipo === 'venta') {
         let rest = Math.min(q, p.acciones); const qv = rest; let costoVendido = 0;
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
@@ -285,7 +285,8 @@ const E = {
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -q * px);
       const spx = Number(o.spy) || Spy.at(o.fecha) || null;
       flujos.push({ fecha: o.fecha, monto, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
-      if (spx) p.spyShares += monto / spx; p.flujoNeto += monto;
+      if (spx && o.tipo !== 'dividendo') p.spyShares += monto / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
+      p.flujoNeto += monto;
     }
     const mep = Number(state.settings.tc) || 0, ccl = Number(state.settings.ccl) || mep;
     const enrich = p => {
@@ -293,6 +294,8 @@ const E = {
       const ppc = p.acciones ? p.costo / p.acciones : 0;
       const valor = precio != null ? p.acciones * precio : null;
       const gp = valor != null ? valor - p.costo : null;
+      // rendimiento total = precio + dividendos cobrados (sobre el costo de lo que tenés); el realizado por ventas va aparte
+      const gpTotal = gp != null ? gp + p.dividendos : null; const rendPrecio = p.costo && gp != null ? gp / p.costo : null; const rendDiv = p.costo ? p.dividendos / p.costo : null;
       const al = c.alertas[p.ticker] || null;
       let estado = null; if (al && precio != null) { if (al.urgente && precio <= al.urgente) estado = 'urgente'; else if (al.mirala && precio <= al.mirala) estado = 'mirala'; }
       const ced = Cedears.de(p.ticker);
@@ -300,7 +303,7 @@ const E = {
       const sombraPos = spyHoy ? p.spyShares * spyHoy : null;
       const valorAlfa = p.acciones > 0 ? valor : 0;
       const alfaUSD = sombraPos != null && valorAlfa != null ? valorAlfa - sombraPos : null;
-      return { ...p, ppc, precio, dp: pr ? pr.dp : null, precioT: pr ? pr.t : null, valor, gp, gpPct: p.costo ? (gp != null ? gp / p.costo : null) : null, alerta: al, estado,
+      return { ...p, ppc, precio, dp: pr ? pr.dp : null, precioT: pr ? pr.t : null, valor, gp, gpPct: p.costo ? (gp != null ? gp / p.costo : null) : null, gpTotal, rendTotal: p.costo && gpTotal != null ? gpTotal / p.costo : null, rendPrecio, rendDiv, alerta: al, estado,
         distMirala: al && al.mirala && precio ? (precio - al.mirala) / precio : null, distUrgente: al && al.urgente && precio ? (precio - al.urgente) / precio : null, cedear: ced,
         sombraPos, alfaUSD, objetivo: al && al.objetivo ? al.objetivo : null, upside: al && al.objetivo && precio ? al.objetivo / precio - 1 : null };
     };
@@ -313,10 +316,23 @@ const E = {
     abiertas.sort((a, b) => (b.valor != null ? b.valor : b.costo) - (a.valor != null ? a.valor : a.costo));
     const watch = Object.keys(c.alertas).filter(t => !pos[t] || pos[t].acciones <= 0).map(t => enrich(get(t)));
     const cerradas = all.filter(p => p.acciones <= 0 && p.nOps);
-    const k = { posiciones: abiertas, cerradas, watch, costo, valor, conPrecio, gp: valor != null ? valor - costo : null, gpPct: valor != null && costo ? (valor - costo) / costo : null,
-      dividendos, realizado: sum(all.map(p => p.realizado)), mep, ccl, valorMEP: valor != null ? valor * mep : null, valorCCL: valor != null ? valor * ccl : null,
+    const realizado = sum(all.map(p => p.realizado)); const gpAb = valor != null ? valor - costo : null; const divAb = sum(abiertas.map(p => p.dividendos));
+    const k = { posiciones: abiertas, cerradas, watch, costo, valor, conPrecio, gp: gpAb, gpPct: valor != null && costo ? (valor - costo) / costo : null,
+      // total: no realizado + dividendos (de todo) + realizado por ventas; rendTotal = (no realizado + dividendos de lo que tenés) / costo
+      gpTotal: gpAb != null ? gpAb + dividendos + realizado : null, rendTotal: gpAb != null && costo ? (gpAb + divAb) / costo : null, dividendosAbiertas: divAb,
+      // caja de dividendos: lo cobrado menos lo que ya se reinvirtió (compras marcadas "pagada con dividendos"); valor total = acciones + caja (sin contar dos veces)
+      dividendosUsados: Math.min(dividendosUsados, dividendos), caja: Math.max(0, dividendos - dividendosUsados),
+      valorTotal: valor != null ? valor + Math.max(0, dividendos - dividendosUsados) : null,
+      dividendos, realizado, mep, ccl, valorMEP: valor != null ? valor * mep : null, valorCCL: valor != null ? valor * ccl : null,
       preciosFecha: c.preciosFecha, ops, cerradasCount: cerradas.length, flujos, spyHoy, inicio: c.inicio || null,
       legados: flujos.filter(f => f.legado).length, primeraOp: ops.length ? ops[0].fecha : null };
+    // posibles duplicadas: mismo ticker y tipo, ≤ 5 días de diferencia, mismo monto (dividendo) o mismas acciones y precio (±1 %) — típico de cargar a mano algo que ya vino del CSV
+    const dupl = []; const dupIds = new Set();
+    for (let i = 0; i < ops.length; i++) for (let j = i + 1; j < ops.length; j++) { const a = ops[i], b = ops[j]; if (b.ticker !== a.ticker || b.tipo !== a.tipo) continue; if (D.daysBetween(a.fecha, b.fecha) > 5) break;
+      const cerca = (x, y) => Math.abs((Number(x) || 0) - (Number(y) || 0)) <= Math.max(0.01, Math.abs(Number(x) || 0) * 0.01);
+      const igual = a.tipo === 'dividendo' ? cerca(a.monto, b.monto) : cerca(a.acciones, b.acciones) && cerca(a.precio, b.precio);
+      if (igual) { dupl.push([a, b]); dupIds.add(b.id); } }
+    k.duplicadas = dupl; k.dupIds = dupIds;
     k.ventanas = {}; for (const [m] of E.VENTANAS) k.ventanas[m] = E.ventana(k, m);
     return k;
   },
@@ -377,16 +393,24 @@ const E = {
       desde = val.fecha; V0 = val.V; spy0 = val.spy; S0 = spy0 ? V0 / spy0 : 0; esInicial = val.esInicial;
     }
     if (!spy0 || !spyHoy) return { disponible: false, modo, motivo: 'Falta la cotización de SPY.' };
-    const fl = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado }));
-    const S = S0 + sum(fl.map(f => f.spy ? f.monto / f.spy : 0));
+    // precio contra precio: los dividendos (tuyos y del S&P) quedan afuera de esta comparación; el rendimiento total con dividendos vive en el resumen y en cada posición
+    const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && !esInicial({ fecha: f.fecha, legado: f.legado }));
+    // la sombra reinvierte los dividendos de SPY (S&P 500 total return): cada lote de acciones sombra crece por las ex-fechas posteriores a su entrada
+    const S = S0 * Spy.factor(desde, hoy) + sum(fl.map(f => f.spy ? f.monto / f.spy * Spy.factor(f.fecha, hoy) : 0));
     const sombraValor = S * spyHoy;
     const T = Math.max(1, D.daysBetween(desde, hoy));
     // --- dinero (money-weighted): TIR anual y su equivalente acumulado en la ventana; Dietz como aproximación/respaldo
     const cfs = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...fl.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
     const tirReal = k.valor != null ? E.xirr(cfs(k.valor)) : null; const tirSombra = E.xirr(cfs(sombraValor));
+    // --- rendimiento CON dividendos (lo que ganó tu plata de verdad): mismos flujos + cada dividendo como cash que te entra en su fecha
+    const flD = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado }));
+    const cfsD = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...flD.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
+    const tirRealDiv = k.valor != null ? E.xirr(cfsD(k.valor)) : null; const dietzRealDiv = k.valor != null ? E.dietz(V0, k.valor, flD, desde, hoy) : null;
+    const dividendosVentana = sum(flD.filter(f => f.tipo === 'dividendo').map(f => -f.monto));
     const acum = tir => tir == null ? null : Math.pow(1 + tir, T / 365) - 1;
     const dietzReal = k.valor != null ? E.dietz(V0, k.valor, fl, desde, hoy) : null; const dietzSombra = E.dietz(V0, sombraValor, fl, desde, hoy);
     const real = tirReal != null ? acum(tirReal) : dietzReal, sombra = tirSombra != null ? acum(tirSombra) : dietzSombra;
+    const realDiv = tirRealDiv != null ? acum(tirRealDiv) : dietzRealDiv;
     // --- tiempo (time-weighted): sub-períodos entre valuaciones conocidas, Dietz en cada uno, encadenados. La sombra es 100 % SPY → su TWR = SPY solo.
     //     Si la ventana arranca en cero (primera operación), las compras de ese día son la valuación inicial.
     let twr = null;
@@ -407,10 +431,11 @@ const E = {
       for (let i = 0; ok && i < vals.length - 1; i++) { const a = vals[i], b = vals[i + 1]; const sub = fl0.filter(f => f.fecha > a.fecha && f.fecha <= b.fecha); const r = E.dietz(a.V, b.V, sub, a.fecha, b.fecha); if (r == null) ok = false; else acc *= 1 + r; }
       twr = ok ? acc - 1 : null;
     }
-    const spyDirecto = spyHoy / spy0 - 1;
+    const spyDirecto = spyHoy * Spy.factor(desde, hoy) / spy0 - 1;  // S&P 500 total return (precio + dividendos reinvertidos)
     return { disponible: true, modo, desde, objetivo, aprox, V0, S0, spy0, flujos: fl, sombraValor, invertidoNeto: V0 + sum(fl.map(f => f.monto)), nota, dias: T, valuaciones: null,
       rend: { real, sombra, alfa: real != null && sombra != null ? real - sombra : null, alfaUSD: k.valor != null ? k.valor - sombraValor : null, spyDirecto, dias: T,
-        tirReal, tirSombra, tirSpy: T >= 30 ? Math.pow(1 + spyDirecto, 365 / T) - 1 : null, dietzReal, dietzSombra, twr, metodo: tirReal != null ? 'tir' : 'dietz' } };
+        tirReal, tirSombra, tirSpy: T >= 30 ? Math.pow(1 + spyDirecto, 365 / T) - 1 : null, dietzReal, dietzSombra, twr, metodo: tirReal != null ? 'tir' : 'dietz',
+        realDiv, tirRealDiv, dividendosVentana } };
   },
   /** Serie temporal de una ventana: sombra S&P (diaria), invertido neto (escalón) y cartera real (valuaciones conocidas: arranque, seed 31-dic, snapshots, hoy) */
   carteraSerie(k, modo = 'anio') {
@@ -427,8 +452,11 @@ const E = {
     let S = v.S0, inv = v.V0, j = 0;
     const sombra = [], invertido = [], real = [];
     const seed = c.inicio && c.inicio.fecha > v.desde && c.inicio.fecha <= hoy ? E.valuacionEn(k, c.inicio.fecha) : null;
+    let prevF = v.desde;
     for (const f of fechas) {
-      while (j < fl.length && fl[j].fecha <= f) { if (fl[j].spy) S += fl[j].monto / fl[j].spy; inv += fl[j].monto; j++; }
+      S *= Spy.factor(prevF, f);  // dividendos de SPY entre el punto anterior y este
+      while (j < fl.length && fl[j].fecha <= f) { if (fl[j].spy) S += fl[j].monto / fl[j].spy * Spy.factor(fl[j].fecha, f); inv += fl[j].monto; j++; }
+      prevF = f;
       const spx = f === hoy ? k.spyHoy : Spy.at(f);
       sombra.push(spx ? S * spx : null); invertido.push(inv);
       let r = null;
