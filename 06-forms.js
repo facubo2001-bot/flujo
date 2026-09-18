@@ -7,7 +7,8 @@ const Modal = {
     $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">${submit ? 'Cancelar' : 'Cerrar'}</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
     $('#modal').style.width = wide ? 'min(820px,100%)' : '';
     $('#overlay').classList.add('open');
-    const first = $('#modal .m-body [autofocus]'); if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+    // sin foco automático: en iOS el teclado saltaba solo al abrir cualquier ventana (pedido de Facu); el campo se toca cuando se quiere escribir
+    $$('#modal [autofocus]').forEach(el => el.removeAttribute('autofocus'));
   },
   close() { $('#overlay').classList.remove('open'); Modal.onSubmit = null; },
   submit() { if (Modal.onSubmit && Modal.onSubmit() !== false) Modal.close(); },
