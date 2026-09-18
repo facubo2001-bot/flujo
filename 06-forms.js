@@ -636,8 +636,11 @@ function formImportar() {
     <label class="btn sm" style="width:fit-content">Elegir archivo… <input type="file" id="import-file" accept=".json,.md,.txt" hidden></label>
     <div id="import-out"></div>
   </div>`, onSubmit: () => {
+    // segundo toque del botón del pie: ya analizado → aplicar (el pie siempre está a la vista, sin scrollear la lista)
+    if (Intercambio._pendiente && Intercambio._pendiente.txt === $('#import-txt').value) { Actions['import-apply'](); return false; }
+    Intercambio._pendiente = null;
     try {
-      const obj = Intercambio.parsear($('#import-txt').value); const d = Intercambio.diff(obj);
+      const obj = Intercambio.parsear($('#import-txt').value); const d = Intercambio.diff(obj); d.txt = $('#import-txt').value;
       const out = $('#import-out');
       if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
       Intercambio._pendiente = d;
@@ -646,6 +649,8 @@ function formImportar() {
         ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
         ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
         <button type="button" class="btn primary" data-act="import-apply">Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}</button></div>`;
+      const sb = $('#modal [data-act="submit"]'); if (sb) sb.textContent = `Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}`;
+      const cnt = $('#import-out'); if (cnt) cnt.scrollIntoView({ block: 'start', behavior: 'smooth' });
       return false;
     } catch (e) { $('#import-out').innerHTML = `<div class="callout crit small">${esc(e.message)}</div>`; return false; }
   } });

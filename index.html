@@ -4334,7 +4334,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null },
   };
 }
-const BUILD = '202609180043';
+const BUILD = '202609182040';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -5991,6 +5991,7 @@ function viewConfig() {
       </div>
       <div class="divider"></div>
       <p class="small muted">${(() => { const b = BUILD; const v = /^\d{12}/.test(b) ? `${b.slice(6, 8)}/${b.slice(4, 6)}/${b.slice(0, 4)} ${b.slice(8, 10)}:${b.slice(10, 12)} UTC` : '—'; const u = state.updatedAt ? new Date(state.updatedAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; return `App actualizada al ${v} · tus datos modificados por última vez el ${u}`; })()}</p>
+      <div class="row" style="gap:8px;margin-top:6px"><button class="btn sm" data-act="sw-update">Buscar actualización</button></div>
       <p class="small muted">Estado: ${Persist.status === 'ok' ? 'guardado en la nube (esta página se actualiza sola en todos tus dispositivos).' : Persist.status === 'local' ? 'guardado solo en este dispositivo. Exportá un respaldo cada tanto.' : Persist.status === 'err' ? 'error al guardar: ' + esc(Persist.lastError) : 'sincronizando…'}</p>
     </div>
   </div>`;
@@ -6781,8 +6782,11 @@ function formImportar() {
     <label class="btn sm" style="width:fit-content">Elegir archivo… <input type="file" id="import-file" accept=".json,.md,.txt" hidden></label>
     <div id="import-out"></div>
   </div>`, onSubmit: () => {
+    // segundo toque del botón del pie: ya analizado → aplicar (el pie siempre está a la vista, sin scrollear la lista)
+    if (Intercambio._pendiente && Intercambio._pendiente.txt === $('#import-txt').value) { Actions['import-apply'](); return false; }
+    Intercambio._pendiente = null;
     try {
-      const obj = Intercambio.parsear($('#import-txt').value); const d = Intercambio.diff(obj);
+      const obj = Intercambio.parsear($('#import-txt').value); const d = Intercambio.diff(obj); d.txt = $('#import-txt').value;
       const out = $('#import-out');
       if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
       Intercambio._pendiente = d;
@@ -6791,6 +6795,8 @@ function formImportar() {
         ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
         ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
         <button type="button" class="btn primary" data-act="import-apply">Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}</button></div>`;
+      const sb = $('#modal [data-act="submit"]'); if (sb) sb.textContent = `Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}`;
+      const cnt = $('#import-out'); if (cnt) cnt.scrollIntoView({ block: 'start', behavior: 'smooth' });
       return false;
     } catch (e) { $('#import-out').innerHTML = `<div class="callout crit small">${esc(e.message)}</div>`; return false; }
   } });
@@ -6973,7 +6979,8 @@ const Actions = {
   'import-claude'() { formImportar(); },
   'export-copy'() { const t = $('#export-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo en un chat del proyecto Inversiones.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
   async 'export-share'() { const t = $('#export-md'); if (!t) return; try { const file = new File([t.value], Intercambio.nombreArchivo(), { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Cartera para Claude' }); else await navigator.share({ title: 'Cartera para Claude', text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') toast('No se pudo compartir; usá Copiar texto'); } },
-  'import-apply'() { const d = Intercambio._pendiente; if (!d) return; Intercambio.aplicar(d); Intercambio._pendiente = null; Modal.close(); toast(`${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''} aplicado${d.cambios.length > 1 ? 's' : ''}`); render(); },
+  'import-apply'() { const d = Intercambio._pendiente; if (!d) { toast('Primero tocá Analizar'); return; } try { Intercambio.aplicar(d); } catch (e) { toast('No se pudo aplicar: ' + e.message, 5000); return; } Intercambio._pendiente = null; Modal.close(); toast(`${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''} aplicado${d.cambios.length > 1 ? 's' : ''}`); render(); },
+  'sw-update'() { toast('Buscando versión nueva…'); if (!('serviceWorker' in navigator)) { location.reload(); return; } navigator.serviceWorker.getRegistration().then(async reg => { if (!reg) { location.reload(); return; } await reg.update(); setTimeout(() => { if (reg.waiting) { reg.waiting.postMessage('skip'); } else if (!reg.installing) { toast('Ya tenés la última versión'); } }, 1500); }).catch(() => location.reload()); },
   'set-date-op'(v) { const f = $('#o-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
   'del-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (!o) return; confirmar(`¿Borrar ${o.tipo} de ${o.ticker} del ${D.fmt(o.fecha, { year: true })}?`, () => { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); render(); }); },
   'del-op-modal'(id) { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); Modal.close(); render(); toast('Operación borrada'); },
