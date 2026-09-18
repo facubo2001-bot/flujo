@@ -4329,11 +4329,12 @@ function defaultState() {
     inversiones: [],
     pagos: [],
     sueldos: {},
+    presets: [],
     aprendido: {},
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null },
   };
 }
-const BUILD = '202609172334';
+const BUILD = '202609180043';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -4380,6 +4381,7 @@ const Persist = {
     if (!list) return false; if (!Array.isArray(list)) list = [list];
     state = Persist.migrate(state);
     let changed = false;
+    if (!Array.isArray(state.presets)) state.presets = [];
     for (const p of list) if (p && p.id && !state.presets.includes(p.id)) { Persist.applyOne(p); changed = true; }
     return changed;
   },
@@ -4595,7 +4597,7 @@ const Spy = {
   /** Dividendos de SPY (ex-fecha → USD por acción), para que la sombra sea S&P 500 *total return*: se reinvierten al cierre de la ex-fecha */
   divs() { if (!Spy._divs) { const d = typeof SPY_DIVS !== 'undefined' && SPY_DIVS.divs ? SPY_DIVS.divs : {}; Spy._divs = Object.keys(d).sort().map(f => ({ fecha: f, monto: Number(d[f]) || 0 })); } return Spy._divs; },
   /** factor de reinversión de dividendos de SPY para acciones tenidas desde `desde` (exclusive) hasta `hasta` (inclusive): Π (1 + div / cierre ex-fecha) */
-  /** Decisión de Facu (17-sep-2026): la comparación contra el S&P 500 es precio contra precio, sin dividendos de ningún lado → TR apagado (los datos quedan por si algún día se quiere total return) */
+  /** Decisión de diseño (sep-2026): la comparación contra el S&P 500 es precio contra precio, sin dividendos de ningún lado → TR apagado (los datos quedan por si algún día se quiere total return) */
   TR: false,
   factor(desde, hasta) { if (!Spy.TR) return 1; let f = 1; for (const d of Spy.divs()) { if (d.fecha <= desde) continue; if (d.fecha > hasta) break; const c = Spy.at(d.fecha); if (c && d.monto) f *= 1 + d.monto / c; } return f; },
   /** fecha del último cierre conocido ≤ fecha (null si no hay) */
@@ -4959,7 +4961,7 @@ const E = {
         let rest = Math.min(q, p.acciones); const qv = rest; let costoVendido = 0;
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
         p.realizado += qv * px - costoVendido; p.costo -= costoVendido; p.acciones -= qv;
-        if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (decisión de Facu: las ventas viejas no entran, las nuevas sí)
+        if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (las ventas anteriores a esta función no entran; las nuevas sí, salvo que se apague el switch)
         if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; p.lotes = []; }
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -q * px);
@@ -5955,7 +5957,7 @@ function viewConfig() {
   const inp = (id, label, val, extra = '', help = '') => `<div class="field"><label>${label}</label><input class="input" data-setting="${id}" value="${esc(val ?? '')}" ${extra}>${help ? `<span class="help">${help}</span>` : ''}</div>`;
   let html = `<div class="grid g-2">
     <div class="card"><div class="card-head"><h2>Perfil</h2></div><div class="form-grid">
-      ${inp('nombre', 'Nombre', s.nombre, 'placeholder="Facu"')}
+      ${inp('nombre', 'Nombre', s.nombre, 'placeholder="Tu nombre"')}
       ${inp('ingreso', 'Sueldo neto mensual (ARS)', s.ingreso ? fmtARS.format(s.ingreso) : '', 'inputmode="numeric"')}
       ${inp('diaCobro', 'Día de cobro', s.diaCobro, 'inputmode="numeric"', '31 = último día del mes. Ese día la app te pregunta cuánto cobraste y recalcula todo.')}
       ${inp('ccl', 'Dólar CCL (ARS por USD)', s.ccl || '', 'inputmode="numeric"', 'Para valuar los CEDEARs en pesos. Se actualiza junto con el MEP.')}
@@ -6672,7 +6674,7 @@ const Intercambio = {
       watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
-    const md = `# Cartera de ${esc(s.nombre || 'Facu')} — exportada el ${D.fmt(hoy, { year: true })} ${pad2(hora.getHours())}:${pad2(hora.getMinutes())}
+    const md = `# Cartera de ${esc(s.nombre || 'mi cartera')} — exportada el ${D.fmt(hoy, { year: true })} ${pad2(hora.getHours())}:${pad2(hora.getMinutes())}
 
 App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR') : 's/d'} · MEP $ ${fmtARS.format(k.mep)} · CCL $ ${fmtARS.format(k.ccl)} · SPY ${n(k.spyHoy)}.
 
@@ -6680,7 +6682,7 @@ App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preci
 - Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) · **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD · rendimiento total sobre el costo de lo que tenés ${pct(k.rendTotal)} · valor total (acciones + caja US$ ${n(k.caja)}: dividendos + ventas a caja − compras pagadas con la caja) US$ ${n(k.valorTotal)}
 - Dividendos cobrados US$ ${n(k.dividendos)} · resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
 ${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operación)' : l)).join('\n')}
-- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los de Facu ni los del S&P (decisión de Facu). Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
+- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
 
 ## Posiciones (${k.posiciones.length})
 | Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo total % (precio + dividendos) | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Tesis / nota |
@@ -6801,7 +6803,7 @@ function cargarDemo() {
   let seed = 7; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
   const pick = arr => arr[Math.floor(rnd() * arr.length)]; const between = (a, b) => Math.round(a + rnd() * (b - a));
   const s = defaultState();
-  s.settings = { ...s.settings, ingreso: 2900000, presupuesto: 1900000, diaCobro: 1, tc: 1350, alertaCuotasPct: 60, nombre: 'Facu' };
+  s.settings = { ...s.settings, ingreso: 2900000, presupuesto: 1900000, diaCobro: 1, tc: 1350, alertaCuotasPct: 60, nombre: 'Demo' };
   const visa = { id: 't_visa', nombre: 'Visa', banco: 'Galicia', cierre: 20, vencimiento: 5, limite: 3000000, color: CARD_COLORS[0] };
   const master = { id: 't_master', nombre: 'Mastercard', banco: 'Santander', cierre: 24, vencimiento: 10, limite: 2000000, color: CARD_COLORS[1] };
   s.tarjetas = [visa, master];

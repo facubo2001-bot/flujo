@@ -529,7 +529,7 @@ const Intercambio = {
       watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
-    const md = `# Cartera de ${esc(s.nombre || 'Facu')} — exportada el ${D.fmt(hoy, { year: true })} ${pad2(hora.getHours())}:${pad2(hora.getMinutes())}
+    const md = `# Cartera de ${esc(s.nombre || 'mi cartera')} — exportada el ${D.fmt(hoy, { year: true })} ${pad2(hora.getHours())}:${pad2(hora.getMinutes())}
 
 App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR') : 's/d'} · MEP $ ${fmtARS.format(k.mep)} · CCL $ ${fmtARS.format(k.ccl)} · SPY ${n(k.spyHoy)}.
 
@@ -537,7 +537,7 @@ App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preci
 - Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) · **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD · rendimiento total sobre el costo de lo que tenés ${pct(k.rendTotal)} · valor total (acciones + caja US$ ${n(k.caja)}: dividendos + ventas a caja − compras pagadas con la caja) US$ ${n(k.valorTotal)}
 - Dividendos cobrados US$ ${n(k.dividendos)} · resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
 ${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operación)' : l)).join('\n')}
-- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los de Facu ni los del S&P (decisión de Facu). Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
+- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
 
 ## Posiciones (${k.posiciones.length})
 | Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo total % (precio + dividendos) | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Tesis / nota |

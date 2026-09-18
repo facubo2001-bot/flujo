@@ -3,7 +3,8 @@ const src = p => fs.readFileSync(path.join(__dirname, 'src', p), 'utf8');
 const css = src('style.css');
 const dataJs = `/* ===== datos embebidos (generados por build.js desde /data) ===== */\nconst CEDEARS_EMBED = ${fs.readFileSync(path.join(__dirname, 'data', 'cedears.json'), 'utf8')};\nconst SPY_HIST = ${fs.readFileSync(path.join(__dirname, 'data', 'spy-hist.json'), 'utf8')};\nconst SPY_DIVS = ${fs.readFileSync(path.join(__dirname, 'data', 'spy-divs.json'), 'utf8')};\n`;
 const js = [dataJs].concat(['01-core.js', '02-engine.js', '03-charts.js', '04-insights.js', '05-views-a.js', '05-views-b.js', '06-forms.js', '07-demo.js', '08-main.js'].map(src)).join('\n\n');
-const preset = fs.existsSync(path.join(__dirname, 'src', 'preset.json')) ? src('preset.json').replace(/<\//g, '<\\/') : 'null';
+// FLUJO_PRESET=none → build limpia (sin preset.json): para compartir la app sin datos personales
+const preset = process.env.FLUJO_PRESET !== 'none' && fs.existsSync(path.join(__dirname, 'src', 'preset.json')) ? src('preset.json').replace(/<\//g, '<\\/') : 'null';
 const version0 = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
 const html = src('shell.html').replace('/*__CSS__*/', () => css).replace('/*__JS__*/', () => js).replace('/*__PRESET__*/', () => preset).replace("'__BUILD__'", `'${version0}'`);
 fs.writeFileSync(path.join(__dirname, 'flujo.html'), html);

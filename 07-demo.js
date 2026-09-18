@@ -3,7 +3,7 @@ function cargarDemo() {
   let seed = 7; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
   const pick = arr => arr[Math.floor(rnd() * arr.length)]; const between = (a, b) => Math.round(a + rnd() * (b - a));
   const s = defaultState();
-  s.settings = { ...s.settings, ingreso: 2900000, presupuesto: 1900000, diaCobro: 1, tc: 1350, alertaCuotasPct: 60, nombre: 'Facu' };
+  s.settings = { ...s.settings, ingreso: 2900000, presupuesto: 1900000, diaCobro: 1, tc: 1350, alertaCuotasPct: 60, nombre: 'Demo' };
   const visa = { id: 't_visa', nombre: 'Visa', banco: 'Galicia', cierre: 20, vencimiento: 5, limite: 3000000, color: CARD_COLORS[0] };
   const master = { id: 't_master', nombre: 'Mastercard', banco: 'Santander', cierre: 24, vencimiento: 10, limite: 2000000, color: CARD_COLORS[1] };
   s.tarjetas = [visa, master];

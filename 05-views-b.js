@@ -184,7 +184,7 @@ function viewConfig() {
   const inp = (id, label, val, extra = '', help = '') => `<div class="field"><label>${label}</label><input class="input" data-setting="${id}" value="${esc(val ?? '')}" ${extra}>${help ? `<span class="help">${help}</span>` : ''}</div>`;
   let html = `<div class="grid g-2">
     <div class="card"><div class="card-head"><h2>Perfil</h2></div><div class="form-grid">
-      ${inp('nombre', 'Nombre', s.nombre, 'placeholder="Facu"')}
+      ${inp('nombre', 'Nombre', s.nombre, 'placeholder="Tu nombre"')}
       ${inp('ingreso', 'Sueldo neto mensual (ARS)', s.ingreso ? fmtARS.format(s.ingreso) : '', 'inputmode="numeric"')}
       ${inp('diaCobro', 'Día de cobro', s.diaCobro, 'inputmode="numeric"', '31 = último día del mes. Ese día la app te pregunta cuánto cobraste y recalcula todo.')}
       ${inp('ccl', 'Dólar CCL (ARS por USD)', s.ccl || '', 'inputmode="numeric"', 'Para valuar los CEDEARs en pesos. Se actualiza junto con el MEP.')}

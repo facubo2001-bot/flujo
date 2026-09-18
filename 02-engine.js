@@ -280,7 +280,7 @@ const E = {
         let rest = Math.min(q, p.acciones); const qv = rest; let costoVendido = 0;
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
         p.realizado += qv * px - costoVendido; p.costo -= costoVendido; p.acciones -= qv;
-        if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (decisión de Facu: las ventas viejas no entran, las nuevas sí)
+        if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (las ventas anteriores a esta función no entran; las nuevas sí, salvo que se apague el switch)
         if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; p.lotes = []; }
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -q * px);
