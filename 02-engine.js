@@ -271,15 +271,16 @@ const E = {
     const spyHoy = (c.precios.SPY && c.precios.SPY.c) || Spy.at(hoy) || null;
     const pos = {};
     const get = t => pos[t] || (pos[t] = { ticker: t, acciones: 0, costo: 0, dividendos: 0, realizado: 0, nOps: 0, lotes: [], spyShares: 0, flujoNeto: 0 });
-    const flujos = []; let dividendos = 0, dividendosUsados = 0;
+    const flujos = []; let dividendos = 0, cajaUsada = 0, ventasEnCaja = 0;
     for (const o of ops) {
       const p = get(o.ticker); p.nOps++;
       const q = Number(o.acciones) || 0, px = Number(o.precio) || 0;
-      if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; if (o.deDividendos > 0) dividendosUsados += Math.min(Number(o.deDividendos) || 0, q * px); }
+      if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; const dc = Number(o.deCaja != null ? o.deCaja : o.deDividendos) || 0; if (dc > 0) cajaUsada += Math.min(dc, q * px); }
       else if (o.tipo === 'venta') {
         let rest = Math.min(q, p.acciones); const qv = rest; let costoVendido = 0;
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
         p.realizado += qv * px - costoVendido; p.costo -= costoVendido; p.acciones -= qv;
+        if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (decisión de Facu: las ventas viejas no entran, las nuevas sí)
         if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; p.lotes = []; }
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -q * px);
@@ -321,8 +322,10 @@ const E = {
       // total: no realizado + dividendos (de todo) + realizado por ventas; rendTotal = (no realizado + dividendos de lo que tenés) / costo
       gpTotal: gpAb != null ? gpAb + dividendos + realizado : null, rendTotal: gpAb != null && costo ? (gpAb + divAb) / costo : null, dividendosAbiertas: divAb,
       // caja de dividendos: lo cobrado menos lo que ya se reinvirtió (compras marcadas "pagada con dividendos"); valor total = acciones + caja (sin contar dos veces)
-      dividendosUsados: Math.min(dividendosUsados, dividendos), caja: Math.max(0, dividendos - dividendosUsados),
-      valorTotal: valor != null ? valor + Math.max(0, dividendos - dividendosUsados) : null,
+      // caja: dividendos cobrados + cobros de ventas marcadas "a caja" − compras pagadas con la caja (nunca negativa); valor total = acciones + caja
+      cajaEntradas: dividendos + ventasEnCaja, ventasEnCaja, cajaUsada: Math.min(cajaUsada, dividendos + ventasEnCaja), dividendosUsados: Math.min(cajaUsada, dividendos + ventasEnCaja),
+      caja: Math.max(0, dividendos + ventasEnCaja - cajaUsada),
+      valorTotal: valor != null ? valor + Math.max(0, dividendos + ventasEnCaja - cajaUsada) : null,
       dividendos, realizado, mep, ccl, valorMEP: valor != null ? valor * mep : null, valorCCL: valor != null ? valor * ccl : null,
       preciosFecha: c.preciosFecha, ops, cerradasCount: cerradas.length, flujos, spyHoy, inicio: c.inicio || null,
       legados: flujos.filter(f => f.legado).length, primeraOp: ops.length ? ops[0].fecha : null };

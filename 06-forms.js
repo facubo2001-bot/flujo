@@ -358,7 +358,8 @@ function formOp(pre = {}) {
     <div class="full" id="o-modo-box" ${tipo === 'dividendo' ? 'hidden' : ''}>${F.field('Cómo lo cargás', F.choice('o-modo', [['cedear', 'CEDEARs en pesos'], ['usd', 'Acciones en USD']], modo), 'En pesos: cantidad de CEDEARs y precio en $; la app convierte con el ratio y el CCL.')}</div>
     <div id="o-campos" class="full form-grid" style="padding:0">${formOpCampos(tipo, modo, pre)}</div>
     <div class="full callout" id="o-calc" style="padding:8px 12px;font-size:13px"></div>
-    ${(k.caja || 0) + (pre.deDividendos || 0) > 0.005 ? `<div class="full" id="o-dediv-box" ${tipo === 'compra' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-de-div" ${pre.deDividendos > 0 ? 'checked' : ''}><span>Pagada con dividendos <small class="muted">(tenés ${fmtU((k.caja || 0) + (pre.deDividendos || 0), 2)} sin usar)</small></span></label></div>` : ''}
+    ${(k.caja || 0) + (pre.deCaja || 0) > 0.005 ? `<div class="full" id="o-dediv-box" ${tipo === 'compra' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-de-div" ${pre.deCaja > 0 ? 'checked' : ''}><span>Pagada con la caja <small class="muted">(dividendos y ventas: tenés ${fmtU((k.caja || 0) + (pre.deCaja || 0), 2)})</small></span></label></div>` : ''}
+    <div class="full" id="o-acaja-box" ${tipo === 'venta' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-a-caja" ${editando ? (pre.aCaja ? 'checked' : '') : 'checked'}><span>El cobro queda en caja <small class="muted">(para pagar compras futuras)</small></span></label></div>
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? '⚠️ Fecha estimada (posición previa cargada el 3-4/1/26). Poné la fecha real de compra para afinar la comparación contra el S&P.' : '', 'full')}
     ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
     ${editando && pre.verif ? `<div class="full small muted traza"><b class="${pre.verif.nivel === 'ok' ? 'up' : 'warn-text'}">${pre.verif.nivel === 'ok' ? '✓ verificada' : pre.verif.nivel === 'block' ? '✕ guardada con errores' : '⚠ con advertencias'}</b> · ${esc(Verif.trazaTxt(pre.verif))}</div>` : ''}
@@ -384,7 +385,8 @@ function formOp(pre = {}) {
         if (!ced || !px || !ccl) { toast('Faltan cantidad, precio o CCL'); return false; }
         Object.assign(o, { modo: 'cedear', cedears: ced, precioCedear: px, ccl, ratio: Cedears.ratioTxt(c), acciones: Cedears.aAcciones(ced, c), precio: Cedears.precioUSD(px, c, ccl), montoARS: ced * px });
       } else { o.modo = 'usd'; o.acciones = M.parse(Modal.val('o-acc')); o.precio = M.parse(Modal.val('o-precio')); if (!o.acciones || !o.precio) { toast('Faltan acciones o precio'); return false; } }
-      if (deDiv) o.deDividendos = Math.round(Math.min((k.caja || 0) + (pre.deDividendos || 0), o.acciones * o.precio) * 100) / 100;
+      if (deDiv) o.deCaja = Math.round(Math.min((k.caja || 0) + (pre.deCaja || 0), o.acciones * o.precio) * 100) / 100;
+      if (tipo === 'venta' && $('#o-a-caja') && $('#o-a-caja').checked) o.aCaja = true;
     }
     // control de calidad: contrasta precio, CCL, ratio, SPY, fecha, duplicados y tenencia; lo rojo bloquea salvo que lo confirmes
     const ev = Verif.evaluar(Verif.candidata(pre), k); const force = $('#o-force') && $('#o-force').checked;
@@ -395,7 +397,7 @@ function formOp(pre = {}) {
     if (tipo !== 'dividendo' && !state.cartera.precios[ticker]) state.cartera.precios[ticker] = { c: o.precio, dp: 0, t: 0, estimado: true };
     Persist.save(); toast(editando ? 'Operación actualizada' : `${tipo === 'compra' ? 'Compra' : tipo === 'venta' ? 'Venta' : 'Dividendo'} de ${ticker} registrada`); if (ui.view !== 'cartera') ui.view = 'cartera'; render();
   } });
-  const refresh = () => { const t = Modal.choice('o-tipo') || 'compra'; const m = Modal.choice('o-modo') || 'usd'; const box = $('#o-campos'); const mb = $('#o-modo-box'); if (mb) mb.hidden = t === 'dividendo'; const dd = $('#o-dediv-box'); if (dd) dd.hidden = t !== 'compra'; if (box) box.innerHTML = formOpCampos(t, m, { ticker: formOpTicker() }); formOpCalc(); formOpCclInfo(); };
+  const refresh = () => { const t = Modal.choice('o-tipo') || 'compra'; const m = Modal.choice('o-modo') || 'usd'; const box = $('#o-campos'); const mb = $('#o-modo-box'); if (mb) mb.hidden = t === 'dividendo'; const dd = $('#o-dediv-box'); if (dd) dd.hidden = t !== 'compra'; const ac = $('#o-acaja-box'); if (ac) ac.hidden = t !== 'venta'; if (box) box.innerHTML = formOpCampos(t, m, { ticker: formOpTicker() }); formOpCalc(); formOpCclInfo(); };
   $('#modal').onchange = e => { if (e.target.closest('#o-tipo') || e.target.closest('#o-modo')) refresh(); else formOpCalc(); };
   $('#modal').oninput = e => {
     if (e.target.id === 'o-ticker') { const q = e.target.value.trim(); $('#o-tk').value = q.toUpperCase().replace(/[^A-Z0-9.\-]/g, ''); const res = Cedears.buscar(q); const sug = $('#o-sug'); sug.innerHTML = res.map(c => `<button type="button" data-act="pick-ced" data-id="${esc(c.code)}"><b>${esc(c.code)}</b><span>${esc(c.nombre)}</span><i>${Cedears.ratioTxt(c)}</i></button>`).join(''); $('#o-info').innerHTML = formOpInfo(formOpTicker()); formOpCalc(); return; }
@@ -532,7 +534,7 @@ const Intercambio = {
 App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR') : 's/d'} · MEP $ ${fmtARS.format(k.mep)} · CCL $ ${fmtARS.format(k.ccl)} · SPY ${n(k.spyHoy)}.
 
 ## Resumen
-- Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) · **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD · rendimiento total sobre el costo de lo que tenés ${pct(k.rendTotal)} · valor total (acciones + caja de dividendos sin usar US$ ${n(k.caja)}${k.dividendosUsados ? `; ${n(k.dividendosUsados)} ya reinvertidos` : ''}) US$ ${n(k.valorTotal)}
+- Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) · **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD · rendimiento total sobre el costo de lo que tenés ${pct(k.rendTotal)} · valor total (acciones + caja US$ ${n(k.caja)}: dividendos + ventas a caja − compras pagadas con la caja) US$ ${n(k.valorTotal)}
 - Dividendos cobrados US$ ${n(k.dividendos)} · resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
 ${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operación)' : l)).join('\n')}
 - "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los de Facu ni los del S&P (decisión de Facu). Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
