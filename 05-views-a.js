@@ -59,7 +59,7 @@ function viewResumen() {
   let html = renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
   html += `<div class="grid g-kpi">`;
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${avgToDate ? deltaPill(c.total, avgToDate) : ''} <span>${avgToDate ? `vs promedio${isCur ? ' al mismo día' : ''} (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})` : ''} · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
-  html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: M.f(proj.total), sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
+  html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg glow-text' : ''}">${M.f(proj.total)}</span>`, sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
   html += kpi({ label: `Fijos + cuotas de ${mesN}`, value: M.f(comp), sub: `<span>Fijos ${M.c(margen.fijos)} · ${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'} ${M.c(c.cuotas)}</span>${pres ? `<span class="pill ${comp / pres > 0.6 ? 'crit' : comp / pres > 0.4 ? 'warn' : 'neutral'}">${M.pct(comp / pres)} del presupuesto</span>` : ''}`, cls: 'amber' });
   html += kpi({ label: isCur ? 'Te queda para gastar' : ym < D.thisMonth() ? 'Te quedó sin gastar' : 'Quedará para gastar', value: M.f(margen.queda), sub: pres ? `<span class="pill ${margen.queda < 0 ? 'crit' : margen.queda < pres * 0.1 ? 'warn' : 'good'}">${margen.queda < 0 ? 'te pasaste del presupuesto' : 'presupuesto ' + M.c(pres)}</span>${isCur && margen.restantes ? `<span>${M.f(Math.max(0, margen.queda) / margen.restantes)}/día por ${margen.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>', cls: 'accent' });
   html += `</div>`;
@@ -84,7 +84,7 @@ function viewResumen() {
       ] }), 230)}
       ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, ...(avg.vals ? [{ name: `Promedio (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})`, color: 'var(--line-2)', kind: 'line' }] : []), ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
     </div>
-    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><button class="btn ghost sm" data-go="plan">Plan e inversión →</button></div>${renderMargen(margen, proj)}</div>
+    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><button class="btn ghost sm" data-go="plan">Plan e inversión ${G.to}</button></div>${renderMargen(margen, proj)}</div>
   </div>`;
 
   // insights + donut
@@ -93,7 +93,7 @@ function viewResumen() {
   html += `<div class="grid g-21 section">
     <div class="card"><div class="card-head"><h2>Lectura del mes</h2><span class="hint">Alertas y patrones calculados sobre tus datos</span></div>${renderInsights(ins)}</div>
     <div class="card"><div class="card-head"><h2>Dónde se fue</h2><span class="hint">${D.monthName(ym)}</span></div>
-      ${grupos.length ? `<div class="row" style="align-items:flex-start;gap:16px">${Charts.donut({ slices: grupos, size: 150, thick: 22, center: `Total|${M.c(c.total)}` })}<div class="dl">${grupos.map(g => `<i class="swatch" style="background:${g.color}"></i><span>${esc(g.name)}</span><b class="mono">${M.pct(g.value / c.total)}</b>`).join('')}</div></div>` : '<div class="empty">Sin gastos este mes</div>'}
+      ${grupos.length ? `<div class="row" style="align-items:flex-start;gap:16px">${Charts.donut({ slices: grupos, size: 150, thick: 22, center: `Total|${M.c(c.total)}` })}<div class="dl">${grupos.map(g => `<i class="swatch" style="background:${g.color}"></i><span>${esc(g.name)}</span><b class="mono">${M.pct(g.value / c.total)}</b>`).join('')}</div></div>` : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
     </div>
   </div>`;
 
@@ -102,32 +102,32 @@ function viewResumen() {
   const hz = E.horizonte(D.thisMonth(), 12); const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Por categoría</h2><span class="hint">Barra = vs presupuesto o promedio 3 meses</span></div>
-      ${cats.length ? cats.slice(0, 9).map(({ cat, v, avg }) => { const ref = cat.presupuesto || avg || v; const r = v / (ref || 1); return `<div class="meter-row"><div class="l"><i class="swatch" style="background:${L.catColor(cat.id)}"></i><span>${esc(cat.nombre)}</span>${cat.presupuesto ? `<span class="pill ${r > 1 ? 'crit' : r > .8 ? 'warn' : 'neutral'}" style="font-size:10.5px">${M.pct(r)}</span>` : ''}</div><div class="v"><b class="mono">${M.f(v)}</b>${cat.presupuesto ? ` <span class="muted">/ ${M.c(cat.presupuesto)}</span>` : avg ? ` <span class="muted">prom. ${M.c(avg)}</span>` : ''}</div><div class="meter ${cat.presupuesto && r > 1 ? 'crit' : cat.presupuesto && r > .8 ? 'warn' : ''}"><i style="width:${clamp(r * 100, 2, 100)}%;background:${cat.presupuesto ? '' : L.catColor(cat.id)}"></i>${!cat.presupuesto && avg ? `<span class="mark" style="left:${clamp(avg / Math.max(v, avg) * 100, 0, 100)}%"></span>` : ''}</div></div>`; }).join('') : '<div class="empty">Sin gastos este mes</div>'}
+      ${cats.length ? cats.slice(0, 9).map(({ cat, v, avg }) => { const ref = cat.presupuesto || avg || v; const r = v / (ref || 1); return `<div class="meter-row"><div class="l"><i class="swatch" style="background:${L.catColor(cat.id)}"></i><span>${esc(cat.nombre)}</span>${cat.presupuesto ? `<span class="pill ${r > 1 ? 'crit' : r > .8 ? 'warn' : 'neutral'}" style="font-size:10.5px">${M.pct(r)}</span>` : ''}</div><div class="v"><b class="mono">${M.f(v)}</b>${cat.presupuesto ? ` <span class="muted">/ ${M.c(cat.presupuesto)}</span>` : avg ? ` <span class="muted">prom. ${M.c(avg)}</span>` : ''}</div><div class="meter ${cat.presupuesto && r > 1 ? 'crit' : cat.presupuesto && r > .8 ? 'warn' : ''}"><i style="width:${clamp(r * 100, 2, 100)}%;background:${cat.presupuesto ? '' : L.catColor(cat.id)}"></i>${!cat.presupuesto && avg ? `<span class="mark" style="left:${clamp(avg / Math.max(v, avg) * 100, 0, 100)}%"></span>` : ''}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
     </div>
     <div class="card"><div class="card-head"><h2>Próximos 12 meses</h2><span class="hint">Fijos + cuotas ya comprometidos vs presupuesto</span></div>
-      ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--s1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--s4)', values: hz.map(h => h.cuotas) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 230)}
-      ${Charts.legend([{ name: 'Fijos', color: 'var(--s1)' }, { name: 'Cuotas', color: 'var(--s4)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Alerta ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
+      ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 230)}
+      ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Alerta ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
     </div>
   </div>`;
 
   // últimas compras (solo lo cargado a mano en el mes visto: sin fijos ni cuotas)
   const last = state.movimientos.filter(m => !m.recId && m.fecha.startsWith(ym)).slice().sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id > a.id ? 1 : -1));
-  html += `<div class="card section"><div class="card-head"><h2>Últimas compras</h2><div class="row" style="gap:8px"><span class="hint">Sin fijos ni cuotas</span><button class="btn ghost sm" data-go="movimientos">Ver todo el mes →</button></div></div>${renderMovTable(last, { compact: true })}</div>`;
+  html += `<div class="card section"><div class="card-head"><h2>Últimas compras</h2><div class="row" style="gap:8px"><span class="hint">Sin fijos ni cuotas</span><button class="btn ghost sm" data-go="movimientos">Ver todo el mes ${G.to}</button></div></div>${renderMovTable(last, { compact: true })}</div>`;
   return html;
 }
 
 function renderMargen(mg, proj) {
-  if (!mg.presupuesto) return `<div class="empty">Cargá en Configuración cuánto querés gastar por mes (tu presupuesto) para ver cuánto te queda.</div>`;
+  if (!mg.presupuesto) return empty({ kind: 'setup', icon: 'chart', head: 'Falta tu presupuesto mensual', sub: 'Definilo y Gastos te avisa cuánto te queda por día y cuándo lo vas a cruzar.', btn: 'Definir presupuesto', go: 'config' });
   const isCur = mg.ym === D.thisMonth();
   const rows = [
     ['Presupuesto del mes', mg.presupuesto, 'in'],
-    ['Fijos', -mg.fijos, 'var(--s1)'],
-    ['Cuotas del mes', -mg.cuotas, 'var(--s4)'],
-    [isCur ? 'Compras hasta hoy' : 'Compras', -mg.compras, 'var(--s2)'],
+    ['Fijos', -mg.fijos, 'var(--c1)'],
+    ['Cuotas del mes', -mg.cuotas, 'var(--c4)'],
+    [isCur ? 'Compras hasta hoy' : 'Compras', -mg.compras, 'var(--c7)'],
   ];
   let acc = 0; const maxV = Math.max(mg.presupuesto, mg.fijos + mg.cuotas + mg.compras, 1);
   const wf = rows.map(([l, v, color]) => { let left, width; if (color === 'in') { left = 0; width = v / maxV * 100; acc = v; } else { const from = acc; acc += v; left = Math.max(0, acc) / maxV * 100; width = (Math.max(from, 0) - Math.max(acc, 0)) / maxV * 100; } return `<div class="wf"><span>${l}</span><div class="bar"><i style="left:${left}%;width:${width}%;background:${color === 'in' ? 'var(--line-2)' : color}"></i></div><span class="n">${v < 0 ? '−' : ''}${M.f(Math.abs(v))}</span></div>`; }).join('');
-  return `<div style="font-family:var(--font-display);font-size:30px;font-weight:600;letter-spacing:-.02em;color:${mg.queda < 0 ? 'var(--crit-text)' : 'var(--ink)'}">${M.f(mg.queda)}</div>
+  return `<div style="font-family:var(--font-display);font-size:30px;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:${mg.queda < 0 ? 'var(--crit-text)' : 'var(--ink)'}">${M.f(mg.queda)}</div>
     <p class="small muted" style="margin:2px 0 12px">${mg.queda < 0 ? 'Ya te pasaste del presupuesto del mes.' : isCur ? `Podés gastar hasta ahí en lo que queda de ${D.monthName(mg.ym).split(' ')[0]}.` : 'Lo que quedó del presupuesto después de fijos, cuotas y compras.'}</p>
     <div class="waterfall">${wf}<div class="wf total"><span>Queda</span><div class="bar"><i style="left:0;width:${clamp(Math.max(0, mg.queda) / maxV * 100, 0, 100)}%;background:var(--accent)"></i></div><span class="n">${M.f(mg.queda)}</span></div></div>
     ${isCur && proj && proj.pace != null ? `<div class="callout ${mg.quedaProj < 0 ? 'crit' : ''}" style="margin-top:12px">Al ritmo actual (${M.f(proj.pace)}/día en compras) cerrás el mes ${mg.quedaProj < 0 ? `<b>${M.f(-mg.quedaProj)}</b> por encima del presupuesto.` : `con <b>${M.f(mg.quedaProj)}</b> sin usar.`}</div>` : ''}
@@ -135,8 +135,8 @@ function renderMargen(mg, proj) {
 }
 
 function renderInsights(list) {
-  if (!list.length) return '<div class="empty">Nada para señalar todavía.</div>';
-  return list.map(i => `<div class="insight ${i.level}"><div class="ic">${ICONS[i.icon] || ICONS.spark}</div><div><div class="t">${esc(i.title)}</div><p>${esc(i.text)}${i.view ? ` <a href="#" data-go="${i.view}">Ver →</a>` : ''}${i.action === 'detectar' ? ` <a href="#" data-act="detectar">Revisar →</a>` : ''}</p></div></div>`).join('');
+  if (!list.length) return empty({ kind: 'periodo', icon: 'list', head: 'Todo en orden', sub: 'Cuando algo se salga de lo normal lo vas a ver acá.' });
+  return list.map(i => `<div class="insight ${i.level}"><div class="ic">${ICONS[i.icon] || ICONS.spark}</div><div><div class="t">${esc(i.title)}</div><p>${esc(i.text)}${i.view ? ` <a href="#" data-go="${i.view}">Ver ${G.to}</a>` : ''}${i.action === 'detectar' ? ` <a href="#" data-act="detectar">Revisar ${G.to}</a>` : ''}</p></div></div>`).join('');
 }
 
 function viewOnboarding() {
@@ -159,11 +159,13 @@ function viewOnboarding() {
 
 /* ---------- MOVIMIENTOS ---------- */
 function renderMovTable(movs, opts = {}) {
-  if (!movs.length) return '<div class="empty">No hay movimientos con estos filtros.</div>';
+  if (!movs.length) return opts.compact
+    ? empty({ kind: 'periodo', icon: 'cal', head: `Sin compras en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Las compras sueltas del mes aparecen acá, sin los fijos ni las cuotas.' })
+    : empty({ kind: 'filtro', icon: 'search', head: 'Ningún movimiento coincide', sub: 'Probá ampliando el período o sacando alguna categoría.', btn: 'Limpiar filtros', action: 'clear-filters', ghost: true });
   const s = ui.sort; const key = s.key;
   const val = m => key === 'monto' ? E.rowAmount(m) : key === 'cat' ? L.cat(m.catId).nombre : key === 'nec' ? (m.necesidad || 1) : key === 'desc' ? norm(m.desc) : m.fecha + (m.id || '');
   const rows = opts.compact ? movs : movs.slice().sort((a, b) => { const va = val(a), vb = val(b); return (va > vb ? 1 : va < vb ? -1 : 0) * s.dir; });
-  const th = (k, label, cls = '') => opts.compact ? `<th class="${cls}">${label}</th>` : `<th class="${cls} ${key === k ? 'sorted' : ''}" data-sort="${k}">${label}${key === k ? (s.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`;
+  const th = (k, label, cls = '') => opts.compact ? `<th class="${cls}">${label}</th>` : `<th class="${cls} ${key === k ? 'sorted' : ''}" data-sort="${k}">${label}${key === k ? (s.dir > 0 ? ' ' + G.up : ' ' + G.down) : ''}</th>`;
   return `<div class="table-wrap"><table class="responsive ${!opts.compact && key === 'fecha' ? 'grouped' : ''}"><thead><tr>${th('fecha', 'Fecha')}${th('desc', 'Descripción')}${th('cat', 'Categoría')}<th>Medio</th>${th('nec', 'Nec.')}${th('monto', 'Monto', 'r')}<th></th></tr></thead><tbody>
   ${rows.map((m, i) => { const ars = E.rowAmount(m); const dayHead = !opts.compact && key === 'fecha' && (i === 0 || rows[i - 1].fecha !== m.fecha) ? `<tr class="day"><td colspan="7">${['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][D.dow(m.fecha)]} ${D.fmt(m.fecha)}<span>${M.f(sum(rows.filter(x => x.fecha === m.fecha).map(E.rowAmount)))}</span></td></tr>` : ''; const total = M.toARS(m.monto, m.moneda); const cuotas = (m.cuotas || 1) > 1; const t = L.tarjeta(m.tarjetaId); const pago = m.medio === 'tarjeta' && t && !m.cuotaRow ? E.primerPago(m) : null;
     return dayHead + `<tr class="${m.virtual ? 'virtual' : ''} ${m.cuotaRow ? 'cuota' : ''}" data-id="${m.id}">
@@ -216,14 +218,14 @@ function viewCuotas() {
     ${kpi({ label: 'Deuda restante en cuotas', value: M.f(restante), sub: act.length ? `<span>última cuota ${D.monthName(act[act.length - 1].last, true)}</span>` : '' })}
   </div>`;
   html += `<div class="card section"><div class="card-head"><h2>Carga mensual de los próximos 12 meses</h2><span class="hint">Lo que ya sabés que vas a pagar, contra tu presupuesto</span></div>
-    ${ChartQ.reg(w => Charts.stacked({ w, h: 250, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--s1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--s4)', values: hz.map(h => h.cuotas) }, { name: 'Compras', color: 'var(--line-2)', values: hz.map(h => h.nuevo) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 250)}
-    ${Charts.legend([{ name: 'Fijos', color: 'var(--s1)' }, { name: 'Cuotas', color: 'var(--s4)' }, { name: 'Compras del mes', color: 'var(--line-2)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Umbral ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
+    ${ChartQ.reg(w => Charts.stacked({ w, h: 250, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }, { name: 'Compras', color: 'var(--line-2)', values: hz.map(h => h.nuevo) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 250)}
+    ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Compras del mes', color: 'var(--line-2)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Umbral ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
     <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Mes</th><th class="r">Fijos</th><th class="r">Cuotas</th><th class="r">Fijos + cuotas</th><th class="r">% presup.</th><th class="r">Libre para compras</th></tr></thead><tbody>
       ${hz.map(h => `<tr><td style="text-transform:capitalize">${D.monthName(h.ym)}</td><td class="amount r">${M.f(h.fijos)}</td><td class="amount r">${M.f(h.cuotas)}</td><td class="amount r"><b>${M.f(h.comprometido)}</b></td><td class="r">${h.presupuesto ? `<span class="pill ${h.pct > 0.5 ? 'crit' : h.pct > alerta ? 'warn' : 'good'}">${M.pct(h.pct)}</span>` : '—'}</td><td class="amount r">${h.presupuesto ? M.f(h.libre) : '—'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Cuotas en curso</h2><span class="hint">${act.length} planes</span></div>
-      ${act.length ? act.map(a => `<div class="cuota-row"><div><b style="font-weight:500">${esc(a.m.desc)}</b> <span class="progress-pill">${a.idxPeriodo}/${a.n}</span></div><div class="amt">${M.f(a.cuota)}<span class="muted"> /mes</span></div><div class="sub">${L.cat(a.m.catId).nombre} · ${medioLabel(a.m)}${a.cierre && a.idxPeriodo <= a.n ? ` · la ${a.idxPeriodo}/${a.n} cierra el ${D.fmt(a.cierre)}` : ''} · termina ${D.monthName(a.last, true)} · faltan ${M.f(a.restante)}</div><div class="meter"><i style="width:${a.idxPeriodo / a.n * 100}%;background:var(--s4)"></i></div></div>`).join('') : '<div class="empty">No tenés compras en cuotas activas.</div>'}
+      ${act.length ? act.map(a => `<div class="cuota-row"><div><b style="font-weight:500">${esc(a.m.desc)}</b> <span class="progress-pill">${a.idxPeriodo}/${a.n}</span></div><div class="amt">${M.f(a.cuota)}<span class="muted"> /mes</span></div><div class="sub">${L.cat(a.m.catId).nombre} · ${medioLabel(a.m)}${a.cierre && a.idxPeriodo <= a.n ? ` · la ${a.idxPeriodo}/${a.n} cierra el ${D.fmt(a.cierre)}` : ''} · termina ${D.monthName(a.last, true)} · faltan ${M.f(a.restante)}</div><div class="meter"><i style="width:${a.idxPeriodo / a.n * 100}%;background:var(--c4)"></i></div></div>`).join('') : empty({ kind: 'periodo', icon: 'cal', head: 'Ninguna cuota activa', sub: 'Las compras en cuotas aparecen acá con cuántas van y cuánto falta.' })}
     </div>
     <div class="card"><div class="card-head"><h2>Simulador: ¿me conviene sacar cuotas?</h2></div>
       <div class="form-grid">
@@ -242,7 +244,7 @@ function viewCuotas() {
     ${recs.length ? `<div class="table-wrap"><table class="responsive"><thead><tr><th>Concepto</th><th>Categoría</th><th>Medio</th><th>Día</th><th class="r">Monto / mes</th><th></th></tr></thead><tbody>${recs.map(r => `<tr data-rec="${r.id}" style="cursor:pointer;${r.activo === false ? 'opacity:.5' : ''}">
       <td class="keep"><div class="mrow"><div><b style="font-weight:500">${esc(r.desc)}</b>${r.activo === false ? ' <span class="tag">pausado</span>' : ''}<span class="sub">${L.cat(r.catId).nombre} · ${medioLabel(r)} · día ${r.dia || 1}${r.hasta ? ` · hasta ${D.monthName(r.hasta, true)}` : ''}</span></div><div class="mob"><span class="mono">${M.f(M.toARS(r.monto, r.moneda))}</span></div></div></td>
       <td>${catChip(r.catId)}</td><td class="small">${esc(medioLabel(r))}</td><td class="mono">${r.dia || 1}</td><td class="amount r">${M.f(M.toARS(r.monto, r.moneda))}${r.moneda === 'USD' ? `<span class="sub">${M.orig(r)}</span>` : ''}</td>
-      <td class="r" style="white-space:nowrap"><span class="row-actions"><button class="mini-btn" data-act="edit-rec" data-id="${r.id}" title="Editar">${ICONS.edit}</button><button class="mini-btn" data-act="toggle-rec" data-id="${r.id}" title="${r.activo === false ? 'Reactivar' : 'Pausar'}">${ICONS.clock}</button><button class="mini-btn" data-act="del-rec" data-id="${r.id}" title="Borrar">${ICONS.trash}</button></span></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Cargá tus gastos fijos (alquiler, seguro del auto, Claude, Netflix…) para que el pronóstico los descuente solo.</div>'}
+      <td class="r" style="white-space:nowrap"><span class="row-actions"><button class="mini-btn" data-act="edit-rec" data-id="${r.id}" title="Editar">${ICONS.edit}</button><button class="mini-btn" data-act="toggle-rec" data-id="${r.id}" title="${r.activo === false ? 'Reactivar' : 'Pausar'}">${ICONS.clock}</button><button class="mini-btn" data-act="del-rec" data-id="${r.id}" title="Borrar">${ICONS.trash}</button></span></td></tr>`).join('')}</tbody></table></div>` : empty({ kind: 'setup', icon: 'list', head: 'Todavía no cargaste gastos fijos', sub: 'Alquiler, seguro, suscripciones. Una vez cargados el pronóstico los descuenta solo.', btn: 'Agregar gasto fijo', action: 'new-rec' })}
   </div>`;
   return html;
 }

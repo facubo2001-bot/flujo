@@ -6,7 +6,7 @@ function niceMax(v, ticks = 4) {
   const f = raw / p; const nf = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(x => x >= f - 1e-9) || 10;
   const step = nf * p; return { max: step * ticks, step };
 }
-const axisFmt = v => { const cur = ui.cur; if (cur === 'USD') { const u = M.toUSD(v); return u >= 1000 ? (u / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' k' : Math.round(u).toString(); } return v >= 1e6 ? (v / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : v >= 1000 ? Math.round(v / 1000) + ' k' : Math.round(v).toString(); };
+const axisFmt = v => MENOS((() => { const cur = ui.cur; if (cur === 'USD') { const u = M.toUSD(v); return Math.abs(u) >= 1000 ? (u / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' k' : Math.round(u).toString(); } return Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : Math.abs(v) >= 1000 ? Math.round(v / 1000) + ' k' : Math.round(v).toString(); })());
 const tipRow = (color, name, val) => `<div class="row"><span>${color ? `<i style="background:${color}"></i>` : ''}${esc(name)}</span><b>${val}</b></div>`;
 
 const Charts = {

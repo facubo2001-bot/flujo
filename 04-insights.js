@@ -88,7 +88,7 @@ const Insights = {
     // 13. card closing soon
     if (isCur) for (const t of state.tarjetas) { const now = E.cardNow(t); if (now.diasAlCierre >= 0 && now.diasAlCierre <= 3) out.push({ level: 'info', icon: 'tarjetas', title: `${t.nombre} cierra ${now.diasAlCierre === 0 ? 'hoy' : now.diasAlCierre === 1 ? 'mañana' : 'en ' + now.diasAlCierre + ' días'}`, text: `Lo que compres después del ${D.fmt(now.cierre)} recién lo pagás el ${D.fmt(D.dateIn(D.addMonths(now.mesPago, 1), t.vencimiento))}. Si podés esperar, esperá.` }); }
     // 14. backup reminder (only outside claude.ai)
-    if (!window.claude && state.movimientos.length > 20) { const last = state.settings.lastBackup; if (!last || D.daysBetween(last, D.today()) > 30) out.push({ level: 'info', icon: 'download', title: 'Hacé un respaldo', text: `${last ? 'Hace más de un mes que no exportás' : 'Nunca exportaste'} tus datos. Viven solo en este teléfono: Configuración → Exportar → Guardar en Archivos.`, view: 'config' }); }
+    if (!window.claude && state.movimientos.length > 20) { const last = state.settings.lastBackup; if (!last || D.daysBetween(last, D.today()) > 30) out.push({ level: 'info', icon: 'download', title: 'Hacé un respaldo', text: `${last ? 'Hace más de un mes que no exportás' : 'Nunca exportaste'} tus datos. Viven solo en este teléfono: en Configuración tocá Exportar y guardalo en Archivos.`, view: 'config' }); }
     const order = { crit: 0, warn: 1, good: 2, info: 3 };
     return out.sort((a, b) => order[a.level] - order[b.level]).slice(0, 8);
   },

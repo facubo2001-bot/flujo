@@ -24,13 +24,16 @@ function render() {
   E.build(); ChartQ.reset(); renderNav();
   const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, cartera: viewCartera, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
   let body = '';
-  try { body = fns[ui.view](); } catch (e) { console.error(e); body = `<div class="card"><div class="empty">Algo falló al dibujar esta vista: ${esc(e.message)}. <button class="btn sm" data-act="reload">Recargar</button></div></div>`; }
+  try { body = fns[ui.view](); } catch (e) { console.error(e); body = `<div class="card">${empty({ kind: 'is-error', icon: 'warn', head: 'No pudimos dibujar esta vista', sub: 'Tus datos están a salvo. Probá de nuevo o cambiá de mes.', trace: e.message, btn: 'Reintentar', action: 'reload', ghost: true })}</div>`; }
   $('#view').innerHTML = renderTopbar() + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
   if (window.innerWidth > 900) $('#btn-new-desktop').style.display = '';
   ChartQ.mount();
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
+  headLine();
 }
+/** encabezado sticky: la hairline de abajo existe solo cuando hay algo scrolleado arriba */
+function headLine() { const m = $('.main'), h = $('.mobile-head'); if (m && h) h.classList.toggle('scrolled', m.scrollTop > 4); }
 function go(view) { ui.view = view; render(); }
 
 /** setea el ticker elegido en el form de operación y refresca campos/cálculo */
@@ -188,6 +191,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'n' || e.key === 'N') formMov();
 });
 let rzT, lastW = window.innerWidth; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (!$('#overlay').classList.contains('open')) render(); }, 250); });
+$('.main').addEventListener('scroll', headLine, { passive: true });
 window.addEventListener('beforeunload', () => { if (Persist.dirty) { Persist.local(); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } else if (!document.hidden && Gist.cfg() && !Persist.dirty) { Gist.refrescar().then(ch => { if (ch && !$('#overlay').classList.contains('open')) { render(); toast('Datos actualizados'); } }); } });
 
@@ -214,7 +218,7 @@ function importarCSV(txt) {
 (async function boot() {
   applyTheme();
   try { const u = JSON.parse(sessionStorage.getItem('flujo.ui') || 'null'); if (u) { ui.view = u.view || ui.view; ui.mes = u.mes || ui.mes; ui.cur = u.cur || ui.cur; } } catch (e) {}
-  renderNav(); $('#view').innerHTML = '<div class="empty">Cargando…</div>';
+  renderNav(); $('#view').innerHTML = '<div class="empty bare">Cargando…</div>';
   await Persist.init();
   render();
   if (!window.claude && !$('#overlay').classList.contains('open')) {
@@ -225,5 +229,6 @@ function importarCSV(txt) {
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
   if (!window.claude) Cedears.actualizar().then(ch => { if (ch) console.log('Tabla de CEDEARs actualizada:', Cedears.actualizado()); });
   if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
+  if (!window.claude) setTimeout(() => Fund.actualizarCartera().then(n => { if (n && ui.view === 'cartera') render(); }), 4000);
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();

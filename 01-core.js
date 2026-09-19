@@ -58,9 +58,12 @@ const FERIADOS_NYSE = new Set([
 ]);
 
 /* ---------- money ---------- */
-const fmtARS = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
-const fmtUSD = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const fmtUSD2 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** el negativo de toda cifra es el menos tipográfico − (U+2212): mismo ancho que el + en tabular-nums */
+const MENOS = t => String(t).replace(/-/g, '\u2212');
+const NF = o => { const f = new Intl.NumberFormat('es-AR', o); return { format: v => MENOS(f.format(v)) }; };
+const fmtARS = NF({ maximumFractionDigits: 0 });
+const fmtUSD = NF({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmtUSD2 = NF({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const M = {
   tc() { return Number(state.settings.tc) || 1; },
   toARS(monto, moneda) { return moneda === 'USD' ? monto * M.tc() : monto; },
@@ -80,16 +83,16 @@ const M = {
     const cur = opts.cur || ui.cur;
     if (cur === 'USD') return M.f(ars, opts);
     const a = Math.abs(ars);
-    if (a >= 1e6) return `${ars < 0 ? '-' : ''}$ ${(a / 1e6).toLocaleString('es-AR', { maximumFractionDigits: a >= 1e7 ? 1 : 2 })} M`;
-    if (a >= 1e4) return `${ars < 0 ? '-' : ''}$ ${(a / 1e3).toLocaleString('es-AR', { maximumFractionDigits: 0 })} k`;
+    if (a >= 1e6) return `${ars < 0 ? '\u2212' : ''}$ ${(a / 1e6).toLocaleString('es-AR', { maximumFractionDigits: a >= 1e7 ? 1 : 2 })} M`;
+    if (a >= 1e4) return `${ars < 0 ? '\u2212' : ''}$ ${(a / 1e3).toLocaleString('es-AR', { maximumFractionDigits: 0 })} k`;
     return M.f(ars, opts);
   },
-  pct(v, d = 0) { return `${(v * 100).toLocaleString('es-AR', { maximumFractionDigits: d })} %`; },
+  pct(v, d = 0) { return `${MENOS((v * 100).toLocaleString('es-AR', { maximumFractionDigits: d }))} %`; },
   /** original currency formatting for a movement */
   orig(m) { return m.moneda === 'USD' ? `US$ ${fmtUSD2.format(m.monto)}` : `$ ${fmtARS.format(m.monto)}`; },
   parse(str) {
     if (typeof str === 'number') return str;
-    let s = String(str || '').trim().replace(/[^\d,.\-]/g, '');
+    let s = String(str || '').replace(/\u2212/g, '-').trim().replace(/[^\d,.\-]/g, '');
     if (!s) return 0;
     // es-AR: 1.234.567,89 ; also accept 1234567.89
     if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
@@ -154,7 +157,7 @@ function defaultState() {
     sueldos: {},
     presets: [],
     aprendido: {},
-    cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null },
+    cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
 const BUILD = '__BUILD__';
@@ -166,7 +169,7 @@ const L = {
   cat(id) { return state.categorias.find(c => c.id === id) || state.categorias[state.categorias.length - 1]; },
   grupo(id) { return GRUPOS.find(g => g.id === id) || GRUPOS[7]; },
   grupoDeCat(catId) { return L.grupo(L.cat(catId).grupo); },
-  slotColor(slot) { return `var(--s${slot})`; },
+  slotColor(slot) { return slot >= 8 ? 'var(--c-otras)' : `var(--c${slot})`; },
   catColor(catId) { return L.slotColor(L.grupoDeCat(catId).slot); },
   tarjeta(id) { return state.tarjetas.find(t => t.id === id); },
   cuenta(id) { return state.cuentas.find(c => c.id === id); },
@@ -247,7 +250,7 @@ const Persist = {
     if (!s.sueldos || typeof s.sueldos !== 'object' || Array.isArray(s.sueldos)) s.sueldos = {};
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
     for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
-    for (const k of ['alertas', 'precios', 'historial', 'spy']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
+    for (const k of ['alertas', 'precios', 'historial', 'spy', 'fund']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
     for (const o of s.cartera.operaciones) if (o && o.fecha) { const h = D.habil(o.fecha); if (h !== o.fecha) o.fecha = h; }
     for (const o of s.cartera.operaciones) if (o && o.deDividendos > 0 && o.deCaja == null) { o.deCaja = o.deDividendos; delete o.deDividendos; }
     if (!Array.isArray(s.presets)) s.presets = [];
@@ -440,7 +443,7 @@ const Precios = {
   async actualizar(silencioso = false) {
     try { await TC.actualizar(true); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
-    if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes → Cartera para traer precios.', 5000); return false; }
+    if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }
     const tickers = Precios.tickers(); if (!tickers.length) return false;
     let ok = 0;
     for (const t of tickers) {
@@ -466,13 +469,168 @@ const Precios = {
   },
 };
 
+/* ---------- fundamentales de cada empresa (Finnhub: perfil, métricas, balances SEC, calendario) ---------- */
+const Fund = {
+  /** datos guardados de un ticker (se muestran al instante mientras se refrescan) */
+  de(t) { const f = state.cartera.fund || {}; return f[t] || null; },
+  /** concepto de un balance SEC: primer match por nombre exacto o parcial */
+  _v(arr, nombres) {
+    if (!Array.isArray(arr)) return null;
+    for (const n of nombres) { const h = arr.find(x => x.concept === n); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    for (const n of nombres) { const h = arr.find(x => (x.concept || '').includes(n)); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    return null;
+  },
+  C: {
+    ventas: ['Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax', 'RevenueFromContractWithCustomerIncludingAssessedTax', 'SalesRevenueNet', 'SalesRevenueGoodsNet'],
+    neto: ['NetIncomeLoss', 'ProfitLoss'],
+    eps: ['EarningsPerShareDiluted', 'EarningsPerShareBasicAndDiluted', 'EarningsPerShareBasic'],
+    operativo: ['OperatingIncomeLoss'],
+    impuesto: ['IncomeTaxExpenseBenefit'],
+    antesImp: ['IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxes'],
+    patrimonio: ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
+    deuda: ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebt'],
+    caja: ['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'],
+    cfo: ['NetCashProvidedByUsedInOperatingActivities', 'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations'],
+    capex: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets'],
+    acciones: ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic', 'CommonStockSharesOutstanding'],
+  },
+  /** una fila por año fiscal, de más viejo a más nuevo */
+  anios(fin) {
+    if (!fin || !Array.isArray(fin.data)) return [];
+    const V = Fund._v, C = Fund.C;
+    const filas = fin.data.filter(d => d.report && (d.report.ic || d.report.bs)).map(d => {
+      const ic = d.report.ic || [], bs = d.report.bs || [], cf = d.report.cf || [];
+      const opi = V(ic, C.operativo), imp = V(ic, C.impuesto), pre = V(ic, C.antesImp);
+      const pat = V(bs, C.patrimonio), deu = V(bs, C.deuda) || 0, caj = V(bs, C.caja) || 0;
+      const cfo = V(cf, C.cfo), cpx = V(cf, C.capex);
+      const tasa = pre && imp != null && pre > 0 ? clamp(imp / pre, 0, 0.6) : 0.21;
+      const invertido = pat != null ? pat + deu - caj : null;
+      return {
+        anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: d.endDate || '',
+        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
+        patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
+        fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
+        acciones: V(ic, C.acciones) || V(bs, C.acciones),
+        roic: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
+      };
+    }).filter(f => f.anio && (f.ventas || f.neto));
+    const vistos = {}; for (const f of filas) if (!vistos[f.anio] || f.fin > vistos[f.anio].fin) vistos[f.anio] = f;
+    return Object.values(vistos).sort((a, b) => a.anio - b.anio);
+  },
+  /** CAGR entre el primero y el último valor positivo de la serie (n años) */
+  cagr(filas, campo, n) {
+    const xs = filas.filter(f => Number.isFinite(f[campo]) && f[campo] > 0).slice(-(n + 1));
+    if (xs.length < 2) return null;
+    const a = xs[0][campo], b = xs[xs.length - 1][campo], t = xs[xs.length - 1].anio - xs[0].anio;
+    return t > 0 ? Math.pow(b / a, 1 / t) - 1 : null;
+  },
+  prom(filas, campo, n) { const xs = filas.slice(-n).map(f => f[campo]).filter(Number.isFinite); return xs.length ? sum(xs) / xs.length : null; },
+  mediana(xs) { const s = xs.filter(Number.isFinite).slice().sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; },
+  /** trae todo de Finnhub y lo guarda; devuelve los datos o null */
+  async traer(t) {
+    const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
+    const s = encodeURIComponent(Precios.simbolo(t));
+    const get = async q => { try { const r = await fetch(`https://finnhub.io/api/v1/${q}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; return await r.json(); } catch (e) { return null; } };
+    const hoy = D.today(); const hasta = D.iso(new Date(D.parse(hoy).getTime() + 200 * 86400000));
+    const [perfil, met, fin, cal] = await Promise.all([
+      get(`stock/profile2?symbol=${s}`),
+      get(`stock/metric?symbol=${s}&metric=all`),
+      get(`stock/financials-reported?symbol=${s}&freq=annual&from=2008-01-01&to=${hoy}`),
+      get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
+    ]);
+    if (!perfil && !met && !fin) return null;
+    const m = (met && met.metric) || {}; const serie = (met && met.series && met.series.annual) || {};
+    const filas = Fund.anios(fin);
+    const peHist = (serie.pe || []).map(x => Number(x.v)).filter(Number.isFinite);
+    const bal = cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
+    const d = {
+      at: Date.now(), ticker: t,
+      nombre: perfil && perfil.name || null, sector: perfil && perfil.finnhubIndustry || null,
+      capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : null,
+      max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
+      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)),
+      pb: Number(m.pbAnnual ?? m.pbQuarterly) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
+      roe: Number(m.roeTTM ?? m.roeRfy) / 100 || null, roa: Number(m.roaTTM ?? m.roaRfy) / 100 || null,
+      margenNeto: Number(m.netProfitMarginTTM) / 100 || null, margenNeto5: Number(m.netProfitMargin5Y) / 100 || null,
+      margenBruto: Number(m.grossMarginTTM) / 100 || null, margenOper: Number(m.operatingMarginTTM) / 100 || null,
+      deudaPat: Number(m['totalDebt/totalEquityQuarterly'] ?? m['totalDebt/totalEquityAnnual']) || null,
+      yieldDiv: Number(m.dividendYieldIndicatedAnnual ?? m.currentDividendYieldTTM) / 100 || null,
+      divCrec5: Number(m.dividendGrowthRate5Y) / 100 || null, payout: Number(m.payoutRatioTTM) / 100 || null,
+      crecVentas5: Number(m.revenueGrowth5Y) / 100 || null, crecEps5: Number(m.epsGrowth5Y) / 100 || null,
+      beta: Number(m.beta) || null,
+      balance: bal ? { fecha: bal.date, hora: bal.hour || '', epsEst: bal.epsEstimate ?? null, trimestre: bal.quarter ?? null } : null,
+      filas: filas.slice(-12).map(f => ({ anio: f.anio, ventas: f.ventas, neto: f.neto, eps: f.eps, fcf: f.fcf, acciones: f.acciones, roic: f.roic })),
+    };
+    // calculados sobre los balances reportados a la SEC (lo que Finnhub no da hecho)
+    d.cagrVentas5 = Fund.cagr(filas, 'ventas', 5); d.cagrNeto5 = Fund.cagr(filas, 'neto', 5); d.cagrEps5 = Fund.cagr(filas, 'eps', 5);
+    d.cagrVentas10 = Fund.cagr(filas, 'ventas', 10); d.cagrNeto10 = Fund.cagr(filas, 'neto', 10);
+    d.roicProm5 = Fund.prom(filas.filter(f => f.roic != null), 'roic', 5);
+    const u = filas[filas.length - 1];
+    d.roicAct = u && u.roic != null ? u.roic : (Number(m.roiTTM) / 100 || null);  // respaldo: el ROI que ya calcula Finnhub (empresas con patrimonio negativo)
+    d.fcfSobreNeto = u && u.fcf != null && u.neto ? u.fcf / u.neto : null;
+    const accIni = filas.filter(f => f.acciones).slice(0, 1)[0], accFin = filas.filter(f => f.acciones).slice(-1)[0];
+    d.accionesCambio = accIni && accFin && accIni.acciones && accIni.anio !== accFin.anio ? { desde: accIni.anio, hasta: accFin.anio, pct: accFin.acciones / accIni.acciones - 1 } : null;
+    d.aniosDatos = filas.length ? { desde: filas[0].anio, hasta: filas[filas.length - 1].anio } : null;
+    if (!state.cartera.fund) state.cartera.fund = {};
+    state.cartera.fund[t] = d;
+    const ks = Object.keys(state.cartera.fund); if (ks.length > 60) delete state.cartera.fund[ks[0]];
+    Persist.save();
+    return d;
+  },
+  /** refresca en segundo plano los tickers de la cartera con datos viejos (para los avisos de balance) */
+  async actualizarCartera(max = 8, diasFrescura = 6) {
+    if (!(state.settings.finnhubKey || '').trim()) return 0;
+    const f = state.cartera.fund || {}; const corte = Date.now() - diasFrescura * 86400000;
+    const ts = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).slice(0, max);
+    let n = 0; for (const t of ts) { try { if (await Fund.traer(t)) n++; } catch (e) {} await new Promise(r => setTimeout(r, 300)); }
+    return n;
+  },
+  /** próximo balance de un ticker, si está guardado: {fecha, dias} */
+  balance(t) { const d = Fund.de(t); if (!d || !d.balance) return null; const dias = D.daysBetween(D.today(), d.balance.fecha); return dias >= 0 ? { ...d.balance, dias } : null; },
+};
+
 /* ---------- toast ---------- */
 let toastTimer;
 function toast(msg, ms = 2200, action = null) { const t = $('#toast'); t.textContent = msg; if (action) { const b = document.createElement('button'); b.textContent = action.label; b.onclick = () => { t.classList.remove('show'); action.fn(); }; t.appendChild(b); } t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms); }
 
 /* ---------- icons ---------- */
+/* ---------- estados vacios ----------
+ * Cinco tipos con comportamientos distintos, no una sola regla que los estiliza.
+ * El titulo dice que falta; el subtitulo, que pasa cuando lo cargues. Nunca "Sin datos" solo. */
+const EmptyIcons = {
+  card: '<rect x="2.5" y="5.5" width="19" height="13" rx="3"/><path d="M6 14.5h5"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>',
+  cal: '<rect x="3.5" y="4.5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17"/>',
+  warn: '<path d="M12 4.5L21 19.5H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
+  list: '<path d="M4 7h16"/><path d="M4 12h11"/><path d="M4 17h7"/>',
+  chart: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v8.5h8.5"/>',
+};
+function empty({ icon = 'list', head, sub = '', btn = null, action = null, go = null, ghost = false, trace = null, kind = '' }) {
+  return `<div class="empty ${kind}">
+    <div class="ico"><svg viewBox="0 0 24 24">${EmptyIcons[icon]}</svg></div>
+    <h4>${esc(head)}</h4>
+    ${sub ? `<p>${esc(sub)}</p>` : ''}
+    ${trace ? `<div class="trace">${esc(trace)}</div>` : ''}
+    ${btn ? `<button class="btn${ghost ? ' ghost' : ''}" ${go ? `data-go="${go}"` : `data-act="${action}"`}>${esc(btn)}</button>` : ''}
+  </div>`;
+}
+/** hueco chico adentro de una tarjeta: el borde punteado dice "aca va algo" sin ocupar media pantalla */
+function emptyInline(text, btn = 'Agregar', action = null) {
+  return `<div class="empty-inline"><span>${esc(text)}</span>
+    <button data-act="${action}">${esc(btn)}</button></div>`;
+}
+
+/** glifos que en realidad son iconos: mismo trazo 1.5 que el resto, al tamano del texto */
+const G = {
+  ok: '<svg class="g" viewBox="0 0 24 24"><path d="M20 6.5L9.5 17 4 11.5"/></svg>',
+  no: '<svg class="g" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  warn: '<svg class="g" viewBox="0 0 24 24"><path d="M12 4.2L21.2 19.8H2.8z"/><path d="M12 10v4M12 16.8h.01"/></svg>',
+  to: '<svg class="g" viewBox="0 0 24 24"><path d="M4.5 12h14M13 6l6 6-6 6"/></svg>',
+  up: '<svg class="g" viewBox="0 0 24 24"><path d="M6.5 14.5L12 9l5.5 5.5"/></svg>',
+  down: '<svg class="g" viewBox="0 0 24 24"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg>',
+};
 const ICONS = {
-  resumen: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="12" width="8" height="9" rx="2"/><rect x="3" y="15" width="8" height="6" rx="2"/></svg>',
+  resumen: '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>',
   movimientos: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   cuotas: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 15h3"/></svg>',
   tarjetas: '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 10.5h20M6 15h4"/></svg>',

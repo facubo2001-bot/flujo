@@ -5,7 +5,7 @@ const CARD_COLORS = ['#1F4E79', '#5B2C6F', '#7A3E1D', '#1E5E4A', '#3B3B6B', '#7A
 /* ---------- TARJETAS Y PAGOS ---------- */
 function viewTarjetas() {
   const hoy = D.today(); const ym = ui.mes;
-  if (!state.tarjetas.length) return `<div class="card"><div class="empty">Todavía no cargaste tarjetas. <button class="btn primary sm" data-act="new-card" style="margin-left:8px">${ICONS.plus} Agregar tarjeta</button></div></div>`;
+  if (!state.tarjetas.length) return `<div class="card">${empty({ kind: 'setup', icon: 'card', head: 'Todavía no cargaste tarjetas', sub: 'Agregá la primera y Gastos calcula solo el cierre, las cuotas y cuánto pagás cada mes.', btn: 'Agregar tarjeta', action: 'new-card' })}</div>`;
   let html = `<div class="grid g-3">`;
   state.tarjetas.forEach((t, i) => {
     const now = E.cardNow(t, hoy);
@@ -18,10 +18,10 @@ function viewTarjetas() {
       <div class="tname"><span>${esc(t.nombre)}<span style="font-weight:400;opacity:.8;font-size:13px"> ${esc(t.banco || '')}</span></span><button class="mini-btn" style="color:#fff" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button></div>
       <div><div style="font-size:12px;opacity:.85">Período ${D.fmt(cierreDesde)} – ${D.fmt(now.cierre)} · cierra en ${now.diasAlCierre} día${now.diasAlCierre === 1 ? '' : 's'}</div><div class="tbig">${M.f(cerrando.total)}</div></div>
       <div class="tmeta"><span>Consumo nuevo<b>${M.f(consumoPeriodo)}</b></span><span>Cuotas y fijos<b>${M.f(cerrando.total - consumoPeriodo)}</b></span>${prox.ym !== now.mesPago ? `<span>A pagar el ${D.fmt(prox.fecha)}<b>${M.f(prox.total)}</b></span>` : ''}</div>
-      ${lim ? `<div style="margin-top:8px"><div class="row between" style="font-size:11px;opacity:.9"><span>Límite ${M.c(lim)}</span><span>${M.pct(uso)}</span></div><div class="meter" style="background:rgba(255,255,255,.2);height:6px;margin-top:3px"><i style="width:${clamp(uso * 100, 0, 100)}%;background:#fff"></i></div></div>` : ''}
+      ${lim ? `<div style="margin-top:8px"><div class="row between" style="font-size:11px;opacity:.9"><span>Límite ${M.c(lim)}</span><span>${M.pct(uso)}</span></div><div class="meter" style="background:rgba(255,255,255,.2);height:6px;margin-top:3px"><i class="${uso >= 0.85 ? 'glow-fill ink' : ''}" style="width:${clamp(uso * 100, 0, 100)}%;background:#fff"></i></div></div>` : ''}
     </div>`;
   });
-  html += `<button class="card" data-act="new-card" style="display:grid;place-items:center;color:var(--ink-3);font-weight:600;min-height:150px;border-style:dashed;cursor:pointer">${ICONS.plus} Agregar tarjeta</button></div>`;
+  html += `<button class="card" data-act="new-card" style="display:flex;align-items:center;justify-content:center;gap:8px;color:var(--ink-3);font-weight:700;min-height:150px;border-style:dashed;cursor:pointer">${ICONS.plus} Agregar tarjeta</button></div>`;
 
   // Plan de pago del mes
   const meses = D.range(ym, 3);
@@ -39,7 +39,7 @@ function viewTarjetas() {
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>De dónde sale la plata</h2><button class="btn sm" data-act="new-cuenta">${ICONS.plus} Cuenta</button></div>
       ${state.cuentas.length ? state.cuentas.map(c => { const saldo = M.toARS(Number(c.saldo) || 0, c.moneda); const asig = sum(pend.filter(p => p.cuentaId === c.id).map(p => E.resumen(p.tarjetaId, p.mes).total)); const desp = saldo - asig + (c.esSueldo ? (Number(state.settings.ingreso) || 0) : 0);
-        return `<div class="list-item"><div><b style="font-weight:500">${esc(c.nombre)}</b>${c.esSueldo ? ' <span class="tag">cobro el sueldo acá</span>' : ''}<span class="sub small muted">${esc(c.tipo || '')}${asig ? ` · ${M.f(asig)} asignados a resúmenes` : ''}</span></div><div class="row" style="gap:4px"><div style="text-align:right"><div class="mono">${M.f(saldo)}${c.moneda === 'USD' ? `<span class="sub">US$ ${fmtUSD.format(Number(c.saldo) || 0)}</span>` : ''}</div>${asig || c.esSueldo ? `<div class="small ${desp < 0 ? 'pill crit' : 'muted'}">tras pagar${c.esSueldo ? ' + sueldo' : ''}: ${M.f(desp)}</div>` : ''}</div><button class="mini-btn" data-act="edit-cuenta" data-id="${c.id}">${ICONS.edit}</button></div></div>`; }).join('') : '<div class="empty">Agregá tus cuentas (caja de ahorro, Mercado Pago, dólares, Balanz) para planificar con qué pagás cada resumen.</div>'}
+        return `<div class="list-item"><div><b style="font-weight:500">${esc(c.nombre)}</b>${c.esSueldo ? ' <span class="tag">cobro el sueldo acá</span>' : ''}<span class="sub small muted">${esc(c.tipo || '')}${asig ? ` · ${M.f(asig)} asignados a resúmenes` : ''}</span></div><div class="row" style="gap:4px"><div style="text-align:right"><div class="mono">${M.f(saldo)}${c.moneda === 'USD' ? `<span class="sub">US$ ${fmtUSD.format(Number(c.saldo) || 0)}</span>` : ''}</div>${asig || c.esSueldo ? `<div class="small ${desp < 0 ? 'pill crit' : 'muted'}">tras pagar${c.esSueldo ? ' + sueldo' : ''}: ${M.f(desp)}</div>` : ''}</div><button class="mini-btn" data-act="edit-cuenta" data-id="${c.id}">${ICONS.edit}</button></div></div>`; }).join('') : empty({ kind: 'setup', icon: 'chart', head: 'Falta decir con qué pagás', sub: 'Cargá tus cuentas y Gastos te dice si llegás a cubrir cada resumen.', btn: 'Agregar cuenta', action: 'new-cuenta' })}
     </div>
     <div class="card"><div class="card-head"><h2>Detalle del resumen</h2><div class="row" style="gap:6px"><select class="input sm" id="res-card">${state.tarjetas.map(t => `<option value="${t.id}" ${ui.resCard === t.id ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select><select class="input sm" id="res-mes">${D.range(D.addMonths(ym, -2), 8).map(m => `<option value="${m}" ${(ui.resMes || E.cardNow(state.tarjetas[0], hoy).mesPago) === m ? 'selected' : ''}>cierre ${D.fmt(E.fechaCierre((ui.resCard || state.tarjetas[0].id), m), { year: true })}</option>`).join('')}</select></div></div>
       <div id="res-detalle">${renderResumenDetalle(ui.resCard || state.tarjetas[0].id, ui.resMes || E.cardNow(state.tarjetas[0], hoy).mesPago)}</div>
@@ -50,7 +50,7 @@ function viewTarjetas() {
 
 function renderResumenDetalle(tarjetaId, ym) {
   const r = E.resumen(tarjetaId, ym); const t = L.tarjeta(tarjetaId);
-  if (!r.pieces.length) return '<div class="empty">Sin consumos en este resumen.</div>';
+  if (!r.pieces.length) return empty({ kind: 'periodo', icon: 'cal', head: 'Sin consumos en este resumen', sub: 'Los que hagas antes del cierre aparecen acá.' });
   const rows = r.pieces.slice().sort((a, b) => a.m.fecha.localeCompare(b.m.fecha));
   const cuotas = sum(rows.filter(p => p.idx > 1).map(p => p.montoARS));
   return `<div class="row between small muted" style="margin-bottom:8px"><span>Cierra ${D.fmt(E.fechaCierre(tarjetaId, ym), { year: true })} · vence ${D.fmt(r.fecha, { year: true })} · ${rows.length} ítems</span><span>Cuotas de compras anteriores: <b class="mono">${M.f(cuotas)}</b></span></div>
@@ -63,10 +63,10 @@ function viewPlan() {
   const meta = mg.ahorro;
   const libre = ing.total - c.total;
   const steps = [
-    { l: 'Ingreso', v: ing.total, color: 'var(--s3)', kind: 'in' },
-    { l: 'Fijos', v: -mg.fijos, color: 'var(--s1)' },
-    { l: 'Cuotas del mes', v: -c.cuotas, color: 'var(--s4)' },
-    { l: 'Compras', v: -c.compras, color: 'var(--s2)' },
+    { l: 'Ingreso', v: ing.total, color: 'var(--c2)', kind: 'in' },
+    { l: 'Fijos', v: -mg.fijos, color: 'var(--c3)' },
+    { l: 'Cuotas del mes', v: -c.cuotas, color: 'var(--c5)' },
+    { l: 'Compras', v: -c.compras, color: 'var(--c7)' },
     { l: 'Libre', v: libre, color: 'var(--accent)', kind: 'total' },
   ];
   const maxV = Math.max(ing.total, c.total, 1);
@@ -82,13 +82,13 @@ function viewPlan() {
     ${kpi({ label: 'Tasa de inversión (3 meses)', value: M.pct(tasaProm), sub: `<span>promedio invertido / ingreso</span>` })}
   </div>`;
   html += `<div class="grid g-2 section">
-    <div class="card"><div class="card-head"><h2>Cascada del mes</h2><span class="hint">Sueldo → fijos → cuotas → compras → libre</span></div><div class="waterfall">${wf}</div>
+    <div class="card"><div class="card-head"><h2>Cascada del mes</h2><span class="hint">Del sueldo salen los fijos, después las cuotas y las compras; lo que queda es libre</span></div><div class="waterfall">${wf}</div>
       <div class="divider"></div>
-      <div class="row between"><div><div class="small muted">${ym < D.thisMonth() ? 'Quedó para invertir' : 'Podés invertir'}</div><div style="font-family:var(--font-display);font-size:22px;font-weight:600">${M.f(Math.max(0, libre))}</div><div class="small muted">objetivo ${M.f(meta)}${libre > meta ? ` · sobran ${M.f(libre - meta)} del presupuesto` : libre < meta ? ` · faltan ${M.f(meta - libre)}` : ''}</div></div><button class="btn primary sm" data-act="new-inv">${ICONS.invest} Registrar inversión</button></div>
+      <div class="row between"><div><div class="small muted">${ym < D.thisMonth() ? 'Quedó para invertir' : 'Podés invertir'}</div><div style="font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums">${M.f(Math.max(0, libre))}</div><div class="small muted">objetivo ${M.f(meta)}${libre > meta ? ` · sobran ${M.f(libre - meta)} del presupuesto` : libre < meta ? ` · faltan ${M.f(meta - libre)}` : ''}</div></div><button class="btn primary sm" data-act="new-inv">${ICONS.invest} Registrar inversión</button></div>
     </div>
     <div class="card"><div class="card-head"><h2>Ingreso, gasto e inversión</h2><span class="hint">Últimos 12 meses</span></div>
-      ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz12.map(h => D.monthName(h.ym, true)), series: [{ name: 'Gastos del mes', color: 'var(--s2)', values: hz12.map(h => h.gasto) }, { name: 'Invertido', color: 'var(--s3)', values: hz12.map(h => h.inv) }], line: { name: 'Ingreso', color: 'var(--ink-2)', values: hz12.map(h => h.ingreso || null) } }), 230)}
-      ${Charts.legend([{ name: 'Gasto', color: 'var(--s2)' }, { name: 'Invertido', color: 'var(--s3)' }, { name: 'Ingreso', color: 'var(--ink-2)', kind: 'dash' }])}
+      ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz12.map(h => D.monthName(h.ym, true)), series: [{ name: 'Gastos del mes', color: 'var(--c1)', values: hz12.map(h => h.gasto) }, { name: 'Invertido', color: 'var(--c4)', values: hz12.map(h => h.inv) }], line: { name: 'Ingreso', color: 'var(--ink-2)', values: hz12.map(h => h.ingreso || null) } }), 230)}
+      ${Charts.legend([{ name: 'Gasto', color: 'var(--c1)' }, { name: 'Invertido', color: 'var(--c4)' }, { name: 'Ingreso', color: 'var(--ink-2)', kind: 'dash' }])}
     </div>
   </div>`;
   // sueldo: historial de cobros (lo que la app pregunta cada día de cobro)
@@ -109,7 +109,7 @@ function viewPlan() {
       <p class="small muted" style="margin-top:8px">Total presupuestado: <b class="mono">${M.f(sum(state.categorias.map(c => Number(c.presupuesto) || 0)))}</b> · fijos estimados: <b class="mono">${M.f(E.fijosEstimados(ym))}</b></p>
     </div>
     <div class="card"><div class="card-head"><h2>Portfolio · inversiones</h2><span class="hint">todo lo registrado</span></div>
-      ${(() => { const list = state.inversiones.slice().sort((a, b) => M.toARS(b.monto, b.moneda) - M.toARS(a.monto, a.moneda)); if (!list.length) return '<div class="empty">Registrá lo que aportás a Balanz, BTC o plazo fijo para medir tu tasa de ahorro real.</div>'; const tot = sum(list.map(i => M.toARS(i.monto, i.moneda))); return list.map(i => `<div class="list-item"><div><b style="font-weight:500">${esc(i.destino || i.desc || 'Inversión')}</b><span class="sub small muted">${esc(i.desc && i.destino ? i.desc : D.fmt(i.fecha))}</span></div><div class="row" style="gap:4px"><span class="mono">${i.moneda === 'USD' ? 'US$ ' + (Number(i.monto) || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }) : M.f(i.monto)}</span><button class="mini-btn" data-act="del-inv" data-id="${i.id}">${ICONS.trash}</button></div></div>`).join('') + `<div class="list-item" style="border-top:1px solid var(--line)"><b>Total invertido</b><b class="mono">${M.f(tot)}</b></div>`; })()}
+      ${(() => { const list = state.inversiones.slice().sort((a, b) => M.toARS(b.monto, b.moneda) - M.toARS(a.monto, a.moneda)); if (!list.length) return empty({ kind: 'setup', icon: 'chart', head: 'Todavía no registrás aportes', sub: 'Cargá lo que ponés en Balanz, BTC o plazo fijo y Gastos calcula tu tasa de ahorro real.', btn: 'Registrar aporte', action: 'new-inv' }); const tot = sum(list.map(i => M.toARS(i.monto, i.moneda))); return list.map(i => `<div class="list-item"><div><b style="font-weight:500">${esc(i.destino || i.desc || 'Inversión')}</b><span class="sub small muted">${esc(i.desc && i.destino ? i.desc : D.fmt(i.fecha))}</span></div><div class="row" style="gap:4px"><span class="mono">${i.moneda === 'USD' ? 'US$ ' + (Number(i.monto) || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }) : M.f(i.monto)}</span><button class="mini-btn" data-act="del-inv" data-id="${i.id}">${ICONS.trash}</button></div></div>`).join('') + `<div class="list-item" style="border-top:1px solid var(--line)"><b>Total invertido</b><b class="mono">${M.f(tot)}</b></div>`; })()}
       <div class="divider"></div>
       <div class="card-head"><h3>Ingresos extra</h3><button class="btn sm" data-act="new-ing">${ICONS.plus} Ingreso</button></div>
       ${(() => { const list = state.ingresos.filter(i => D.ym(i.fecha) === ym); return list.length ? list.map(i => `<div class="list-item"><div><b style="font-weight:500">${esc(i.desc || 'Ingreso')}</b><span class="sub small muted">${D.fmt(i.fecha)}</span></div><div class="row" style="gap:4px"><span class="mono">${M.f(M.toARS(i.monto, i.moneda))}</span><button class="mini-btn" data-act="del-ing" data-id="${i.id}">${ICONS.trash}</button></div></div>`).join('') : `<p class="small muted">Sueldo base: <b class="mono">${M.f(ing.base)}</b>. Aguinaldo, freelance o ventas van acá.</p>`; })()}
@@ -131,7 +131,7 @@ function viewTendencias() {
     ${Charts.legend(gruposUsados.map(g => ({ name: g.nombre, color: L.slotColor(g.slot) })))}
   </div>`;
   // necesidad + medio
-  const necSeries = [1, 2, 3].map(k => ({ name: NECESIDAD[k], color: k === 1 ? 'var(--seq4)' : k === 2 ? 'var(--seq2)' : 'var(--s8)', values: cons.map(c => c.byNec[k]) }));
+  const necSeries = [1, 2, 3].map(k => ({ name: NECESIDAD[k], color: k === 1 ? 'var(--c1)' : k === 2 ? 'var(--c4)' : 'var(--c7)', values: cons.map(c => c.byNec[k]) }));
   const innecPct = cons.map(c => c.total ? c.byNec[3] / c.total : null);
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Necesario vs innecesario</h2><span class="hint">Según cómo lo marcaste</span></div>
@@ -139,8 +139,8 @@ function viewTendencias() {
       <div class="row between small" style="margin-top:8px"><span class="muted">Innecesario, % del total:</span><span class="mono">${innecPct.map((p, i) => `${labels[i].split(' ')[0]} ${p == null ? '—' : M.pct(p)}`).join(' · ')}</span></div>
     </div>
     <div class="card"><div class="card-head"><h2>Total, compras, fijos y cuotas</h2></div>
-      ${ChartQ.reg(w => Charts.line({ w, h: 220, labels, series: [{ name: 'Total', color: 'var(--accent)', values: cons.map(c => c.total || null), strong: true, area: true }, { name: 'Compras', color: 'var(--s2)', values: cons.map(c => c.count ? c.compras : null) }, { name: 'Fijos', color: 'var(--s1)', values: cons.map(c => c.count ? c.fijo : null) }, { name: 'Cuotas', color: 'var(--s4)', values: cons.map(c => c.count ? c.cuotas : null) }], refY: state.settings.ingreso || null, refLabel: 'Ingreso' }), 220)}
-      ${Charts.legend([{ name: 'Total', color: 'var(--accent)', kind: 'line' }, { name: 'Compras', color: 'var(--s2)', kind: 'line' }, { name: 'Fijos', color: 'var(--s1)', kind: 'line' }, { name: 'Cuotas', color: 'var(--s4)', kind: 'line' }])}
+      ${ChartQ.reg(w => Charts.line({ w, h: 220, labels, series: [{ name: 'Total', color: 'var(--accent)', values: cons.map(c => c.total || null), strong: true, area: true }, { name: 'Compras', color: 'var(--c2)', values: cons.map(c => c.count ? c.compras : null) }, { name: 'Fijos', color: 'var(--c4)', values: cons.map(c => c.count ? c.fijo : null) }, { name: 'Cuotas', color: 'var(--c6)', values: cons.map(c => c.count ? c.cuotas : null) }], refY: state.settings.ingreso || null, refLabel: 'Ingreso' }), 220)}
+      ${Charts.legend([{ name: 'Total', color: 'var(--accent)', kind: 'line' }, { name: 'Compras', color: 'var(--c2)', kind: 'line' }, { name: 'Fijos', color: 'var(--c4)', kind: 'line' }, { name: 'Cuotas', color: 'var(--c6)', kind: 'line' }])}
     </div>
   </div>`;
   // tabla categorías mes vs anterior vs prom
@@ -152,12 +152,12 @@ function viewTendencias() {
   const top = Object.values(byDesc).sort((a, b) => b.total - a.total).slice(0, 10);
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Categorías: mes a mes</h2></div>
-      <div class="table-wrap"><table><thead><tr><th>Categoría</th><th class="r">${labels[n - 1]}</th><th class="r">${labels[n - 2] || 'Ant.'}</th><th class="r">Prom. 3m</th><th class="r">Δ vs prom.</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>Categoría</th><th class="r">${labels[n - 1]}</th><th class="r">${labels[n - 2] || 'Ant.'}</th><th class="r">Prom. 3m</th><th class="r">Dif. vs prom.</th></tr></thead><tbody>
       ${catRows.map(r => { const d = r.avg ? (r.v - r.avg) / r.avg : null; return `<tr><td><span class="row nowrap" style="gap:6px;flex-wrap:nowrap"><i class="swatch" style="background:${L.catColor(r.cat.id)}"></i>${esc(r.cat.nombre)}</span></td><td class="amount r">${M.f(r.v)}</td><td class="amount r muted">${M.f(r.p)}</td><td class="amount r muted">${M.f(r.avg)}</td><td class="r">${d == null ? '—' : `<span class="pill ${d > 0.25 ? 'crit' : d > 0.1 ? 'warn' : d < -0.1 ? 'good' : 'neutral'}">${d > 0 ? '+' : ''}${M.pct(d)}</span>`}</td></tr>`; }).join('')}
       </tbody></table></div></div>
     <div class="card"><div class="card-head"><h2>Dónde gastás más</h2><span class="hint">Top comercios, ${n} meses, sin fijos (compras a valor total)</span></div>
       <div class="table-wrap"><table><thead><tr><th>Comercio</th><th class="r">Veces</th><th class="r">Total</th><th class="r">Promedio</th></tr></thead><tbody>
-      ${top.map(t => `<tr><td><b style="font-weight:500">${esc(t.desc)}</b><span class="sub">${L.cat(t.cat).nombre}</span></td><td class="mono r">${t.n}</td><td class="amount r">${M.f(t.total)}</td><td class="amount r muted">${M.f(t.total / t.n)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Sin datos</td></tr>'}
+      ${top.map(t => `<tr><td><b style="font-weight:500">${esc(t.desc)}</b><span class="sub">${L.cat(t.cat).nombre}</span></td><td class="mono r">${t.n}</td><td class="amount r">${M.f(t.total)}</td><td class="amount r muted">${M.f(t.total / t.n)}</td></tr>`).join('') || `<tr><td colspan="4" style="padding:0">${empty({ kind: 'periodo bare-top', icon: 'chart', head: 'Todavía no hay suficiente historia', sub: 'Con dos meses cargados ya vas a ver tendencias.' })}</td></tr>`}
       </tbody></table></div></div>
   </div>`;
   // heat + weekday
@@ -168,10 +168,10 @@ function viewTendencias() {
   html += `<div class="grid g-3 section">
     <div class="card"><div class="card-head"><h2>Calendario</h2><span class="hint">${D.monthName(ym)}</span></div>${Charts.heat(ym, cur.byDay)}</div>
     <div class="card"><div class="card-head"><h2>Por día de la semana</h2><span class="hint">Total en ${n} meses</span></div>
-      ${['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((d, i) => `<div class="meter-row"><div class="l"><span>${d}</span></div><div class="v"><b class="mono">${M.f(wd[i])}</b> <span class="muted">· ${wn[i]}</span></div><div class="meter"><i style="width:${wd[i] / wdMax * 100}%;background:var(--s1)"></i></div></div>`).join('')}
+      ${['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((d, i) => `<div class="meter-row"><div class="l"><span>${d}</span></div><div class="v"><b class="mono">${M.f(wd[i])}</b> <span class="muted">· ${wn[i]}</span></div><div class="meter"><i style="width:${wd[i] / wdMax * 100}%;background:var(--c4)"></i></div></div>`).join('')}
     </div>
     <div class="card"><div class="card-head"><h2>Medio de pago</h2><span class="hint">${D.monthName(ym, true)}</span></div>
-      ${medios.length ? medios.map((m, i) => `<div class="meter-row"><div class="l"><span>${esc(m.name)}</span></div><div class="v"><b class="mono">${M.f(m.value)}</b> <span class="muted">${M.pct(m.value / cur.total)}</span></div><div class="meter"><i style="width:${m.value / cur.total * 100}%;background:var(--s7)"></i></div></div>`).join('') : '<div class="empty">Sin datos</div>'}
+      ${medios.length ? medios.map((m, i) => `<div class="meter-row"><div class="l"><span>${esc(m.name)}</span></div><div class="v"><b class="mono">${M.f(m.value)}</b> <span class="muted">${M.pct(m.value / cur.total)}</span></div><div class="meter"><i style="width:${m.value / cur.total * 100}%;background:var(--c4)"></i></div></div>`).join('') : empty({ kind: 'periodo', icon: 'chart', head: 'Todavía no hay suficiente historia', sub: 'Con dos meses cargados ya vas a ver tendencias.' })}
       ${state.tarjetas.length > 1 ? `<div class="divider"></div>${state.tarjetas.map(t => { const v = sum(cur.movs.filter(m => m.tarjetaId === t.id).map(m => M.toARS(m.monto, m.moneda))); return `<div class="row between small"><span>${esc(t.nombre)}</span><b class="mono">${M.f(v)}</b></div>`; }).join('')}` : ''}
     </div>
   </div>`;
@@ -188,16 +188,16 @@ function viewConfig() {
       ${inp('ingreso', 'Sueldo neto mensual (ARS)', s.ingreso ? fmtARS.format(s.ingreso) : '', 'inputmode="numeric"')}
       ${inp('diaCobro', 'Día de cobro', s.diaCobro, 'inputmode="numeric"', '31 = último día del mes. Ese día la app te pregunta cuánto cobraste y recalcula todo.')}
       ${inp('ccl', 'Dólar CCL (ARS por USD)', s.ccl || '', 'inputmode="numeric"', 'Para valuar los CEDEARs en pesos. Se actualiza junto con el MEP.')}
-      ${inp('finnhubKey', 'Clave de Finnhub (precios de acciones)', s.finnhubKey || '', 'placeholder="pegá tu API key" autocomplete="off"', 'Gratis en finnhub.io → Get free API key. Con esto la Cartera trae los precios al abrir la app. <a href="#" data-act="precios-update">Actualizar precios ahora</a>')}
+      ${inp('finnhubKey', 'Clave de Finnhub (precios de acciones)', s.finnhubKey || '', 'placeholder="pegá tu API key" autocomplete="off"', 'Gratis en finnhub.io, botón Get free API key. Con esto la Cartera trae los precios al abrir la app. <a href="#" data-act="precios-update">Actualizar precios ahora</a>')}
       ${inp('tc', 'Dólar MEP (ARS por USD)', s.tc, 'inputmode="numeric"', `${s.tcFecha ? `Actualizado ${D.fmt(s.tcFecha, { year: true })}${s.tcFuente ? ' · ' + esc(s.tcFuente) : ''}. ` : ''}Se usa para la vista en USD y para gastos en dólares. <a href="#" data-act="tc-update">Actualizar desde dolarapi.com</a>`)}
       ${inp('presupuesto', 'Presupuesto mensual de gasto (ARS)', s.presupuesto ? fmtARS.format(s.presupuesto) : '', 'inputmode="numeric"', `Lo que decidís gastar por mes (fijos + cuotas + compras). El resto del sueldo${s.ingreso && s.presupuesto ? ` (${M.f(s.ingreso - s.presupuesto)})` : ''} es para invertir.`)}
       ${inp('alertaCuotasPct', 'Alerta de cuotas (% del presupuesto)', s.alertaCuotasPct, 'inputmode="numeric"', 'Te aviso cuando fijos + cuotas superan esto')}
     </div></div>
     <div class="card"><div class="card-head"><h2>Tarjetas</h2><button class="btn sm" data-act="new-card">${ICONS.plus} Tarjeta</button></div>
-      ${state.tarjetas.length ? state.tarjetas.map((t, i) => `<div class="list-item"><div class="row" style="gap:10px"><i class="swatch" style="width:28px;height:18px;border-radius:4px;background:${t.color || CARD_COLORS[i % CARD_COLORS.length]}"></i><div><b style="font-weight:500">${esc(t.nombre)}</b> <span class="muted small">${esc(t.banco || '')}</span><span class="sub small muted">Cierra el ${t.cierre} · vence el ${t.vencimiento}${t.limite ? ` · límite ${M.c(t.limite)}` : ''}</span></div></div><div class="row" style="gap:2px"><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-card" data-id="${t.id}">${ICONS.trash}</button></div></div>`).join('') : '<div class="empty">Sin tarjetas</div>'}
+      ${state.tarjetas.length ? state.tarjetas.map((t, i) => `<div class="list-item"><div class="row" style="gap:10px"><i class="swatch" style="width:28px;height:18px;border-radius:4px;background:${t.color || CARD_COLORS[i % CARD_COLORS.length]}"></i><div><b style="font-weight:500">${esc(t.nombre)}</b> <span class="muted small">${esc(t.banco || '')}</span><span class="sub small muted">Cierra el ${t.cierre} · vence el ${t.vencimiento}${t.limite ? ` · límite ${M.c(t.limite)}` : ''}</span></div></div><div class="row" style="gap:2px"><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-card" data-id="${t.id}">${ICONS.trash}</button></div></div>`).join('') : emptyInline('Ninguna tarjeta cargada', 'Agregar', 'new-card')}
       <div class="divider"></div>
       <div class="card-head"><h3>Cuentas</h3><button class="btn sm" data-act="new-cuenta">${ICONS.plus} Cuenta</button></div>
-      ${state.cuentas.length ? state.cuentas.map(c => `<div class="list-item"><div><b style="font-weight:500">${esc(c.nombre)}</b><span class="sub small muted">${esc(c.tipo || '')} · ${c.moneda}${c.esSueldo ? ' · cobro el sueldo acá' : ''}</span></div><div class="row" style="gap:2px"><span class="mono">${M.f(M.toARS(Number(c.saldo) || 0, c.moneda))}</span><button class="mini-btn" data-act="edit-cuenta" data-id="${c.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-cuenta" data-id="${c.id}">${ICONS.trash}</button></div></div>`).join('') : '<div class="empty">Sin cuentas</div>'}
+      ${state.cuentas.length ? state.cuentas.map(c => `<div class="list-item"><div><b style="font-weight:500">${esc(c.nombre)}</b><span class="sub small muted">${esc(c.tipo || '')} · ${c.moneda}${c.esSueldo ? ' · cobro el sueldo acá' : ''}</span></div><div class="row" style="gap:2px"><span class="mono">${M.f(M.toARS(Number(c.saldo) || 0, c.moneda))}</span><button class="mini-btn" data-act="edit-cuenta" data-id="${c.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-cuenta" data-id="${c.id}">${ICONS.trash}</button></div></div>`).join('') : emptyInline('Ninguna cuenta cargada', 'Agregar', 'new-cuenta')}
     </div>
   </div>`;
   html += `<div class="grid g-2 section">
@@ -208,7 +208,7 @@ function viewConfig() {
       <div class="stack">
         ${(() => { const g = Gist.cfg(); return g
           ? `<div class="list-item"><div><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Conectada a tu GitHub (gist ${esc(String(g.id).slice(0, 8))}…). Sube al guardar y baja al abrir la app.</span></div><div class="row" style="gap:4px"><button class="btn sm" data-act="gist-pull">Traer ahora</button><button class="btn sm danger" data-act="gist-off">Desconectar</button></div></div>`
-          : `<div class="list-item" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Guarda tus datos en un gist privado de tu GitHub para verlos iguales en el celu y la PC. Creá un token clásico con permiso "gist" en github.com → Settings → Developer settings → Personal access tokens → Tokens (classic) y pegalo acá (una vez por dispositivo).</span></div><div class="row" style="gap:6px;width:100%;margin-top:8px"><input class="input sm" type="password" id="g-token" placeholder="ghp_…" style="flex:1;min-width:160px"><button class="btn sm primary" data-act="gist-connect">Conectar</button></div></div>`; })()}
+          : `<div class="list-item" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Guarda tus datos en un gist privado de tu GitHub para verlos iguales en el celu y la PC. Creá un token clásico con permiso "gist" en github.com, en Settings, Developer settings, Personal access tokens, Tokens (classic), y pegalo acá (una vez por dispositivo).</span></div><div class="row" style="gap:6px;width:100%;margin-top:8px"><input class="input sm" type="password" id="g-token" placeholder="ghp_…" style="flex:1;min-width:160px"><button class="btn sm primary" data-act="gist-connect">Conectar</button></div></div>`; })()}
         <div class="list-item"><div><b style="font-weight:500">Resumen para analizar con Claude</b><span class="sub small muted">Copia un informe del mes en texto para pegarlo en el chat del proyecto</span></div><button class="btn sm" data-act="copiar-resumen">${ICONS.copy} Copiar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Exportar respaldo</b><span class="sub small muted">Descarga todo en JSON (${state.movimientos.length} movimientos)</span></div><button class="btn sm" data-act="export">${ICONS.download} Exportar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Importar respaldo</b><span class="sub small muted">Reemplaza los datos actuales por un JSON exportado</span></div><label class="btn sm">${ICONS.upload} Importar<input type="file" accept="application/json" id="import-file" class="hidden"></label></div>
@@ -226,8 +226,8 @@ function viewConfig() {
 }
 
 /* ---------- cartera ---------- */
-const fmtU = (v, d = null) => { const a = Math.abs(v); const f = d != null ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }) : (a < 100 ? fmtUSD2 : fmtUSD); return `${v < 0 ? '−' : ''}US$ ${f.format(a)}`; };
-const fmtAcc = q => (Number(q) || 0).toLocaleString('es-AR', { maximumFractionDigits: 4 });
+const fmtU = (v, d = null) => { const a = Math.abs(v); const f = d != null ? NF({ minimumFractionDigits: d, maximumFractionDigits: d }) : (a < 100 ? fmtUSD2 : fmtUSD); return `${v < 0 ? '−' : ''}US$ ${f.format(a)}`; };
+const fmtAcc = q => MENOS((Number(q) || 0).toLocaleString('es-AR', { maximumFractionDigits: 4 }));
 const pctS = (v, d = 1) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${M.pct(Math.abs(v), d)}`;
 const gpPill = (gp, pct) => gp == null ? '' : `<span class="pill ${gp >= 0 ? 'good' : 'crit'}">${gp >= 0 ? '+' : '−'}${fmtU(Math.abs(gp), 0)}${pct != null ? ` · ${pctS(pct)}` : ''}</span>`;
 function viewCartera() {
@@ -235,10 +235,10 @@ function viewCartera() {
   const fechaP = k.preciosFecha ? new Date(k.preciosFecha) : null;
   const fechaTxt = fechaP ? `${D.fmt(D.iso(fechaP))} ${pad2(fechaP.getHours())}:${pad2(fechaP.getMinutes())}` : null;
   const enZona = [...k.posiciones, ...k.watch].filter(p => p.estado);
-  if (!k.posiciones.length && !k.ops.length) return `<div class="card"><div class="empty">Todavía no hay operaciones. Cargá tu primera compra con el + o esperá a que se apliquen tus posiciones.</div></div>`;
+  if (!k.posiciones.length && !k.ops.length) return `<div class="card">${empty({ kind: 'setup', icon: 'chart', head: 'Todavía no hay operaciones', sub: 'Cargá tu primera compra y la cartera se arma sola.', btn: 'Cargar operación', action: 'new-op' })}</div>`;
   let html = '';
-  html += `<div class="card tight" style="margin-bottom:14px"><div class="row between" style="flex-wrap:nowrap"><div style="min-width:0"><b style="font-weight:600">${k.conPrecio ? `Precios al ${fechaTxt}` : 'Sin precios todavía'}</b><span class="sub">${hayKey ? `MEP $ ${fmtARS.format(k.mep)}${s.ccl ? ' · CCL $ ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' · SPY ' + fmtU(k.spyHoy) : ''}${k.conPrecio < k.posiciones.length ? ` · ${k.posiciones.length - k.conPrecio} sin precio` : ''}` : 'Falta tu clave de Finnhub en Ajustes'}</span></div><button class="btn sm ${hayKey ? 'primary' : ''}" style="flex:none" data-act="${hayKey ? 'precios-update' : 'go-config'}">${hayKey ? 'Actualizar' : 'Configurar'}</button></div></div>`;
-  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b>${enZona.some(p => p.estado === 'urgente') ? '🔴 Che, comprá urgente' : '🟡 Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (≤ ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
+  html += `<div class="card tight" style="margin-bottom:14px"><div class="row between" style="flex-wrap:nowrap"><div style="min-width:0"><b style="font-weight:800">${k.conPrecio ? `Precios al ${fechaTxt}` : 'Sin precios todavía'}</b><span class="sub">${hayKey ? `MEP $ ${fmtARS.format(k.mep)}${s.ccl ? ' · CCL $ ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' · SPY ' + fmtU(k.spyHoy) : ''}${k.conPrecio < k.posiciones.length ? ` · ${k.posiciones.length - k.conPrecio} sin precio` : ''}` : 'Falta tu clave de Finnhub en Ajustes'}</span></div><button class="btn sm ${hayKey ? 'primary' : ''}" style="flex:none" data-act="${hayKey ? 'precios-update' : 'go-config'}">${hayKey ? 'Actualizar' : 'Configurar'}</button></div></div>`;
+  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b><span class="dot ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'warn'}"></span>${enZona.some(p => p.estado === 'urgente') ? 'Che, comprá urgente' : 'Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (≤ ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
   const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0); const valorTotTxt = k.valorTotal != null ? fmtU(k.valorTotal, 0) : valorTxt;
   const n0 = x => Math.abs(x).toLocaleString('es-AR', { maximumFractionDigits: 0 }); const sg = x => x >= 0 ? '+' : '−';
   const va = k.ventanas.anio, vi = k.ventanas.inicio; const vAlfa = va.disponible ? va : vi.disponible ? vi : null;
@@ -257,7 +257,7 @@ function viewCartera() {
       foot: `precio contra precio · S&P ${pctS(vAlfa.rend.spyDirecto)}` }) : kpi({ label: 'vs S&P 500', value: '—', foot: 'sin comparación todavía' })}
     ${kpi({ label: 'Dividendos cobrados', value: fmtU(k.dividendos),
       stats: [{ k: 'S/ costo', v: k.costo && k.dividendos ? M.pct(k.dividendos / k.costo, 1) : '—' }, { k: 'Caja', v: k.cajaEntradas ? (k.caja > 0.005 ? fmtU(k.caja, 2) : 'usada') : '—' }],
-      foot: ultimoDiv ? `último: ${esc(ultimoDiv.ticker)} ${fmtU(Number(ultimoDiv.monto) || 0, 2)} · ${D.fmt(ultimoDiv.fecha)}` : 'cargalos con + → Dividendo' })}
+      foot: ultimoDiv ? `último: ${esc(ultimoDiv.ticker)} ${fmtU(Number(ultimoDiv.monto) || 0, 2)} · ${D.fmt(ultimoDiv.fecha)}` : 'cargalos con el +, opción Dividendo' })}
   </div>`;
   const conc = state.cartera.conciliacion || null;
   // composición ↔ evolución
@@ -265,19 +265,15 @@ function viewCartera() {
   const seg = `<div class="seg" style="padding:2px"><button class="${modo === 'comp' ? 'on' : ''}" data-act="cartera-chart" data-id="comp" style="padding:4px 10px;font-size:12.5px">Composición</button><button class="${modo === 'evo' ? 'on' : ''}" data-act="cartera-chart" data-id="evo" style="padding:4px 10px;font-size:12.5px">vs S&P 500</button></div>`;
   let chartCard;
   if (modo === 'comp') {
-    const slices = k.posiciones.slice(0, 9).map((p, i) => ({ name: p.ticker, value: Math.round(M.toARS(p.valor != null ? p.valor : p.costo, 'USD')), color: `var(--s${(i % 8) + 1})` }));
-    const resto = k.posiciones.slice(9); if (resto.length) slices.push({ name: `Otras (${resto.length})`, value: Math.round(M.toARS(sum(resto.map(p => p.valor != null ? p.valor : p.costo)), 'USD')), color: 'var(--ink-3)' });
-    chartCard = `<div class="card"><div class="card-head"><h2>Composición</h2>${seg}</div>
-      <div class="row" style="align-items:flex-start;gap:16px">${Charts.donut({ slices, size: 150, thick: 22, center: `Total|${valorTxt}` })}<div class="dl">${slices.map(g => `<i class="swatch" style="background:${g.color}"></i><span>${esc(g.name)}</span><b class="mono">${M.pct(g.value / Math.max(1, sum(slices.map(x => x.value))), 1)}</b>`).join('')}</div></div>
-    </div>`;
+    chartCard = `<div class="card"><div class="card-head"><h2>Composición</h2>${seg}</div>${mapaCartera(k)}</div>`;
   } else chartCard = renderEvolucion(k, seg);
   html += `<div class="grid g-12 section">
     ${chartCard}
     <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
       ${k.posiciones.map(p => `<div class="pos-row" data-act="pos" data-id="${esc(p.ticker)}">
         <div class="pos-l"><b>${esc(p.ticker)}</b><span class="sub">${p.cedear ? `${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs · ` : ''}${fmtAcc(p.acciones)} acc</span><span class="sub">PPC ${fmtU(p.ppc)}</span></div>
-        <div class="pos-m">${p.precio != null ? `<span class="mono">${fmtU(p.precio)}</span><span class="sub ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : ''}">${p.dp != null ? (p.dp > 0 ? '+' : '') + p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' % hoy' : ''}</span>` : `<span class="muted small">sin precio</span>`}</div>
-        <div class="pos-r"><b class="mono">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b><span class="sub">${p.gpTotal != null ? `<span class="${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>${p.dividendos ? '<span class="muted" title="incluye dividendos">+d</span>' : ''} · ` : ''}${M.pct(p.peso, 1)}${p.estado ? ' · ' + (p.estado === 'urgente' ? '🔴' : '🟡') : ''}${conc && conc.items[p.ticker] && !conc.items[p.ticker].ok ? ` · <span class="warn-text">≠ Balanz ${fmtAcc(conc.items[p.ticker].balanz)}</span>` : ''}</span></div>
+        <div class="pos-m">${p.precio != null ? `<span class="mono">${fmtU(p.precio)}</span><span class="sub ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : ''}${p.dp != null && Math.abs(p.dp) >= 5 ? ' glow-text' : ''}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + ' % hoy' : ''}</span>` : `<span class="muted small">sin precio</span>`}</div>
+        <div class="pos-r"><b class="mono">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b><span class="sub">${p.gpTotal != null ? `<span class="${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>${p.dividendos ? '<span class="muted" title="incluye dividendos">+d</span>' : ''} · ` : ''}${M.pct(p.peso, 1)}${p.estado ? ` · <span class="dot ${p.estado === 'urgente' ? 'crit' : 'warn'}" style="margin-right:0"></span>` : ''}${conc && conc.items[p.ticker] && !conc.items[p.ticker].ok ? ` · <span class="warn-text">Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}</span>` : ''}${(() => { const b = Fund.balance(p.ticker); return b && b.dias <= 7 ? ` · <span class="warn-text">balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : 'en ' + b.dias + ' d'}</span>` : ''; })()}</span></div>
       </div>`).join('')}
     </div>
   </div>`;
@@ -288,29 +284,29 @@ function viewCartera() {
     const dist = (niv) => pr && niv ? (pr - niv) / pr : null;
     const dM = dist(al.mirala), dU = dist(al.urgente);
     const cerca = dM != null ? clamp(1 - Math.max(0, dM) / 0.25, 0, 1) : 0;
-    const chip = p.estado === 'urgente' ? '<span class="pill crit">🔴 comprá urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn">🟡 mirala</span>' : dM != null ? `<span class="pill neutral">a ${M.pct(dM, 1)}</span>` : '<span class="pill neutral">sin precio</span>';
+    const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>comprá urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : dM != null ? `<span class="pill neutral">a ${M.pct(dM, 1)}</span>` : '<span class="pill neutral">sin precio</span>';
     return `<div class="al-row" data-alerta="${esc(p.ticker)}">
       <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : 'sin precio'}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
-      <div class="al-bar"><i style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
-      <div class="al-lv"><span>🟡 ≤ ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span>🔴 ≤ ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
+      <div class="al-bar"><i class="${p.estado === 'urgente' ? 'glow-fill crit' : p.estado === 'mirala' ? 'glow-fill warn' : ''}" style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
+      <div class="al-lv"><span><span class="dot warn"></span>≤ ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>≤ ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
     </div>`;
   };
   const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));
   html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><span class="hint">ordenadas por cercanía</span><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
-    ${ordenAl.length ? ordenAl.map(alRow).join('') : '<div class="empty">Sin alertas cargadas. Tocá una posición para ponerle niveles.</div>'}
+    ${ordenAl.length ? ordenAl.map(alRow).join('') : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
   </div>`;
   // operaciones
   const ops = k.ops.slice().reverse().slice(0, 25);
   const opMonto = o => o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0);
   html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} · tocá para editar${k.legados ? ` · <span class="tag" style="color:var(--warn-text)">${k.legados} con fecha estimada</span>` : ''}</span></div>
-    ${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}${o.verif && o.verif.nivel !== 'ok' ? ` <span class="tag ${o.verif.nivel === 'block' ? 'verif-block' : 'verif-warn'}">${o.verif.nivel === 'block' ? '✕' : '⚠'} revisar</span>` : ''}${(o.deCaja || o.deDividendos) > 0 ? ` <span class="tag">con caja ${fmtU(o.deCaja || o.deDividendos, 0)}</span>` : ''}${o.aCaja ? ' <span class="tag">a caja</span>' : ''}${k.dupIds.has(o.id) ? ' <span class="tag verif-warn">¿duplicada?</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${o.modo === 'cedear' ? `${fmtAcc(o.cedears)} CEDEARs a $ ${fmtARS.format(o.precioCedear)} · ` : ''}${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px;flex:none;flex-wrap:nowrap"><span class="mono op-amt ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'up' : ''}">${o.tipo === 'compra' ? '−' : '+'}${fmtU(opMonto(o), 2)}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || '<div class="empty">Sin operaciones</div>'}
+    ${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}${o.verif && o.verif.nivel !== 'ok' ? ` <span class="tag ${o.verif.nivel === 'block' ? 'verif-block' : 'verif-warn'}">${o.verif.nivel === 'block' ? G.no : G.warn} revisar</span>` : ''}${(o.deCaja || o.deDividendos) > 0 ? ` <span class="tag">con caja ${fmtU(o.deCaja || o.deDividendos, 0)}</span>` : ''}${o.aCaja ? ' <span class="tag">a caja</span>' : ''}${k.dupIds.has(o.id) ? ' <span class="tag verif-warn">¿duplicada?</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${o.modo === 'cedear' ? `${fmtAcc(o.cedears)} CEDEARs a $ ${fmtARS.format(o.precioCedear)} · ` : ''}${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px;flex:none;flex-wrap:nowrap"><span class="mono op-amt ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'up' : ''}">${o.tipo === 'compra' ? '−' : '+'}${fmtU(opMonto(o), 2)}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || emptyInline('Sin operaciones', 'Cargar', 'new-op')}
   </div>`;
   // control de calidad: conciliación con Balanz + operaciones con advertencias
   const conAviso = k.ops.filter(o => o.verif && o.verif.nivel !== 'ok').length; const concDias = conc ? D.daysBetween(conc.fecha, D.today()) : null;
   html += `<div class="card section"><div class="card-head"><h2>Control</h2><button class="btn sm ${!conc || concDias > 35 ? 'primary' : ''}" data-act="conciliar">Conciliar con Balanz</button></div>
-    <div class="list-item"><div><b style="font-weight:500">Tenencia vs Balanz</b><span class="sub small muted">${conc ? `${D.fmt(conc.fecha, { year: true })} · ${conc.n} posición${conc.n === 1 ? '' : 'es'} revisada${conc.n === 1 ? '' : 's'}` : 'todavía no conciliaste'}</span></div>${conc ? (conc.dif ? `<span class="pill warn">⚠ ${conc.dif} diferencia${conc.dif > 1 ? 's' : ''}</span>` : `<span class="pill good">✓ coincide</span>`) : `<span class="pill neutral">pendiente</span>`}</div>
+    <div class="list-item"><div><b style="font-weight:500">Tenencia vs Balanz</b><span class="sub small muted">${conc ? `${D.fmt(conc.fecha, { year: true })} · ${conc.n} posición${conc.n === 1 ? '' : 'es'} revisada${conc.n === 1 ? '' : 's'}` : 'todavía no conciliaste'}</span></div>${conc ? (conc.dif ? `<span class="pill warn">${G.warn} ${conc.dif} diferencia${conc.dif > 1 ? 's' : ''}</span>` : `<span class="pill good">${G.ok} coincide</span>`) : `<span class="pill neutral">pendiente</span>`}</div>
     ${k.duplicadas.length ? `<div class="list-item"><div><b style="font-weight:500">Posibles duplicadas</b><span class="sub small muted">${k.duplicadas.slice(0, 3).map(([a, b]) => `${a.tipo} ${esc(a.ticker)} ${D.fmt(a.fecha)} / ${D.fmt(b.fecha)}`).join(' · ')}${k.duplicadas.length > 3 ? ' …' : ''} — marcadas en la lista</span></div><span class="pill warn">${k.duplicadas.length}</span></div>` : ''}
-    <div class="list-item"><div><b style="font-weight:500">Operaciones con advertencias</b><span class="sub small muted">${conAviso ? 'marcadas ⚠ en la lista: tocá para revisar' : 'cada operación se verifica contra NY, CCL, ratio y SPY al guardarla'}</span></div>${conAviso ? `<span class="pill warn">${conAviso}</span>` : `<span class="pill good">0</span>`}</div>
+    <div class="list-item"><div><b style="font-weight:500">Operaciones con advertencias</b><span class="sub small muted">${conAviso ? `marcadas ${G.warn} en la lista: tocá para revisar` : 'cada operación se verifica contra NY, CCL, ratio y SPY al guardarla'}</span></div>${conAviso ? `<span class="pill warn">${conAviso}</span>` : `<span class="pill good">0</span>`}</div>
   </div>`;
   // trabajar con Claude
   html += `<div class="card section"><div class="card-head"><h2>Trabajar con Claude</h2><span class="hint">análisis y niveles</span></div>
@@ -319,22 +315,47 @@ function viewCartera() {
   return html;
 }
 /** Evolución: tu cartera contra la "cartera sombra" (mismas compras/ventas hechas en SPY) por rango: YTD · 1A · 3A · 5A · Todo */
+/** Composición de la cartera como mapa de bloques: el área es el peso, así que no hace falta leyenda.
+ *  Nueve bloques en tres filas (alto de cada fila = peso de la fila, ancho de cada bloque = su peso)
+ *  y una franja para el resto. La variación del día va sin color a propósito: si el mapa se pinta de
+ *  verde y rojo compite con el semáforo del resto de la app. */
+function mapaCartera(k) {
+  const top = k.posiciones.slice(0, 9); if (!top.length) return '';
+  const val = p => Math.max(p.valor != null ? p.valor : p.costo, 0);
+  const resto = k.posiciones.slice(9);
+  const TK = [14, 12, 11], NM = [10.5, 9.5, 9], PD = [9, 8, 7];
+  const dpTxt = p => p.dp == null ? '\u00B1x,xx %' : `${p.dp > 0 ? '+' : ''}${MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} %`;
+  const filas = [top.slice(0, 3), top.slice(3, 6), top.slice(6, 9)].filter(f => f.length).map((fila, r) => {
+    const bs = fila.map(p => {
+      const i = top.indexOf(p);
+      // rampa de cian por opacidad: del quinto bloque para abajo ya no aguanta texto oscuro
+      return `<div class="cmap-b" data-act="pos" data-id="${esc(p.ticker)}" style="flex-grow:${Math.max(val(p), 0.01)};background:var(--c${i + 1});color:${i < 4 ? 'var(--on-fill)' : '#FFFFFF'};padding:${PD[r]}px">
+        <b style="font-size:${TK[r]}px">${esc(p.ticker)}</b>
+        <span class="n" style="font-size:${NM[r]}px"><i>${M.pct(p.peso, 1)}</i><em>${dpTxt(p)}</em></span>
+      </div>`;
+    }).join('');
+    return `<div class="cmap-row" style="flex-grow:${Math.max(sum(fila.map(val)), 0.01)}">${bs}</div>`;
+  }).join('');
+  const franja = resto.length ? `<div class="cmap-otras"><span>Otras ${resto.length} posicion${resto.length === 1 ? '' : 'es'}</span><span>${M.pct(sum(resto.map(p => p.peso)), 1)}</span></div>` : '';
+  return `<div class="cmap">${filas}${franja}</div>`;
+}
+
 function renderEvolucion(k, seg) {
   const modo = ui.carteraVentana && k.ventanas[ui.carteraVentana] ? ui.carteraVentana : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
   const v = k.ventanas[modo];
   const rangos = `<div class="seg rangos">${E.VENTANAS.map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}</div>`;
-  if (!v || !v.disponible) return `<div class="card"><div class="card-head"><h2>vs S&P 500</h2>${seg}</div>${rangos}<div class="empty">${esc(v && v.motivo || 'Sin datos para esta ventana.')}</div></div>`;
+  if (!v || !v.disponible) return `<div class="card"><div class="card-head"><h2>vs S&P 500</h2>${seg}</div>${rangos}${empty({ kind: 'periodo', icon: 'cal', head: v && v.motivo || 'Sin datos para esta ventana', sub: 'Probá con un período más largo.' })}</div>`;
   const r = v.rend; const alfaOk = r.alfa != null && r.alfa >= 0;
   const serie = E.carteraSerie(k, modo);
   let chart = '';
   if (serie && serie.fechas.length > 2) {
     const mesLabels = (w) => { const meses = serie.fechas.length > 260 ? 3 : (w < 520 ? 2 : 1); let n = -1; return serie.fechas.map((f, i) => { const ym = D.ym(f); const prev = i ? D.ym(serie.fechas[i - 1]) : null; if (i === 0 || ym === prev || i > serie.fechas.length - 4) return ''; n++; return n % meses === 0 ? (serie.fechas.length > 260 ? D.monthName(ym, true) : D.monthName(ym, true).split(' ')[0]) : ''; }); };
-    const yFmt = x => x >= 1000 ? (x / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' k' : Math.round(x).toString();
+    const yFmt = x => MENOS(Math.abs(x) >= 1000 ? (x / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' k' : Math.round(x).toString());
     chart = ChartQ.reg(w => Charts.line({ w, labels: mesLabels(w), h: 220, yFmt, xSparse: true, tipFmt: x => fmtU(x, 0), tipTitle: i => D.fmt(serie.fechas[i], { year: true }), series: [
       { name: 'Invertido (neto)', color: 'var(--ink-3)', values: serie.invertido, dashed: true },
-      { name: 'Sombra S&P 500', color: 'var(--s1)', values: serie.sombra },
+      { name: 'Sombra S&P 500', color: 'var(--c4)', values: serie.sombra },
       { name: 'Tu cartera', color: 'var(--accent)', values: serie.real, connect: true, dots: true, strong: true },
-    ] }), 220) + Charts.legend([{ name: 'Tu cartera', color: 'var(--accent)', kind: 'line' }, { name: 'Sombra S&P 500', color: 'var(--s1)', kind: 'line' }, { name: 'Invertido neto', color: 'var(--ink-3)', kind: 'dash' }]);
+    ] }), 220) + Charts.legend([{ name: 'Tu cartera', color: 'var(--accent)', kind: 'line' }, { name: 'Sombra S&P 500', color: 'var(--c4)', kind: 'line' }, { name: 'Invertido neto', color: 'var(--ink-3)', kind: 'dash' }]);
   }
   // alfa por posición (mismas compras hechas en SPY): quién suma y quién resta
   const conAlfa = [...k.posiciones, ...k.cerradas].filter(p => p.alfaUSD != null).sort((a, b) => b.alfaUSD - a.alfaUSD);
@@ -357,7 +378,7 @@ function infoEvolucion(modo) {
   const k = E.cartera(); const v = k.ventanas[modo] || k.ventanas.anio; if (!v || !v.disponible) return;
   const r = v.rend; const puntos = Object.keys(state.cartera.historial || {}).length; const anual = v.dias >= 30;
   const p = x => x == null ? '<span class="muted">—</span>' : `<span class="${x >= 0 ? 'up' : 'down'}">${pctS(x)}</span>`;
-  const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })} → hoy<br>${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
+  const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
     <tr><td>Acumulado<small>${r.metodo === 'tir' ? 'ponderado por dinero (TIR)' : 'ponderado por dinero (Dietz)'}</small></td><td>${p(r.real)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
     <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirReal) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
     <tr><td>Ponderado por tiempo<small>TWR, sin efecto de tus aportes</small></td><td>${p(r.twr)}</td><td>${p(r.spyDirecto)}</td><td>${p(r.spyDirecto)}</td></tr>
@@ -366,6 +387,6 @@ function infoEvolucion(modo) {
     ${tabla}
     <p><b>Precio contra precio.</b> Acá no cuentan dividendos, ni los tuyos ni los del S&P: solo compras, ventas y cotización. Con dividendos, tu cartera rindió ${r.realDiv != null ? pctS(r.realDiv) : '—'} en este rango${r.dividendosVentana ? ` (${fmtU(r.dividendosVentana)} cobrados)` : ''}: es el número de la card "Valor de la cartera". <b>Acumulado</b> es lo que ves en las cajas: cuánto rindió tu plata en el rango contando cuándo entró cada aporte (TIR, el "personal rate of return" de Fidelity o Sharesight). <b>TIR anual</b> es esa misma tasa expresada por año. <b>TWR</b> es la norma profesional (GIPS): mide tu selección de activos sin premiar ni castigar el momento de los aportes; acá se aproxima entre valuaciones guardadas (${puntos} hasta ahora, una por día al traer precios).</p>
     <p><b>Sombra S&P 500.</b> ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}; después` : `Arranca en cero el ${D.fmt(v.desde, { year: true })} y`} cada compra o venta se replica el mismo día en SPY por el mismo monto. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día. Alfa = cartera − sombra, en puntos y en dólares.</p>
-    ${v.nota ? `<p class="callout amber" style="margin:0">⚠️ ${esc(v.nota)}</p>` : ''}
+    ${v.nota ? `<p class="callout amber" style="margin:0">${G.warn} ${esc(v.nota)}</p>` : ''}
   </div>` });
 }

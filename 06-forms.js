@@ -86,7 +86,7 @@ function formMov(m = null, opts = {}) {
     const c = L.cat(s.catId);
     const auto = !$('#f-cat').dataset.touched && isNew;
     if (auto) { $('#f-cat').value = s.catId; const nb = $(`#f-nec button[data-v="${s.necesidad || 2}"]`); if (nb) nb.click(); upd(); }
-    box.innerHTML = `<button type="button" id="f-apply">${auto ? '✓ ' : ''}${s.src === 'historial' ? `Como otras ${s.n} veces: ` : 'Sugerido: '}${esc(c.nombre)} · ${NECESIDAD[s.necesidad] || 'Útil'}${s.medio ? ' · ' + (s.medio === 'tarjeta' ? (L.tarjeta(s.tarjetaId) || {}).nombre || 'tarjeta' : MEDIOS[s.medio]) : ''}${s.monto && !$('#f-monto').value ? ' · ' + M.orig(s) : ''}</button>`;
+    box.innerHTML = `<button type="button" id="f-apply">${auto ? G.ok + ' ' : ''}${s.src === 'historial' ? `Como otras ${s.n} veces: ` : 'Sugerido: '}${esc(c.nombre)} · ${NECESIDAD[s.necesidad] || 'Útil'}${s.medio ? ' · ' + (s.medio === 'tarjeta' ? (L.tarjeta(s.tarjetaId) || {}).nombre || 'tarjeta' : MEDIOS[s.medio]) : ''}${s.monto && !$('#f-monto').value ? ' · ' + M.orig(s) : ''}</button>`;
     $('#f-apply').onclick = () => { $('#f-cat').value = s.catId; const nb = $(`#f-nec button[data-v="${s.necesidad || 2}"]`); if (nb) nb.click(); if (s.medio) { const mv = s.medio === 'tarjeta' ? 't:' + s.tarjetaId : s.medio; const mb = $(`#f-medio button[data-v="${mv}"]`); if (mb) mb.click(); } if (s.monto && !$('#f-monto').value) { $('#f-monto').value = s.moneda === 'USD' ? String(s.monto).replace('.', ',') : fmtARS.format(s.monto); const cb = $(`#f-moneda button[data-v="${s.moneda || 'ARS'}"]`); if (cb) cb.click(); } box.innerHTML = ''; upd(); };
   }, 180); });
   upd();
@@ -164,7 +164,7 @@ const Cobro = {
   /** Resultado de registrar: toast con variación y lo que queda para invertir */
   avisar(ym, r) {
     const mes = D.monthName(ym).split(' ')[0]; const pres = E.presupuesto(ym);
-    const delta = r.delta != null && Math.abs(r.delta) >= 0.001 ? ` (${r.delta > 0 ? '+' : ''}${(r.delta * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} % vs ${r.prevRegistrado ? D.monthName(D.addMonths(ym, -1)).split(' ')[0] : 'el anterior'})` : '';
+    const delta = r.delta != null && Math.abs(r.delta) >= 0.001 ? ` (${r.delta > 0 ? '+' : ''}${MENOS((r.delta * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }))} % vs ${r.prevRegistrado ? D.monthName(D.addMonths(ym, -1)).split(' ')[0] : 'el anterior'})` : '';
     toast(`Sueldo de ${mes}: ${M.f(r.monto)}${delta}${pres ? ` · para invertir ${M.f(r.monto - pres)}` : ''}`, 5000);
   },
 };
@@ -192,10 +192,10 @@ function formFijos(ym = D.thisMonth()) {
   const pend = E.fijosPendientes(ym); if (!pend.length) { toast('No hay fijos pendientes'); return; }
   const mes = D.monthName(ym).split(' ')[0]; Fijos.marcar(ym);
   const rows = pend.map(v => `<div class="fijo-row" data-rec="${esc(v.recId)}"><div style="min-width:0"><b>${esc(v.desc)}</b><span class="sub">día ${Number(v.fecha.slice(8, 10))} · antes ${M.f(M.toARS(v.monto, v.moneda))}</span></div><div class="amount-input"><span class="cur">${v.moneda === 'USD' ? 'US$' : '$'}</span><input class="input sm mono" inputmode="decimal" data-fijo="${esc(v.recId)}" value="${v.moneda === 'USD' ? String(v.monto).replace('.', ',') : fmtARS.format(v.monto)}"></div><button type="button" class="mini-btn" data-act="fijo-omitir" data-id="${esc(v.recId)}" aria-label="Este mes no va">${ICONS.x}</button></div>`).join('');
-  Modal.open({ title: `Fijos de ${mes}`, submit: 'Confirmar', body: `<div class="stack"><div class="small muted">Dejá el monto si quedó igual, corregilo si cambió, ✕ si este mes no va.</div><div class="fijos">${rows}</div></div>`, onSubmit: () => {
+  Modal.open({ title: `Fijos de ${mes}`, submit: 'Confirmar', body: `<div class="stack"><div class="small muted">Dejá el monto si quedó igual, corregilo si cambió, ${G.no} si este mes no va.</div><div class="fijos">${rows}</div></div>`, onSubmit: () => {
     const montos = {}; const omit = [];
     $$('.fijo-row').forEach(row => { const id = row.dataset.rec; if (row.classList.contains('omitido')) { omit.push(id); return; } montos[id] = M.parse(row.querySelector('input').value); });
-    if (Object.values(montos).some(m => !(m > 0))) { toast('Hay un fijo sin monto: corregilo o marcalo con ✕'); return false; }
+    if (Object.values(montos).some(m => !(m > 0))) { toast('Hay un fijo sin monto: corregilo o marcá que este mes no va'); return false; }
     const r = E.confirmarFijos(ym, montos, omit); Persist.save(); render();
     const camb = r.cambios.map(c => `${c.desc} ${c.d > 0 ? '+' : ''}${M.pct(c.d, 0)}`).join(', ');
     setTimeout(() => toast(`${r.n} fijo${r.n === 1 ? '' : 's'} de ${mes} confirmado${r.n === 1 ? '' : 's'}${r.cambios.length ? ` · cambiaron: ${camb}` : r.n ? ' · sin cambios' : ''}${r.omitidos ? ` · ${r.omitidos} omitido${r.omitidos > 1 ? 's' : ''}` : ''}`, 5000), 250);
@@ -207,7 +207,7 @@ function formConciliar() {
   const k = E.cartera(); const prev = state.cartera.conciliacion || null;
   if (!k.posiciones.length) { toast('Sin posiciones para conciliar'); return; }
   const rows = k.posiciones.map(p => { const c = p.cedear; const app = c ? Cedears.aCedears(p.acciones, c) : p.acciones; const pv = prev && prev.items && prev.items[p.ticker]; return `<div class="conc-row"><div style="min-width:0"><b>${esc(p.ticker)}</b><span class="sub">${fmtAcc(Math.round(app * 1000) / 1000)} ${c ? 'CEDEARs' : 'acc'} según la app</span></div><input class="input sm mono" inputmode="decimal" data-conc="${esc(p.ticker)}" placeholder="Balanz" value="${pv && pv.balanz != null ? String(pv.balanz).replace('.', ',') : ''}"></div>`; }).join('');
-  Modal.open({ title: 'Conciliar con Balanz', submit: 'Guardar', body: `<div class="stack"><div class="small muted">Balanz → Tenencia: copiá la cantidad de cada ${k.posiciones.some(p => p.cedear) ? 'CEDEAR' : 'activo'}. Vacío = no lo revisaste.${prev ? ` Última conciliación: ${D.fmt(prev.fecha, { year: true })}.` : ''}</div><div class="conc">${rows}</div></div>`, onSubmit: () => {
+  Modal.open({ title: 'Conciliar con Balanz', submit: 'Guardar', body: `<div class="stack"><div class="small muted">En Balanz, sección Tenencia: copiá la cantidad de cada ${k.posiciones.some(p => p.cedear) ? 'CEDEAR' : 'activo'}. Vacío = no lo revisaste.${prev ? ` Última conciliación: ${D.fmt(prev.fecha, { year: true })}.` : ''}</div><div class="conc">${rows}</div></div>`, onSubmit: () => {
     const items = {}; let ok = 0, dif = 0, n = 0;
     for (const p of k.posiciones) { const el = $(`[data-conc="${p.ticker}"]`); if (!el || !el.value.trim()) continue; const v = M.parse(el.value); const c = p.cedear; const app = c ? Cedears.aCedears(p.acciones, c) : p.acciones; n++; const coincide = Math.abs(v - app) <= Math.max(0.01, app * 0.002); items[p.ticker] = { app: Math.round(app * 1000) / 1000, balanz: v, ok: coincide }; if (coincide) ok++; else dif++; }
     if (!n) { toast('Cargá al menos una cantidad'); return false; }
@@ -331,7 +331,7 @@ const Verif = {
   },
   nivel(items) { return items.some(i => i.nivel === 'block') ? 'block' : items.some(i => i.nivel === 'warn') ? 'warn' : 'ok'; },
   html(ev) {
-    const ic = { ok: '✓', info: '·', warn: '⚠', block: '✕' };
+    const ic = { ok: G.ok, info: '·', warn: G.warn, block: G.no };
     return `<ul class="verif">${ev.items.map(i => `<li class="${i.nivel}"><i>${ic[i.nivel]}</i><span>${i.txt}</span></li>`).join('')}</ul>${ev.nivel === 'block' ? `<label class="switch verif-force"><input type="checkbox" id="o-force"><span>Lo revisé, guardar igual</span></label>` : ''}`;
   },
   /** Texto corto de trazabilidad para el detalle de una operación guardada */
@@ -361,9 +361,9 @@ function formOp(pre = {}) {
     <div class="full callout" id="o-calc" style="padding:8px 12px;font-size:13px"></div>
     ${(k.caja || 0) + (pre.deCaja || 0) > 0.005 ? `<div class="full" id="o-dediv-box" ${tipo === 'compra' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-de-div" ${pre.deCaja > 0 ? 'checked' : ''}><span>Pagada con la caja <small class="muted">(dividendos y ventas: tenés ${fmtU((k.caja || 0) + (pre.deCaja || 0), 2)})</small></span></label></div>` : ''}
     <div class="full" id="o-acaja-box" ${tipo === 'venta' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-a-caja" ${editando ? (pre.aCaja ? 'checked' : '') : 'checked'}><span>El cobro queda en caja <small class="muted">(para pagar compras futuras)</small></span></label></div>
-    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? '⚠️ Fecha estimada (posición previa cargada el 3-4/1/26). Poné la fecha real de compra para afinar la comparación contra el S&P.' : '', 'full')}
+    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? `${G.warn} Fecha estimada (posición previa cargada el 3-4/1/26). Poné la fecha real de compra para afinar la comparación contra el S&P.` : '', 'full')}
     ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
-    ${editando && pre.verif ? `<div class="full small muted traza"><b class="${pre.verif.nivel === 'ok' ? 'up' : 'warn-text'}">${pre.verif.nivel === 'ok' ? '✓ verificada' : pre.verif.nivel === 'block' ? '✕ guardada con errores' : '⚠ con advertencias'}</b> · ${esc(Verif.trazaTxt(pre.verif))}</div>` : ''}
+    ${editando && pre.verif ? `<div class="full small muted traza"><b class="${pre.verif.nivel === 'ok' ? 'up' : 'warn-text'}">${pre.verif.nivel === 'ok' ? G.ok + ' verificada' : pre.verif.nivel === 'block' ? G.no + ' guardada con errores' : G.warn + ' con advertencias'}</b> · ${esc(Verif.trazaTxt(pre.verif))}</div>` : ''}
   </div>`;
   Modal.open({ title: editando ? 'Editar operación' : 'Operación de cartera', body, submit: editando ? 'Guardar cambios' : 'Guardar', extra: editando ? `<button type="button" class="btn danger" data-act="del-op-modal" data-id="${pre.id}">Borrar</button>` : '', onSubmit: () => {
     const tipo = Modal.choice('o-tipo') || 'compra';
@@ -467,6 +467,76 @@ function formOpCalc() {
   let ver = '', nivel = 'ok'; try { const k = E.cartera(); const o = Verif.candidata(formOpCalc._pre || {}); const ev = Verif.evaluar(o, k); ver = Verif.html(ev); nivel = ev.nivel; } catch (err) { ver = ''; }
   box.hidden = false; box.innerHTML = html + ver; box.classList.toggle('crit', nivel === 'block'); box.classList.toggle('amber', nivel === 'warn');
 }
+/* ---------- ficha de fundamentales dentro del detalle de una posición / watchlist ---------- */
+function fundHTML(t, precio) {
+  const d = Fund.de(t);
+  const pct1 = v => v == null ? '—' : `${v >= 0 ? '' : '−'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+  const num = (v, n = 1) => v == null ? '—' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+  const sem = (v, bueno, malo, inv) => v == null ? '' : inv ? (v <= bueno ? 'ok' : v <= malo ? 'mid' : 'bad') : (v >= bueno ? 'ok' : v >= malo ? 'mid' : 'bad');
+  const r = (k, v, cls, n) => `<div class="r"><span class="k">${k}${n ? ` <span class="n">${n}</span>` : ''}</span><span class="v ${cls || ''}">${v}</span></div>`;
+  if (!d) return `<div class="fund" id="fund-box"><div class="grp"><div class="t">Fundamentales</div><div class="small muted">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos…' : 'Cargá tu clave de Finnhub en Ajustes, sección Cartera, para ver los fundamentales.'}</div></div></div>`;
+  const cap = d.capUSD ? 'US$ ' + (d.capUSD >= 1e12 ? `${num(d.capUSD / 1e12, 2)} billones` : d.capUSD >= 1e9 ? `${num(d.capUSD / 1e9, 0)} mil M` : `${num(d.capUSD / 1e6, 0)} M`) : '—';
+  // rango de 52 semanas
+  let rango = '';
+  if (d.min52 != null && d.max52 != null && precio != null && d.max52 > d.min52) {
+    const pos = clamp((precio - d.min52) / (d.max52 - d.min52), 0, 1);
+    rango = `<div class="grp"><div class="t">Rango 52 semanas</div>
+      <div class="rng"><i style="left:${(pos * 100).toFixed(1)}%"></i></div>
+      <div class="r" style="padding:0"><span class="n">${fmtU(d.min52)}</span><span class="n">${(pos * 100).toFixed(0)} % del rango</span><span class="n">${fmtU(d.max52)}</span></div></div>`;
+  }
+  // calidad del negocio (criterio Buffett: retorno sobre el capital, márgenes estables, poca deuda, caja real)
+  const margenVs = d.margenNeto != null && d.margenNeto5 ? d.margenNeto / d.margenNeto5 - 1 : null;
+  const calidad = `<div class="grp"><div class="t">Calidad del negocio</div>
+    ${r('ROIC', pct1(d.roicAct), sem(d.roicAct, 0.15, 0.10), d.roicProm5 != null ? `prom 5A ${pct1(d.roicProm5)}` : '')}
+    ${r('ROE', pct1(d.roe), sem(d.roe, 0.15, 0.10))}
+    ${r('Margen neto', pct1(d.margenNeto), sem(margenVs, -0.05, -0.25), d.margenNeto5 != null ? `prom 5A ${pct1(d.margenNeto5)}` : '')}
+    ${r('Margen bruto / operativo', `${pct1(d.margenBruto)} / ${pct1(d.margenOper)}`)}
+    ${r('Deuda / patrimonio', d.deudaPat != null ? num(d.deudaPat, 2) : '—', d.deudaPat == null ? '' : (d.deudaPat < 0 ? 'mid' : sem(d.deudaPat, 0.6, 1.5, true)), d.deudaPat < 0 ? 'patrimonio negativo' : '')}
+    ${r('Caja libre / ganancia', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '×' : '—', sem(d.fcfSobreNeto, 0.9, 0.6), 'la ganancia declarada, ¿es caja?')}
+    ${d.accionesCambio ? r('Acciones en circulación', pct1(d.accionesCambio.pct), d.accionesCambio.pct <= -0.01 ? 'ok' : d.accionesCambio.pct >= 0.02 ? 'bad' : '', `${d.accionesCambio.desde}–${d.accionesCambio.hasta} · ${d.accionesCambio.pct < 0 ? 'recompra' : 'dilución'}`) : ''}
+  </div>`;
+  // crecimiento (criterio Lynch: que crezca de verdad y que el precio no se lo haya comido)
+  const crec = `<div class="grp"><div class="t">Crecimiento</div>
+    ${r('Ventas', pct1(d.cagrVentas5 ?? d.crecVentas5), sem(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), d.cagrVentas10 != null ? `10A ${pct1(d.cagrVentas10)}` : 'CAGR 5 años')}
+    ${r('Ganancia neta', pct1(d.cagrNeto5), sem(d.cagrNeto5, 0.10, 0.04), d.cagrNeto10 != null ? `10A ${pct1(d.cagrNeto10)}` : 'CAGR 5 años')}
+    ${r('EPS', pct1(d.cagrEps5 ?? d.crecEps5), sem(d.cagrEps5 ?? d.crecEps5, 0.10, 0.04), 'CAGR 5 años')}
+  </div>`;
+  // valuación (contra sí misma, igual criterio que tus zonas de alerta)
+  const peVs = d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null;
+  const val = `<div class="grp"><div class="t">Valuación</div>
+    ${r('P/E', num(d.pe, 1), sem(peVs, -0.10, 0.20, true), d.peMediana ? `mediana 10A ${num(d.peMediana, 1)}${peVs != null ? ` · ${pct1(peVs)}` : ''}` : '')}
+    ${r('PEG', num(d.peg, 2), sem(d.peg, 1, 2, true), 'Lynch: por debajo de 1 es barata')}
+    ${d.pb != null ? r('P/B', num(d.pb, 2)) : ''}
+    ${d.yieldDiv ? r('Dividendo', pct1(d.yieldDiv), '', `payout ${pct1(d.payout)}${d.divCrec5 != null ? ` · crece ${pct1(d.divCrec5)}/año` : ''}`) : ''}
+  </div>`;
+  // próximo balance
+  const b = Fund.balance(t);
+  const bal = b ? `<div class="grp"><div class="t">Próximo balance</div>
+    ${r(D.fmt(b.fecha, { year: true }), b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : `en ${b.dias} días`, b.dias <= 7 ? 'mid' : '', b.epsEst != null ? `EPS esperado ${fmtU(b.epsEst)}` : '')}
+  </div>` : '';
+  // ganancia neta por año (la serie larga de los balances presentados a la SEC)
+  let serie = '';
+  const fs = (d.filas || []).filter(f => Number.isFinite(f.neto));
+  if (fs.length > 3) {
+    const mx = Math.max(...fs.map(f => Math.abs(f.neto)));
+    serie = `<div class="grp"><div class="t">Ganancia neta por año</div>
+      <div class="nibars">${fs.map(f => `<i class="${f.neto < 0 ? 'neg' : ''}" style="height:${Math.max(2, Math.abs(f.neto) / mx * 100)}%" title="${f.anio}: ${fmtU(f.neto / 1e6, 0)} M"></i>`).join('')}</div>
+      <div class="r" style="padding:2px 0 0"><span class="n">${fs[0].anio}</span><span class="n">${fmtU(fs[fs.length - 1].neto / 1e6, 0)} M en ${fs[fs.length - 1].anio}</span><span class="n">${fs[fs.length - 1].anio}</span></div></div>`;
+  }
+  return `<div class="fund" id="fund-box">
+    <div class="f-h"><div><b>${esc(d.nombre || t)}</b><div class="n">${esc(d.sector || '')}${d.beta ? ` · beta ${num(d.beta, 2)}` : ''}</div></div><div class="n" style="text-align:right">cap ${cap}</div></div>
+    ${rango}${calidad}${crec}${val}${bal}${serie}
+    <div class="n">Datos de Finnhub (balances presentados a la SEC${d.aniosDatos ? `, ${d.aniosDatos.desde}–${d.aniosDatos.hasta}` : ''}) · actualizado ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</div>
+  </div>`;
+}
+/** refresca los fundamentales del ticker y repinta solo ese bloque */
+async function fundRefrescar(t, precio) {
+  if (!(state.settings.finnhubKey || '').trim()) return;
+  try { await Fund.traer(t); } catch (e) {}
+  const box = $('#fund-box'); if (!box) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = fundHTML(t, precio);
+  box.replaceWith(tmp.firstElementChild);
+}
 function formPosicion(ticker) {
   const k = E.cartera(); const p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker); if (!p) return;
   const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
@@ -483,9 +553,10 @@ function formPosicion(ticker) {
     </div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
     ${p.objetivo ? `<div class="small"><b>Precio objetivo:</b> ${fmtU(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside)} desde hoy)` : ''}</div>` : ''}
     ${al.nota ? `<div class="callout" style="font-size:13px"><b>Tesis / nota:</b> ${esc(al.nota)}</div>` : ''}
+    ${fundHTML(ticker, p.precio)}
     <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas y objetivo (USD)</div></div>
-      ${F.field('🟡 Che, mirala ≤', F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
-      ${F.field('🔴 Comprá urgente ≤', F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
+      ${F.field('<span class="dot warn"></span>Che, mirala ≤', F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
+      ${F.field('<span class="dot crit"></span>Comprá urgente ≤', F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
       ${F.field('Precio objetivo 12 m', F.input('a-objetivo', al.objetivo || '', 'inputmode="decimal" placeholder="opcional"'))}
       ${F.field('Tesis / nota', F.input('a-nota', al.nota || '', 'placeholder="por qué la tenés, qué mirar"'))}
     </div>
@@ -497,9 +568,10 @@ function formPosicion(ticker) {
     if (!mirala && !urgente && !objetivo && !nota) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, nota: nota || null };
     Persist.save(); toast('Guardado'); render();
   } });
+  fundRefrescar(ticker, p.precio);  // siempre al abrir: se ve lo guardado y se actualiza atrás
 }
 function formWatch() {
-  Modal.open({ title: 'Vigilar un ticker', body: `<div class="form-grid">${F.field('Ticker', F.input('w-ticker', '', 'placeholder="TSM" autofocus autocapitalize="characters" style="text-transform:uppercase"'), 'Sin tenerlo: solo para que la app y el bot te avisen.', 'full')}${F.field('🟡 Che, mirala ≤ (USD)', F.input('w-mirala', '', 'inputmode="decimal"'))}${F.field('🔴 Comprá urgente ≤ (USD)', F.input('w-urgente', '', 'inputmode="decimal"'))}</div>`, submit: 'Guardar', onSubmit: () => {
+  Modal.open({ title: 'Vigilar un ticker', body: `<div class="form-grid">${F.field('Ticker', F.input('w-ticker', '', 'placeholder="TSM" autofocus autocapitalize="characters" style="text-transform:uppercase"'), 'Sin tenerlo: solo para que la app y el bot te avisen.', 'full')}${F.field('<span class="dot warn"></span>Che, mirala ≤ (USD)', F.input('w-mirala', '', 'inputmode="decimal"'))}${F.field('<span class="dot crit"></span>Comprá urgente ≤ (USD)', F.input('w-urgente', '', 'inputmode="decimal"'))}</div>`, submit: 'Guardar', onSubmit: () => {
     const t = Modal.val('w-ticker').trim().toUpperCase(); const mirala = M.parse(Modal.val('w-mirala')), urgente = M.parse(Modal.val('w-urgente'));
     if (!t || (!mirala && !urgente)) { toast('Ticker y al menos un nivel'); return false; }
     state.cartera.alertas[t] = { mirala: mirala || null, urgente: urgente || null }; Persist.save(); render();
