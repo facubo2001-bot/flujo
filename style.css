@@ -139,8 +139,10 @@ button.card svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;s
 .kpi.hero .value{font-size:21px}
 @media (max-width:1180px){.kpi .spark{display:none}}
 
-.kpi.accent{background:linear-gradient(140deg,var(--accent-soft),var(--surface) 70%)}
-.kpi.amber{background:linear-gradient(140deg,var(--amber-soft),var(--surface) 70%)}
+/* sin fondo tenido: el estado se expresa en el chip y en el color de la cifra */
+.kpi .delta .pill{background:transparent;padding:2px 0;border:0}
+.kpi .delta .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.kpi .delta .pill.neutral{color:var(--ink-3)}
 .dot{width:7px;height:7px;border-radius:50%;display:inline-block;vertical-align:1px;margin-right:5px;background:var(--ink-3)}
 .dot.crit{background:var(--crit)} .dot.warn{background:var(--warn)} .dot.good{background:var(--good)} .dot.info{background:var(--accent)}
 .pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;line-height:1.5;border:1px solid transparent;white-space:nowrap}
@@ -153,9 +155,15 @@ button.card svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;s
 .pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:0}
 
 /* meter */
-.meter{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden;position:relative}
+.meter{height:8px;border-radius:4px;background:rgba(255,255,255,.10);overflow:hidden;position:relative}
 .meter > i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .4s}
+/* datos nominales (categorias, medios de pago): el color no ordena nada, solo el largo */
+.meter.neutral > i{background:rgba(255,255,255,.45)}
 .meter.warn > i{background:var(--warn)} .meter.crit > i{background:var(--crit)}
+/* barra de limite de tarjeta: 2 px, sin color salvo que estes al limite */
+.meter.lim{height:2px;border-radius:1px}
+.meter.lim > i{background:rgba(255,255,255,.55);border-radius:1px}
+.meter.lim.warn > i{background:var(--warn)}
 .meter .mark{position:absolute;top:-3px;width:2px;height:14px;background:var(--ink);opacity:.5}
 .meter-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;font-size:13px;padding:7px 0;border-bottom:1px solid var(--line)}
 .meter-row:last-child{border-bottom:0}
@@ -215,9 +223,8 @@ tr.cuota td:first-child{border-left:2px solid var(--c4)}
 .cat-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:2px 8px;border-radius:7px;background:var(--surface-3);color:var(--ink-2);white-space:nowrap}
 .cat-chip i{width:8px;height:8px;border-radius:2px;flex:none}
 .nec{display:inline-block;width:20px;height:20px;border-radius:6px;font-size:11px;font-weight:700;line-height:20px;text-align:center}
-.nec-1{background:var(--accent-soft);color:var(--accent-ink)}
-.nec-2{background:var(--surface-3);color:var(--ink-2)}
-.nec-3{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit-text)}
+.nec-1,.nec-2,.nec-3{background:rgba(255,255,255,.10);color:var(--ink-2)}
+.nec-3{color:var(--crit-text)}
 .row-actions{display:inline-flex;gap:2px;opacity:0;transition:opacity .1s}
 tr:hover .row-actions,.mrow .row-actions{opacity:1}
 .mini-btn{border:0;background:transparent;color:var(--ink-3);border-radius:8px;width:28px;height:28px;display:inline-grid;place-items:center}
@@ -305,7 +312,8 @@ tr:hover .row-actions,.mrow .row-actions{opacity:1}
 @media (max-width:900px){.toast{bottom:140px}}
 
 /* ---------- glow: apagado por defecto; se enciende solo cuando el dato esta en un extremo ---------- */
-.glow-text{text-shadow:0 0 10px color-mix(in srgb,currentColor 38%,transparent)}
+/* Unico uso permitido: relleno. Nunca text-shadow: una cifra de 900 ya es una mancha solida,
+   el halo la convierte en un bloque que irradia. El halo sirve donde hay poca tinta. */
 .glow-fill{box-shadow:0 0 10px color-mix(in srgb,currentColor 45%,transparent)}
 .glow-fill.crit{box-shadow:0 0 10px rgba(255,74,69,.45)}
 .glow-fill.warn{box-shadow:0 0 10px rgba(255,206,33,.45)}
@@ -314,41 +322,43 @@ tr:hover .row-actions,.mrow .row-actions{opacity:1}
 .glow-fill.ink{box-shadow:0 0 10px rgba(255,255,255,.55)}
 /* la barra recorta el halo si sigue en overflow:hidden */
 .meter:has(> i.glow-fill),.al-bar:has(> i.glow-fill){overflow:visible}
-/* el halo ensucia el contorno por debajo de 13px: lo que brilla no baja de ahi */
-.pos-row .sub.glow-text{font-size:13px}
 
 /* composicion de cartera: mapa de bloques proporcionales, sin leyenda */
 .cmap{display:flex;flex-direction:column;gap:4px;height:210px}
-.cmap-row{display:flex;gap:4px;min-height:0}
+.cmap-row{display:flex;gap:4px;min-height:46px}
 .cmap-b{container-type:inline-size;flex-basis:0;min-width:0;border-radius:9px;display:flex;flex-direction:column;justify-content:space-between;gap:4px;overflow:hidden;cursor:pointer}
 .cmap-b b{font-weight:900;letter-spacing:-.02em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cmap-b .n{display:flex;justify-content:space-between;gap:6px;font-weight:800;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden}
+.cmap-b .n{display:flex;justify-content:space-between;gap:4px;font-weight:800;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden}
 .cmap-b .n i,.cmap-b .n em{font-style:normal}
-.cmap-b .n i{opacity:.84} .cmap-b .n em{opacity:.58}
-@container (max-width:104px){.cmap-b .n em{display:none}}
+.cmap-b .n i{opacity:.84} .cmap-b .n em{opacity:.58;text-align:right}
+.cmap-b .n i,.cmap-b .n em{min-width:0;overflow:hidden}
+/* el bloque angosto achica la cifra en vez de esconderla: si una fila muestra la variacion
+   del dia y la otra no, la fila baila y deja de leerse como una unidad */
+@container (max-width:104px){.cmap-b{padding:7px!important}.cmap-b .n{font-size:9px!important;letter-spacing:-.02em}}
+@container (max-width:78px){.cmap-b{padding:6px!important}.cmap-b b{font-size:11px!important}.cmap-b .n{font-size:8px!important}}
 .cmap-otras{flex:none;height:26px;border-radius:9px;background:var(--c-otras);color:var(--c-otras-ink);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums}
 
 /* ---------- insights ---------- */
 .insight{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
 .insight:last-child{border-bottom:0}
-.insight .ic{width:32px;height:32px;border-radius:var(--r-sm);display:grid;place-items:center;flex:none}
-.insight .ic svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.insight.info .ic{background:var(--accent-soft);color:var(--accent-ink)}
-.insight.good .ic{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good-text)}
-.insight.warn .ic{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn-text)}
-.insight.crit .ic{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit-text)}
+.insight .ic{width:40px;height:40px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.12);background:transparent;display:grid;place-items:center;flex:none}
+.insight .ic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.insight.info .ic{color:var(--accent)}
+.insight.good .ic{color:var(--good)}
+.insight.warn .ic{color:var(--warn)}
+.insight.crit .ic{color:var(--crit)}
 .insight b{font-weight:600}
 .insight p{font-size:13.5px;color:var(--ink-2)}
 .insight .t{font-weight:800;margin-bottom:2px;color:var(--ink)}
 
 /* ---------- cards view ---------- */
-.tcard{border-radius:var(--r);padding:18px 20px;color:#fff;position:relative;overflow:hidden;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--shadow)}
-.tcard::after{content:"";position:absolute;right:-40px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.08)}
+.tcard{border-radius:var(--r);border:1px solid var(--line);background:transparent;padding:18px 20px;color:var(--ink);position:relative;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:none}
+.tcard .bankdot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px;vertical-align:1px;flex:none}
 .tcard .tname{font-family:var(--font-display);font-weight:900;font-size:16px;letter-spacing:-.03em;display:flex;justify-content:space-between;align-items:center}
 .tcard .tbig{font-family:var(--font-display);font-size:26px;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.tcard .tmeta{display:flex;gap:16px;font-size:12px;opacity:.85;flex-wrap:wrap}
-.tcard .tmeta b{display:block;font-size:13px;opacity:1}
-.tcard .pill{background:rgba(255,255,255,.18);color:#fff}
+.tcard .tmeta{display:flex;gap:16px;font-size:12px;color:var(--ink-3);flex-wrap:wrap}
+.tcard .tmeta b{display:block;font-size:13px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+.tcard .pill{background:rgba(255,255,255,.10);color:var(--ink-2)}
 .timeline{display:flex;flex-direction:column;gap:8px}
 .tl-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;font-size:13px}
 .tl-row .m{color:var(--ink-3);font-weight:600;font-size:12px}
@@ -369,9 +379,10 @@ tr:hover .row-actions,.mrow .row-actions{opacity:1}
 .muted{color:var(--ink-3)}
 .small{font-size:12.5px}
 .divider{height:1px;background:var(--line);margin:12px 0}
-.callout{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r-sm);padding:12px 14px;background:transparent;font-size:13.5px}
-.callout.amber{border-left-color:var(--amber)}
-.callout.crit{border-left-color:var(--crit)}
+.callout{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:transparent;font-size:13.5px}
+.callout::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:9px;vertical-align:1px;flex:none}
+.callout.amber::before{background:var(--warn)}
+.callout.crit::before{background:var(--crit)}
 .list-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .list-item:last-child{border-bottom:0}
 .onboard{max-width:720px;margin:20px auto}
@@ -432,6 +443,9 @@ th{text-transform:none;letter-spacing:0;font-size:12px;font-weight:700}
 .grabber{width:38px;height:5px;border-radius:3px;background:var(--line-2);margin:8px auto 0}
 .fab{width:48px;height:48px;border-radius:50%;box-shadow:none}
 .fab:active{transform:scale(.94)}
+/* flota sobre el contenido todo el recorrido: se va al bajar y vuelve al frenar o al subir */
+.fab{transition:opacity .15s ease,transform .12s ease}
+.fab.hide{opacity:0;pointer-events:none}
 .tabbar{background:var(--surface-elev)}
 @media (max-width:900px){
   h1{font-size:33px;font-weight:900;letter-spacing:-.035em}
@@ -494,13 +508,9 @@ html,body{background:#000}
 .big-amount input{color:#fff}
 .big-amount input::placeholder{color:#2E2E33}
 .switch input{background:#2E2E33}
-.callout{background:var(--surface)}
 .sim-result .box{background:var(--surface-3)}
 kbd{background:var(--surface-3)}
 tr.day td{background:var(--surface)}
-.kpi.accent{background:linear-gradient(140deg,var(--accent-soft),var(--surface) 72%)}
-.kpi.amber{background:linear-gradient(140deg,var(--amber-soft),var(--surface) 72%)}
-.tcard{box-shadow:none}
 
 
 /* cartera */

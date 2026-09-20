@@ -140,6 +140,9 @@ const DEFAULT_CATS = [
 ].map(([id, nombre, grupo, tipo]) => ({ id, nombre, grupo, tipo, presupuesto: 0 }));
 
 const NECESIDAD = { 1: 'Necesario', 2: 'Útil', 3: 'Innecesario' };
+/** Un solo umbral para "% del presupuesto", en todas las vistas: verde < 40 %, ambar 40-60 %, rojo > 60 %.
+ *  Antes cada vista tenia el suyo y el mismo indicador salia ambar en Resumen y verde en Cuotas. */
+const pctPresu = p => p > 0.6 ? 'crit' : p >= 0.4 ? 'warn' : 'good';
 const MEDIOS = { tarjeta: 'Tarjeta de crédito', debito: 'Débito', efectivo: 'Efectivo', transferencia: 'Transferencia / MP' };
 
 function defaultState() {
@@ -626,6 +629,7 @@ const G = {
   no: '<svg class="g" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',
   warn: '<svg class="g" viewBox="0 0 24 24"><path d="M12 4.2L21.2 19.8H2.8z"/><path d="M12 10v4M12 16.8h.01"/></svg>',
   to: '<svg class="g" viewBox="0 0 24 24"><path d="M4.5 12h14M13 6l6 6-6 6"/></svg>',
+  le: '<svg class="g" viewBox="0 0 24 24"><path d="M18.5 5.5L6 11.3l12.5 5.8"/><path d="M6 20.4h12.5"/></svg>',
   up: '<svg class="g" viewBox="0 0 24 24"><path d="M6.5 14.5L12 9l5.5 5.5"/></svg>',
   down: '<svg class="g" viewBox="0 0 24 24"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg>',
 };

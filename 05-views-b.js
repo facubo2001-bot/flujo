@@ -1,6 +1,10 @@
 /* ===================== FLUJO — views B: tarjetas, plan, tendencias, config ===================== */
 
 const CARD_COLORS = ['#1F4E79', '#5B2C6F', '#7A3E1D', '#1E5E4A', '#3B3B6B', '#7A1F3D'];
+/** Los colores de tarjeta se eligieron para un degrade de fondo; como punto de 8 px sobre negro
+ *  no se ven. Cada uno tiene su equivalente luminoso para el punto y el swatch. */
+const CARD_DOT = { '#1F4E79': '#2F6FD0', '#5B2C6F': '#8E5BD0', '#7A3E1D': '#D07A3A', '#1E5E4A': '#2FA98A', '#3B3B6B': '#6C63C7', '#7A1F3D': '#D0446F' };
+const cardDot = c => CARD_DOT[String(c || '').toUpperCase()] || c || 'var(--ink-3)';
 
 /* ---------- TARJETAS Y PAGOS ---------- */
 function viewTarjetas() {
@@ -14,11 +18,11 @@ function viewTarjetas() {
     const cerrando = E.resumen(t.id, now.mesPago);
     const lim = Number(t.limite) || 0; const uso = lim ? (prox.ym === now.mesPago ? cerrando.total : prox.total + cerrando.total) / lim : 0;
     const cierreDesde = D.addDays(E.fechaCierre(t.id, D.addMonths(now.mesPago, -1)), 1);
-    html += `<div class="tcard" data-act="edit-card" data-id="${t.id}" style="cursor:pointer;background:linear-gradient(135deg,${t.color || CARD_COLORS[i % CARD_COLORS.length]},${t.color || CARD_COLORS[i % CARD_COLORS.length]}cc)">
-      <div class="tname"><span>${esc(t.nombre)}<span style="font-weight:400;opacity:.8;font-size:13px"> ${esc(t.banco || '')}</span></span><button class="mini-btn" style="color:#fff" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button></div>
-      <div><div style="font-size:12px;opacity:.85">Período ${D.fmt(cierreDesde)} – ${D.fmt(now.cierre)} · cierra en ${now.diasAlCierre} día${now.diasAlCierre === 1 ? '' : 's'}</div><div class="tbig">${M.f(cerrando.total)}</div></div>
+    html += `<div class="tcard" data-act="edit-card" data-id="${t.id}" style="cursor:pointer">
+      <div class="tname"><span><i class="bankdot" style="background:${cardDot(t.color || CARD_COLORS[i % CARD_COLORS.length])}"></i>${esc(t.nombre)}<span style="font-weight:400;color:var(--ink-3);font-size:13px"> ${esc(t.banco || '')}</span></span><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button></div>
+      <div><div style="font-size:12px;color:var(--ink-3)">Período ${D.fmt(cierreDesde)} – ${D.fmt(now.cierre)} · cierra en ${now.diasAlCierre} día${now.diasAlCierre === 1 ? '' : 's'}</div><div class="tbig">${M.f(cerrando.total)}</div></div>
       <div class="tmeta"><span>Consumo nuevo<b>${M.f(consumoPeriodo)}</b></span><span>Cuotas y fijos<b>${M.f(cerrando.total - consumoPeriodo)}</b></span>${prox.ym !== now.mesPago ? `<span>A pagar el ${D.fmt(prox.fecha)}<b>${M.f(prox.total)}</b></span>` : ''}</div>
-      ${lim ? `<div style="margin-top:8px"><div class="row between" style="font-size:11px;opacity:.9"><span>Límite ${M.c(lim)}</span><span>${M.pct(uso)}</span></div><div class="meter" style="background:rgba(255,255,255,.2);height:6px;margin-top:3px"><i class="${uso >= 0.85 ? 'glow-fill ink' : ''}" style="width:${clamp(uso * 100, 0, 100)}%;background:#fff"></i></div></div>` : ''}
+      ${lim ? `<div style="margin-top:10px"><div class="row between" style="font-size:11px;color:var(--ink-3)"><span>Límite ${M.c(lim)}</span><span>${M.pct(uso)}</span></div><div class="meter lim ${uso >= 0.85 ? 'warn' : ''}" style="margin-top:6px"><i class="${uso >= 0.85 ? 'glow-fill warn' : ''}" style="width:${clamp(uso * 100, 0, 100)}%"></i></div></div>` : ''}
     </div>`;
   });
   html += `<button class="card" data-act="new-card" style="display:flex;align-items:center;justify-content:center;gap:8px;color:var(--ink-3);font-weight:700;min-height:150px;border-style:dashed;cursor:pointer">${ICONS.plus} Agregar tarjeta</button></div>`;
@@ -194,7 +198,7 @@ function viewConfig() {
       ${inp('alertaCuotasPct', 'Alerta de cuotas (% del presupuesto)', s.alertaCuotasPct, 'inputmode="numeric"', 'Te aviso cuando fijos + cuotas superan esto')}
     </div></div>
     <div class="card"><div class="card-head"><h2>Tarjetas</h2><button class="btn sm" data-act="new-card">${ICONS.plus} Tarjeta</button></div>
-      ${state.tarjetas.length ? state.tarjetas.map((t, i) => `<div class="list-item"><div class="row" style="gap:10px"><i class="swatch" style="width:28px;height:18px;border-radius:4px;background:${t.color || CARD_COLORS[i % CARD_COLORS.length]}"></i><div><b style="font-weight:500">${esc(t.nombre)}</b> <span class="muted small">${esc(t.banco || '')}</span><span class="sub small muted">Cierra el ${t.cierre} · vence el ${t.vencimiento}${t.limite ? ` · límite ${M.c(t.limite)}` : ''}</span></div></div><div class="row" style="gap:2px"><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-card" data-id="${t.id}">${ICONS.trash}</button></div></div>`).join('') : emptyInline('Ninguna tarjeta cargada', 'Agregar', 'new-card')}
+      ${state.tarjetas.length ? state.tarjetas.map((t, i) => `<div class="list-item"><div class="row" style="gap:10px"><i class="swatch" style="width:28px;height:18px;border-radius:4px;background:${cardDot(t.color) || CARD_COLORS[i % CARD_COLORS.length]}"></i><div><b style="font-weight:500">${esc(t.nombre)}</b> <span class="muted small">${esc(t.banco || '')}</span><span class="sub small muted">Cierra el ${t.cierre} · vence el ${t.vencimiento}${t.limite ? ` · límite ${M.c(t.limite)}` : ''}</span></div></div><div class="row" style="gap:2px"><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-card" data-id="${t.id}">${ICONS.trash}</button></div></div>`).join('') : emptyInline('Ninguna tarjeta cargada', 'Agregar', 'new-card')}
       <div class="divider"></div>
       <div class="card-head"><h3>Cuentas</h3><button class="btn sm" data-act="new-cuenta">${ICONS.plus} Cuenta</button></div>
       ${state.cuentas.length ? state.cuentas.map(c => `<div class="list-item"><div><b style="font-weight:500">${esc(c.nombre)}</b><span class="sub small muted">${esc(c.tipo || '')} · ${c.moneda}${c.esSueldo ? ' · cobro el sueldo acá' : ''}</span></div><div class="row" style="gap:2px"><span class="mono">${M.f(M.toARS(Number(c.saldo) || 0, c.moneda))}</span><button class="mini-btn" data-act="edit-cuenta" data-id="${c.id}">${ICONS.edit}</button><button class="mini-btn" data-act="del-cuenta" data-id="${c.id}">${ICONS.trash}</button></div></div>`).join('') : emptyInline('Ninguna cuenta cargada', 'Agregar', 'new-cuenta')}
@@ -238,7 +242,7 @@ function viewCartera() {
   if (!k.posiciones.length && !k.ops.length) return `<div class="card">${empty({ kind: 'setup', icon: 'chart', head: 'Todavía no hay operaciones', sub: 'Cargá tu primera compra y la cartera se arma sola.', btn: 'Cargar operación', action: 'new-op' })}</div>`;
   let html = '';
   html += `<div class="card tight" style="margin-bottom:14px"><div class="row between" style="flex-wrap:nowrap"><div style="min-width:0"><b style="font-weight:800">${k.conPrecio ? `Precios al ${fechaTxt}` : 'Sin precios todavía'}</b><span class="sub">${hayKey ? `MEP $ ${fmtARS.format(k.mep)}${s.ccl ? ' · CCL $ ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' · SPY ' + fmtU(k.spyHoy) : ''}${k.conPrecio < k.posiciones.length ? ` · ${k.posiciones.length - k.conPrecio} sin precio` : ''}` : 'Falta tu clave de Finnhub en Ajustes'}</span></div><button class="btn sm ${hayKey ? 'primary' : ''}" style="flex:none" data-act="${hayKey ? 'precios-update' : 'go-config'}">${hayKey ? 'Actualizar' : 'Configurar'}</button></div></div>`;
-  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b><span class="dot ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'warn'}"></span>${enZona.some(p => p.estado === 'urgente') ? 'Che, comprá urgente' : 'Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (≤ ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
+  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b>${enZona.some(p => p.estado === 'urgente') ? 'Che, comprá urgente' : 'Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (${G.le} ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
   const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0); const valorTotTxt = k.valorTotal != null ? fmtU(k.valorTotal, 0) : valorTxt;
   const n0 = x => Math.abs(x).toLocaleString('es-AR', { maximumFractionDigits: 0 }); const sg = x => x >= 0 ? '+' : '−';
   const va = k.ventanas.anio, vi = k.ventanas.inicio; const vAlfa = va.disponible ? va : vi.disponible ? vi : null;
@@ -272,7 +276,7 @@ function viewCartera() {
     <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
       ${k.posiciones.map(p => `<div class="pos-row" data-act="pos" data-id="${esc(p.ticker)}">
         <div class="pos-l"><b>${esc(p.ticker)}</b><span class="sub">${p.cedear ? `${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs · ` : ''}${fmtAcc(p.acciones)} acc</span><span class="sub">PPC ${fmtU(p.ppc)}</span></div>
-        <div class="pos-m">${p.precio != null ? `<span class="mono">${fmtU(p.precio)}</span><span class="sub ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : ''}${p.dp != null && Math.abs(p.dp) >= 5 ? ' glow-text' : ''}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + ' % hoy' : ''}</span>` : `<span class="muted small">sin precio</span>`}</div>
+        <div class="pos-m">${p.precio != null ? `<span class="mono">${fmtU(p.precio)}</span><span class="sub ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : ''}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + ' % hoy' : ''}</span>` : `<span class="muted small">sin precio</span>`}</div>
         <div class="pos-r"><b class="mono">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b><span class="sub">${p.gpTotal != null ? `<span class="${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>${p.dividendos ? '<span class="muted" title="incluye dividendos">+d</span>' : ''} · ` : ''}${M.pct(p.peso, 1)}${p.estado ? ` · <span class="dot ${p.estado === 'urgente' ? 'crit' : 'warn'}" style="margin-right:0"></span>` : ''}${conc && conc.items[p.ticker] && !conc.items[p.ticker].ok ? ` · <span class="warn-text">Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}</span>` : ''}${(() => { const b = Fund.balance(p.ticker); return b && b.dias <= 7 ? ` · <span class="warn-text">balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : 'en ' + b.dias + ' d'}</span>` : ''; })()}</span></div>
       </div>`).join('')}
     </div>
@@ -288,7 +292,7 @@ function viewCartera() {
     return `<div class="al-row" data-alerta="${esc(p.ticker)}">
       <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : 'sin precio'}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
       <div class="al-bar"><i class="${p.estado === 'urgente' ? 'glow-fill crit' : p.estado === 'mirala' ? 'glow-fill warn' : ''}" style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
-      <div class="al-lv"><span><span class="dot warn"></span>≤ ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>≤ ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
+      <div class="al-lv"><span><span class="dot warn"></span>${G.le} ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>${G.le} ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
     </div>`;
   };
   const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));
@@ -319,25 +323,44 @@ function viewCartera() {
  *  Nueve bloques en tres filas (alto de cada fila = peso de la fila, ancho de cada bloque = su peso)
  *  y una franja para el resto. La variación del día va sin color a propósito: si el mapa se pinta de
  *  verde y rojo compite con el semáforo del resto de la app. */
-function mapaCartera(k) {
-  const top = k.posiciones.slice(0, 9); if (!top.length) return '';
-  const val = p => Math.max(p.valor != null ? p.valor : p.costo, 0);
-  const resto = k.posiciones.slice(9);
+/** Mapa de bloques proporcionales: el area es el dato, asi que no hace falta leyenda.
+ *  Hasta nueve bloques en tres filas (alto de la fila = peso de la fila, ancho del bloque = su peso)
+ *  y una franja para el resto. Sirve igual para posiciones de cartera que para grupos de gasto:
+ *  el color es solo jerarquia, que es lo unico que una rampa secuencial sabe hacer.
+ *  items: [{ label, peso (0..1), der, act, id }] — `der` es la cifra chica de la derecha.
+ *  otras: { n, peso } o null. */
+function mapaBloques(items, otras = null) {
+  const top = items.slice(0, 9); if (!top.length) return '';
   const TK = [14, 12, 11], NM = [10.5, 9.5, 9], PD = [9, 8, 7];
-  const dpTxt = p => p.dp == null ? '\u00B1x,xx %' : `${p.dp > 0 ? '+' : ''}${MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} %`;
-  const filas = [top.slice(0, 3), top.slice(3, 6), top.slice(6, 9)].filter(f => f.length).map((fila, r) => {
-    const bs = fila.map(p => {
-      const i = top.indexOf(p);
-      // rampa de cian por opacidad: del quinto bloque para abajo ya no aguanta texto oscuro
-      return `<div class="cmap-b" data-act="pos" data-id="${esc(p.ticker)}" style="flex-grow:${Math.max(val(p), 0.01)};background:var(--c${i + 1});color:${i < 4 ? 'var(--on-fill)' : '#FFFFFF'};padding:${PD[r]}px">
-        <b style="font-size:${TK[r]}px">${esc(p.ticker)}</b>
-        <span class="n" style="font-size:${NM[r]}px"><i>${M.pct(p.peso, 1)}</i><em>${dpTxt(p)}</em></span>
+  // flex-grow reparte el espacio libre solo hasta donde suman los factores: con pesos de 0 a 1
+  // la suma queda por debajo de 1 y los bloques no llegan a llenar la fila. Se escalan.
+  const G = 1000, grow = x => Math.max(x * G, 0.01);
+  // con pocos items no tiene sentido forzar tres filas: quedan tiras de 20 px ilegibles
+  const porFila = 3, nFilas = top.length <= 3 ? 1 : top.length <= 6 ? 2 : 3;
+  const filas = Array.from({ length: nFilas }, (_, r) => top.slice(r * porFila, (r + 1) * porFila)).filter(f => f.length).map((fila, r) => {
+    const bs = fila.map(it => {
+      const i = top.indexOf(it);
+      // rampa de cian por opacidad: por debajo de alfa 0,62 el texto oscuro ya no se lee
+      const attrs = it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}" style="cursor:pointer;` : ' style="';
+      return `<div class="cmap-b"${attrs}flex-grow:${grow(it.peso)};background:var(--c${i + 1});color:${i < 3 ? 'var(--on-fill)' : '#FFFFFF'};padding:${PD[r]}px">
+        <b style="font-size:${TK[r]}px">${esc(it.label)}</b>
+        <span class="n" style="font-size:${NM[r]}px"><i>${M.pct(it.peso, 1)}</i><em>${it.der || ''}</em></span>
       </div>`;
     }).join('');
-    return `<div class="cmap-row" style="flex-grow:${Math.max(sum(fila.map(val)), 0.01)}">${bs}</div>`;
+    return `<div class="cmap-row" style="flex-grow:${grow(sum(fila.map(x => x.peso)))}">${bs}</div>`;
   }).join('');
-  const franja = resto.length ? `<div class="cmap-otras"><span>Otras ${resto.length} posicion${resto.length === 1 ? '' : 'es'}</span><span>${M.pct(sum(resto.map(p => p.peso)), 1)}</span></div>` : '';
+  const franja = otras && otras.n ? `<div class="cmap-otras"><span>${esc(otras.label)}</span><span>${M.pct(otras.peso, 1)}</span></div>` : '';
   return `<div class="cmap">${filas}${franja}</div>`;
+}
+
+function mapaCartera(k) {
+  const top = k.posiciones.slice(0, 9); if (!top.length) return '';
+  const resto = k.posiciones.slice(9);
+  // sin color a proposito: si el mapa se pinta de verde y rojo compite con el semaforo del resto
+  const dpTxt = p => p.dp == null ? '\u00B1x,xx %' : `${p.dp > 0 ? '+' : ''}${MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} %`;
+  return mapaBloques(
+    top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), act: 'pos', id: p.ticker })),
+    resto.length ? { n: resto.length, peso: sum(resto.map(p => p.peso)), label: `Otras ${resto.length} ${resto.length === 1 ? 'posici\u00f3n' : 'posiciones'}` } : null);
 }
 
 function renderEvolucion(k, seg) {
@@ -387,6 +410,6 @@ function infoEvolucion(modo) {
     ${tabla}
     <p><b>Precio contra precio.</b> Acá no cuentan dividendos, ni los tuyos ni los del S&P: solo compras, ventas y cotización. Con dividendos, tu cartera rindió ${r.realDiv != null ? pctS(r.realDiv) : '—'} en este rango${r.dividendosVentana ? ` (${fmtU(r.dividendosVentana)} cobrados)` : ''}: es el número de la card "Valor de la cartera". <b>Acumulado</b> es lo que ves en las cajas: cuánto rindió tu plata en el rango contando cuándo entró cada aporte (TIR, el "personal rate of return" de Fidelity o Sharesight). <b>TIR anual</b> es esa misma tasa expresada por año. <b>TWR</b> es la norma profesional (GIPS): mide tu selección de activos sin premiar ni castigar el momento de los aportes; acá se aproxima entre valuaciones guardadas (${puntos} hasta ahora, una por día al traer precios).</p>
     <p><b>Sombra S&P 500.</b> ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}; después` : `Arranca en cero el ${D.fmt(v.desde, { year: true })} y`} cada compra o venta se replica el mismo día en SPY por el mismo monto. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día. Alfa = cartera − sombra, en puntos y en dólares.</p>
-    ${v.nota ? `<p class="callout amber" style="margin:0">${G.warn} ${esc(v.nota)}</p>` : ''}
+    ${v.nota ? `<p class="callout amber" style="margin:0">${esc(v.nota)}</p>` : ''}
   </div>` });
 }

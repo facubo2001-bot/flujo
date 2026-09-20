@@ -32,8 +32,20 @@ function render() {
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
   headLine();
 }
-/** encabezado sticky: la hairline de abajo existe solo cuando hay algo scrolleado arriba */
-function headLine() { const m = $('.main'), h = $('.mobile-head'); if (m && h) h.classList.toggle('scrolled', m.scrollTop > 4); }
+/** Cromo que reacciona al scroll: la hairline del encabezado existe solo cuando hay algo arriba,
+ *  y el FAB se va mientras bajas (flotaba sobre el contenido todo el recorrido y tapaba cifras).
+ *  Vuelve al frenar o al subir. */
+let _scrollY = 0, _fabT = null;
+function headLine() {
+  const m = $('.main'); if (!m) return;
+  const h = $('.mobile-head'); if (h) h.classList.toggle('scrolled', m.scrollTop > 4);
+  const f = $('.fab'); if (!f) { _scrollY = m.scrollTop; return; }
+  const y = m.scrollTop;
+  if (y > _scrollY + 2 && y > 40) f.classList.add('hide');
+  else if (y < _scrollY - 2) f.classList.remove('hide');
+  _scrollY = y;
+  clearTimeout(_fabT); _fabT = setTimeout(() => f.classList.remove('hide'), 450);
+}
 function go(view) { ui.view = view; render(); }
 
 /** setea el ticker elegido en el form de operación y refresca campos/cálculo */
