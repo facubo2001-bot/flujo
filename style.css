@@ -363,6 +363,7 @@ tr:hover .row-actions,.mrow .row-actions{opacity:1}
 .chips.filtros .limpiar{flex:none;border:1px solid var(--line-2);background:transparent;color:var(--ink-2);border-radius:999px;padding:7px 13px;font-size:14px;font-weight:700;white-space:nowrap}
 
 /* comparar empresas: gris por defecto, el que lidera la fila en blanco con punto */
+.ctx-paso{display:flex;align-items:center;gap:0;font-size:14px;color:var(--ink-2);padding:6px 0}
 .cmp-wrap{margin:0 -2px}
 .cmp-t{width:100%;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}
 .cmp-t th,.cmp-t td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:right;vertical-align:baseline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}

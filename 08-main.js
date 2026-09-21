@@ -130,6 +130,10 @@ const Actions = {
   'edit-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (o) formOp({ ...o }); },
   'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
   'export-claude'() { formExportar(); },
+  'claude-contexto'() { formContexto(); },
+  'ctx-copy'() { const t = $('#ctx-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo al empezar el chat.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
+  async 'ctx-share'() { const t = $('#ctx-md'); if (!t) return; const d = new Date(); const nombre = `mercado-${D.today()}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`;
+    try { const file = new File([t.value], nombre, { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Contexto de mercado' }); else await navigator.share({ text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') Actions['ctx-copy'](); } },
   'import-claude'() { formImportar(); },
   'export-copy'() { const t = $('#export-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo en un chat del proyecto Inversiones.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
   async 'export-share'() { const t = $('#export-md'); if (!t) return; try { const file = new File([t.value], Intercambio.nombreArchivo(), { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Cartera para Claude' }); else await navigator.share({ title: 'Cartera para Claude', text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') toast('No se pudo compartir; usá Copiar texto'); } },
@@ -267,6 +271,6 @@ function importarCSV(txt) {
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
   if (!window.claude) Cedears.actualizar().then(ch => { if (ch) console.log('Tabla de CEDEARs actualizada:', Cedears.actualizado()); });
   if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
-  if (!window.claude) setTimeout(() => Fund.actualizarCartera().then(n => { if (n && ui.view === 'cartera') render(); }), 4000);
+  if (!window.claude) setTimeout(() => Fund.calentar().then(() => { if (ui.view === 'cartera' && !$('#overlay').classList.contains('open')) render(); }), 4000);
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();

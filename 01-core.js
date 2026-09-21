@@ -542,6 +542,13 @@ const Fund = {
       get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
     ]);
     if (!perfil && !met && !fin) return null;
+    // Si Finnhub corto por limite (la llamada falla, no viene vacia), la ficha nueva esta incompleta.
+    // Metricas es el nucleo: sin ellas se conserva la anterior o se guarda marcada vieja para reintentar.
+    // Balances SEC: sin ellos se conserva la anterior buena; si no habia, se guarda igual, porque hay
+    // empresas que no presentan a la SEC (ASML, TSM) y reintentar para siempre no trae nada.
+    const previa = Fund.de(t);
+    if (!met && previa) return previa;
+    if (!fin && previa && !previa.parcial) return previa;
     const m = (met && met.metric) || {}; const serie = (met && met.series && met.series.annual) || {};
     const filas = Fund.anios(fin);
     const peHist = (serie.pe || []).map(x => Number(x.v)).filter(Number.isFinite);
@@ -575,7 +582,9 @@ const Fund = {
     d.accionesCambio = accIni && accFin && accIni.acciones && accIni.anio !== accFin.anio ? { desde: accIni.anio, hasta: accFin.anio, pct: accFin.acciones / accIni.acciones - 1 } : null;
     d.aniosDatos = filas.length ? { desde: filas[0].anio, hasta: filas[filas.length - 1].anio } : null;
     if (!state.cartera.fund) state.cartera.fund = {};
+    if (!met) { d.parcial = true; d.at = Date.now() - 31 * 86400000; }
     state.cartera.fund[t] = d;
+    try { window.dispatchEvent(new CustomEvent('fund-listo', { detail: t })); } catch (e) {}
     const ks = Object.keys(state.cartera.fund); if (ks.length > 60) delete state.cartera.fund[ks[0]];
     Persist.save();
     return d;
@@ -587,6 +596,24 @@ const Fund = {
     const ts = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).slice(0, max);
     let n = 0; for (const t of ts) { try { if (await Fund.traer(t)) n++; } catch (e) {} await new Promise(r => setTimeout(r, 300)); }
     return n;
+  },
+  /** Mantiene tibias las fichas de toda la cartera y la watchlist: tandas de 8 cada 65 s hasta que no
+   *  quede ninguna vieja. Finnhub gratis corta a las 60 llamadas por minuto y cada ficha son cuatro.
+   *  Una sola corrida a la vez; cada ficha que llega avisa con el evento 'fund-listo'. */
+  _calentando: null,
+  calentar(diasFrescura = 6, pausaInicial = 0) {
+    if (Fund._calentando) return Fund._calentando;
+    Fund._calentando = (async () => {
+      for (let ronda = 0; ronda < 8; ronda++) {
+        const espera = ronda ? 65000 : pausaInicial;
+        if (espera) await new Promise(r => setTimeout(r, espera));
+        const n = await Fund.actualizarCartera(8, diasFrescura);
+        const f = state.cartera.fund || {}; const corte = Date.now() - diasFrescura * 86400000;
+        const quedan = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).length;
+        if (!quedan || (!n && ronda)) break;
+      }
+    })().finally(() => { Fund._calentando = null; });
+    return Fund._calentando;
   },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
   balance(t) { const d = Fund.de(t); if (!d || !d.balance) return null; const dias = D.daysBetween(D.today(), d.balance.fecha); return dias >= 0 ? { ...d.balance, dias } : null; },
