@@ -291,6 +291,7 @@ function viewCartera() {
     const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>comprá urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : dM != null ? `<span class="pill neutral">a ${M.pct(dM, 1)}</span>` : '<span class="pill neutral">sin precio</span>';
     return `<div class="al-row" data-alerta="${esc(p.ticker)}">
       <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : 'sin precio'}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
+      ${al.desc ? `<div class="al-desc">${esc(al.desc)}</div>` : ''}
       <div class="al-bar"><i class="${p.estado === 'urgente' ? 'glow-fill crit' : p.estado === 'mirala' ? 'glow-fill warn' : ''}" style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
       <div class="al-lv"><span><span class="dot warn"></span>${G.le} ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>${G.le} ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
     </div>`;

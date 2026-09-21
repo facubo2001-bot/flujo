@@ -256,6 +256,8 @@ const Persist = {
     for (const k of ['alertas', 'precios', 'historial', 'spy', 'fund']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
     for (const o of s.cartera.operaciones) if (o && o.fecha) { const h = D.habil(o.fecha); if (h !== o.fecha) o.fecha = h; }
     for (const o of s.cartera.operaciones) if (o && o.deDividendos > 0 && o.deCaja == null) { o.deCaja = o.deDividendos; delete o.deDividendos; }
+    // alertas v2: `desc` (qué hace) separado de `nota` (tier + tesis). Nota vieja "qué hace | tesis" se parte una sola vez.
+    for (const a of Object.values(s.cartera.alertas)) if (a && typeof a === 'object' && !a.desc && a.nota && String(a.nota).includes(' | ')) { const t = String(a.nota), i = t.indexOf(' | '); a.desc = t.slice(0, i).trim().slice(0, 120) || null; a.nota = t.slice(i + 3).trim() || null; }
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });

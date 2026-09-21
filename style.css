@@ -600,6 +600,7 @@ tr.day td{background:var(--surface)}
 .al-row:last-child{border-bottom:0}
 .al-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .al-top .sub{display:inline;margin-left:8px;font-size:12px;color:var(--ink-3)}
+.al-desc{font-size:11.5px;font-weight:400;color:var(--ink-3);margin-top:3px;line-height:1.35}
 .al-bar{height:4px;border-radius:2px;background:var(--surface-3);margin:8px 0 6px;overflow:hidden}
 .al-bar i{display:block;height:100%;border-radius:2px;transition:width .3s}
 .al-lv{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
@@ -637,6 +638,7 @@ tr.day td{background:var(--surface)}
 .hoja .f-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .hoja .f-head h3{font-family:var(--font-display);font-size:30px;font-weight:900;letter-spacing:-.035em;line-height:1;margin:0}
 .hoja .f-head .n{font-size:12.5px;margin-top:5px}
+.hoja .f-head .n.desc{font-size:11.5px;font-weight:400;color:var(--ink-3);margin-top:3px;line-height:1.35}
 .hoja .f-px{text-align:right;flex:none}
 .hoja .f-px b{display:block;font-family:var(--font-display);font-size:20px;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
 .hoja .f-px .dp{font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}

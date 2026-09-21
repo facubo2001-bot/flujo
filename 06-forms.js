@@ -486,7 +486,7 @@ function fundHTML(t, pos) {
     ced ? `CEDEAR ${Cedears.ratioTxt(ced)}` : null].filter(Boolean).join(' \u00b7 ');
   const dp = pos && pos.dp != null ? pos.dp : null;
   const cab = `<div class="f-head">
-    <div><h3>${esc(t)}</h3>${ident ? `<div class="n">${ident}</div>` : ''}</div>
+    <div><h3>${esc(t)}</h3>${ident ? `<div class="n">${ident}</div>` : ''}${(() => { const a = state.cartera.alertas[t]; return a && a.desc ? `<div class="n desc">${esc(a.desc)}</div>` : ''; })()}</div>
     <div class="f-px">${precio != null ? `<b>${fmtU(precio)}</b>` : '<b class="muted">US$ x.xxx</b>'}
       ${dp != null ? `<span class="dp ${dp > 0 ? 'up' : dp < 0 ? 'down' : ''}">${dp > 0 ? '+' : ''}${MENOS(dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} % hoy</span>` : ''}</div>
   </div>`;
@@ -580,14 +580,15 @@ function formPosicion(ticker) {
       ${F.field('<span class="dot warn"></span>Che, mirala ' + G.le, F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
       ${F.field('<span class="dot crit"></span>Comprá urgente ' + G.le, F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
       ${F.field('Precio objetivo 12 m', F.input('a-objetivo', al.objetivo || '', 'inputmode="decimal" placeholder="opcional"'))}
-      ${F.field('Tesis / nota', F.input('a-nota', al.nota || '', 'placeholder="por qué la tenés, qué mirar"'))}
+      ${F.field('Qué hace', F.input('a-desc', al.desc || '', 'maxlength="120" placeholder="una línea, fija"'), '', 'full')}
+      ${F.field('Tesis / nota', F.input('a-nota', al.nota || '', 'placeholder="tier · por qué la tenés, qué mirar"'), '', 'full')}
     </div>
     <div class="row" style="gap:8px"><button type="button" class="btn sm" data-act="comparar" data-id="${esc(ticker)}">Comparar</button><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
     ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(tocá para editar)</span></div>${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><span class="mono op-amt">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0), 2)}</span></div>`).join('')}</div>` : ''}
   </div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
-    const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), nota = Modal.val('a-nota').trim();
-    if (!mirala && !urgente && !objetivo && !nota) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, nota: nota || null };
+    const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
+    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null };
     Persist.save(); toast('Guardado'); render();
   } });
   fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atrás
@@ -699,7 +700,10 @@ function formWatch() {
 
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
 const Intercambio = {
-  FORMATO: 'gestor-gastos-cambios', VERSION: 1,
+  FORMATO: 'gestor-gastos-cambios', VERSION: 2,
+  /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
+  DESC_MAX: 120, NOTA_MAX: 300,
+  partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
   nombreArchivo() { return `cartera-${D.today()}.md`; },
   /** Markdown legible (tablas) + bloque JSON exacto + instrucciones y esquema de respuesta */
   exportar() {
@@ -708,8 +712,8 @@ const Intercambio = {
     const pctO = v => v == null ? 's/d' : pct(v);
     const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera con dividendos ${pctO(v.rend.realDiv)} · precio contra precio: cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : `- **${nombre}**: no disponible`;
     const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, carteraConDividendos: { acumulado: v.rend.realDiv, tirAnual: v.rend.tirRealDiv, dividendosUSD: +v.rend.dividendosVentana.toFixed(2) }, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
-    const posRows = k.posiciones.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${fmtAcc(p.acciones)} | ${n(p.ppc)} | ${n(p.precio)} | ${n(p.valor)} | ${pct(p.rendTotal)}${p.dividendos ? ` (precio ${pct(p.rendPrecio)} + div ${n(p.dividendos)} USD)` : ''} | ${pct(p.peso)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
-    const watchRows = k.watch.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${n(p.precio)} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
+    const posRows = k.posiciones.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${fmtAcc(p.acciones)} | ${n(p.ppc)} | ${n(p.precio)} | ${n(p.valor)} | ${pct(p.rendTotal)}${p.dividendos ? ` (precio ${pct(p.rendPrecio)} + div ${n(p.dividendos)} USD)` : ''} | ${pct(p.peso)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.desc ? p.alerta.desc.replace(/\\|/g, '/') : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
+    const watchRows = k.watch.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${n(p.precio)} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.desc ? p.alerta.desc.replace(/\\|/g, '/') : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
     const cerrRows = k.cerradas.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${n(p.dividendos)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} |`).join('\n');
     const ops = k.ops.slice().reverse().slice(0, 40).map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
     const json = {
@@ -732,14 +736,14 @@ ${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la 
 - "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
 
 ## Posiciones (${k.posiciones.length})
-| Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo total % (precio + dividendos) | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Tesis / nota |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo total % (precio + dividendos) | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Qué hace | Tesis / nota |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${posRows}
 
 ## Watchlist (alertas sin posición) (${k.watch.length})
-| Ticker | CEDEAR (ratio) | Precio | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Nota |
-|---|---|---|---|---|---|---|
-${watchRows || '| — | | | | | | |'}
+| Ticker | CEDEAR (ratio) | Precio | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Qué hace | Nota |
+|---|---|---|---|---|---|---|---|
+${watchRows || '| — | | | | | | | |'}
 
 ## Posiciones cerradas
 | Ticker | Realizado USD | Dividendos | Alfa vs SPY |
@@ -764,12 +768,12 @@ Sos mi asesor de inversiones (perfil: largo plazo, value/growth de calidad, Buff
 \`\`\`json
 { "tipo": "${Intercambio.FORMATO}", "version": ${Intercambio.VERSION}, "fecha": "${hoy}",
   "alertas": {
-    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "nota": "líder e-commerce/fintech LatAm; comprar en caídas" },
+    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "desc": "E-commerce + fintech (Mercado Pago) líder de Latinoamérica.", "nota": "A- · próxima compra solo ≤1750" },
     "TSM": null
   },
   "comentario": "resumen en una línea de lo que cambiaste y por qué" }
 \`\`\`
-Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es tier + tesis (máx. 300); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
 `;
     return md;
   },
@@ -799,9 +803,11 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
       if (v === null) { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; }
       if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
       const num = x => x == null || x === '' ? null : (Number(x) || null);
-      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, 300) : null) : (antes ? antes.nota : null) };
+      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) };
+      // nota vieja con " | " (qué hace | tesis): se parte; el desc explícito manda
+      if ('nota' in v && despues.nota && despues.nota.includes(' | ')) { const pt = Intercambio.partirNota(despues.nota); despues.nota = pt.nota; if (!('desc' in v)) despues.desc = pt.desc || despues.desc; }
       if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
-      const igual = antes && ['mirala', 'urgente', 'objetivo', 'nota'].every(f => (antes[f] || null) === (despues[f] || null));
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota'].every(f => (antes[f] || null) === (despues[f] || null));
       if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
     }
     return { cambios, avisos, comentario: obj.comentario || '' };
@@ -883,7 +889,7 @@ function contextoClaude(pendientes = []) {
     const estado = p.estado === 'urgente' ? ' **EN ZONA urgente**' : p.estado === 'mirala' ? ' **EN ZONA mirala**' : '';
     const q = state.cartera.precios[p.ticker]; const viejo = q && ui.ctxT0 && !(q.t >= ui.ctxT0);
     const pxTxt = p.precio == null ? 'sin precio' : viejo ? `${n2(p.precio)} (viejo: de ${D.fmt(D.iso(new Date(q.t)))} ${hhmm(new Date(q.t))})` : n2(p.precio);
-    return `| ${p.ticker} | ${p.tengo ? `tengo \u00b7 ${pc(p.peso)}` : 'watchlist'} | ${pxTxt} | ${p.dp != null && !viejo ? pcS(p.dp) : '\u2014'} | ${p.tengo ? n2(p.ppc) : '\u2014'} | ${p.tengo && p.rendTotal != null ? `${p.rendTotal >= 0 ? '+' : ''}${pc(p.rendTotal)}` : '\u2014'} | ${c ? `${ars(porCedear != null ? porCedear * k.ccl : null)} (${Cedears.ratioTxt(c)})` : 'no es CEDEAR'} | ${d.min52 != null ? `${n2(d.min52)}\u2013${n2(d.max52)}` : '\u2014'} | ${rango != null ? pc(rango) : '\u2014'} | ${zonas}${estado} | ${al.objetivo ? n2(al.objetivo) : '\u2014'} | ${b ? `${D.fmt(b.fecha, { year: true })} (en ${b.dias} d)` : '\u2014'} |`;
+    return `| ${p.ticker} | ${al.desc ? al.desc.replace(/\|/g, '/') : '\u2014'} | ${p.tengo ? `tengo \u00b7 ${pc(p.peso)}` : 'watchlist'} | ${pxTxt} | ${p.dp != null && !viejo ? pcS(p.dp) : '\u2014'} | ${p.tengo ? n2(p.ppc) : '\u2014'} | ${p.tengo && p.rendTotal != null ? `${p.rendTotal >= 0 ? '+' : ''}${pc(p.rendTotal)}` : '\u2014'} | ${c ? `${ars(porCedear != null ? porCedear * k.ccl : null)} (${Cedears.ratioTxt(c)})` : 'no es CEDEAR'} | ${d.min52 != null ? `${n2(d.min52)}\u2013${n2(d.max52)}` : '\u2014'} | ${rango != null ? pc(rango) : '\u2014'} | ${zonas}${estado} | ${al.objetivo ? n2(al.objetivo) : '\u2014'} | ${b ? `${D.fmt(b.fecha, { year: true })} (en ${b.dias} d)` : '\u2014'} |`;
   }).join('\n');
 
   const filasF = todas.map(p => {
@@ -902,8 +908,8 @@ Precios de Finnhub ${pf ? `al ${D.fmt(D.iso(pf))} ${hhmm(pf)}` : 's/d'} \u00b7 M
 **Us\u00e1 estos precios y estos n\u00fameros como la verdad de hoy.** No uses precios ni m\u00faltiplos de tu entrenamiento: est\u00e1n desactualizados. Si para analizar necesit\u00e1s un dato que no est\u00e1 ac\u00e1, ped\u00edmelo antes de concluir. Opero CEDEARs en pesos en Balanz: el precio de cada CEDEAR en pesos est\u00e1 calculado al CCL de arriba.
 
 ## Precios, mi posici\u00f3n y mis zonas (${k.posiciones.length} en cartera, ${k.watch.length} en watchlist)
-| Ticker | Estado \u00b7 peso | Precio USD | Hoy | Mi PPC | Mi resultado | CEDEAR en pesos (ratio) | 52 semanas | Posici\u00f3n en el rango | Mis zonas de compra | Objetivo | Pr\u00f3ximo balance |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ticker | Qu\u00e9 hace | Estado \u00b7 peso | Precio USD | Hoy | Mi PPC | Mi resultado | CEDEAR en pesos (ratio) | 52 semanas | Posici\u00f3n en el rango | Mis zonas de compra | Objetivo | Pr\u00f3ximo balance |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}
 
 ## Fundamentales (Finnhub, balances presentados a la SEC)
@@ -961,10 +967,11 @@ window.addEventListener('fund-listo', () => {
 });
 
 function formImportar() {
+  Intercambio._pendiente = null;  // ventana nueva: siempre se analiza de cero (si no, un texto igual al de la última vez se aplicaba sin vista previa)
   Modal.open({ title: 'Cargar actualizaciones de Claude', submit: 'Analizar', body: `<div class="stack">
     <p class="small muted">Pegá la respuesta de Claude (o solo su bloque JSON). Vas a ver qué cambia antes de aplicar nada.</p>
     <textarea class="input textarea" id="import-txt" placeholder='{ "tipo": "gestor-gastos-cambios", ... }' style="min-height:160px" autofocus></textarea>
-    <label class="btn sm" style="width:fit-content">Elegir archivo… <input type="file" id="import-file" accept=".json,.md,.txt" hidden></label>
+    <label class="btn sm" style="width:fit-content">Elegir archivo… <input type="file" id="import-claude-file" accept=".json,.md,.txt" hidden></label>
     <div id="import-out"></div>
   </div>`, onSubmit: () => {
     // segundo toque del botón del pie: ya analizado → aplicar (el pie siempre está a la vista, sin scrollear la lista)
@@ -975,7 +982,7 @@ function formImportar() {
       const out = $('#import-out');
       if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
       Intercambio._pendiente = d;
-      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}` : '—';
+      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
       out.innerHTML = `<div class="stack">${d.comentario ? `<div class="callout" style="font-size:13px"><b>Claude:</b> ${esc(d.comentario)}</div>` : ''}
         ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
         ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
@@ -985,5 +992,5 @@ function formImportar() {
       return false;
     } catch (e) { $('#import-out').innerHTML = `<div class="callout crit small">${esc(e.message)}</div>`; return false; }
   } });
-  $('#modal').onchange = e => { if (e.target.id === 'import-file' && e.target.files[0]) { const fr = new FileReader(); fr.onload = () => { $('#import-txt').value = fr.result; }; fr.readAsText(e.target.files[0]); } };
+  $('#modal').onchange = e => { if (e.target.id === 'import-claude-file' && e.target.files[0]) { const fr = new FileReader(); fr.onload = () => { $('#import-txt').value = fr.result; }; fr.readAsText(e.target.files[0]); } };
 }
