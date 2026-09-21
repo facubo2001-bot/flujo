@@ -445,7 +445,13 @@ const Precios = {
     try { const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); if (!j || !Number(j.c)) return null; state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; return Number(j.c); } catch (e) { return null; }
   },
   tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) set.add(t); set.add('SPY'); return [...set]; },
-  async actualizar(silencioso = false) {
+  /** una sola corrida a la vez: si el auto-refresco y un toque se pisan, Finnhub da 429 y los dos pierden tickers */
+  actualizar(silencioso = false) {
+    if (Precios._run) { if (!silencioso) toast('Ya se est\u00e1n actualizando los precios\u2026'); return Precios._run; }
+    Precios._run = Precios._actualizar(silencioso).finally(() => { Precios._run = null; });
+    return Precios._run;
+  },
+  async _actualizar(silencioso = false) {
     try { await TC.actualizar(true); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }

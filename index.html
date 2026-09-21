@@ -714,6 +714,15 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 .info-btn{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--ink-3);vertical-align:middle;margin-left:4px;padding:0}
 .info-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round}
 
+/* precios de Cartera: una linea en vez de tarjeta */
+.px-strip{display:flex;align-items:center;gap:10px;margin:-2px 0 12px;min-height:32px}
+.px-strip .px-txt{flex:1;min-width:0;font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.px-strip .px-txt b{color:var(--ink-2);font-weight:700}
+.px-strip .icon-btn{width:32px;height:32px;flex:none;border-radius:10px}
+.px-strip .icon-btn svg{width:16px;height:16px}
+.icon-btn.girando svg{animation:girar .9s linear infinite}
+@keyframes girar{to{transform:rotate(360deg)}}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">[
@@ -4515,7 +4524,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609212035';
+const BUILD = '202609212058';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -4797,7 +4806,13 @@ const Precios = {
     try { const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); if (!j || !Number(j.c)) return null; state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; return Number(j.c); } catch (e) { return null; }
   },
   tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) set.add(t); set.add('SPY'); return [...set]; },
-  async actualizar(silencioso = false) {
+  /** una sola corrida a la vez: si el auto-refresco y un toque se pisan, Finnhub da 429 y los dos pierden tickers */
+  actualizar(silencioso = false) {
+    if (Precios._run) { if (!silencioso) toast('Ya se est\u00e1n actualizando los precios\u2026'); return Precios._run; }
+    Precios._run = Precios._actualizar(silencioso).finally(() => { Precios._run = null; });
+    return Precios._run;
+  },
+  async _actualizar(silencioso = false) {
     try { await TC.actualizar(true); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }
@@ -6507,7 +6522,8 @@ function viewCartera() {
   const enZona = [...k.posiciones, ...k.watch].filter(p => p.estado);
   if (!k.posiciones.length && !k.ops.length) return `<div class="card">${empty({ kind: 'setup', icon: 'chart', head: 'Todavía no hay operaciones', sub: 'Cargá tu primera compra y la cartera se arma sola.', btn: 'Cargar operación', action: 'new-op' })}</div>`;
   let html = '';
-  html += `<div class="card tight" style="margin-bottom:14px"><div class="row between" style="flex-wrap:wrap;row-gap:12px"><div style="min-width:0;flex:1 1 230px"><b style="font-weight:800">${k.conPrecio ? `Precios al ${fechaTxt}` : 'Sin precios todavía'}</b><span class="sub">${hayKey ? `MEP $ ${fmtARS.format(k.mep)}${s.ccl ? ' · CCL $ ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' · SPY ' + fmtU(k.spyHoy) : ''}${k.conPrecio < k.posiciones.length ? ` · ${k.posiciones.length - k.conPrecio} sin precio` : ''}` : 'Falta tu clave de Finnhub en Ajustes'}</span></div><div class="row" style="gap:6px;flex:none;flex-wrap:nowrap;margin-left:auto">${hayKey ? '<button class="btn sm" data-act="claude-contexto">Para Claude</button>' : ''}<button class="btn sm ${hayKey ? 'primary' : ''}" data-act="${hayKey ? 'precios-update' : 'go-config'}">${hayKey ? 'Actualizar' : 'Configurar'}</button></div></div></div>`;
+  // precios: una sola linea, sin tarjeta. La hora manda; CCL y SPY al lado; actualizar es un icono
+  html += `<div class="px-strip"><span class="px-txt">${hayKey ? `${k.conPrecio ? `<b>Precios ${fechaTxt}</b>` : '<b>Sin precios todav\u00eda</b>'}${k.conPrecio && k.conPrecio < k.posiciones.length ? ` \u00b7 <span class="warn-text">${k.posiciones.length - k.conPrecio} sin precio</span>` : ''}${s.ccl ? ' \u00b7 CCL ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' \u00b7 SPY ' + MENOS(k.spyHoy.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}` : '<b>Falta tu clave de Finnhub</b>'}</span>${hayKey ? `<button class="icon-btn" data-act="precios-update" aria-label="Actualizar precios" title="Actualizar precios">${ICONS.repeat}</button>` : '<button class="btn sm" data-act="go-config">Configurar</button>'}</div>`;
   if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b>${enZona.some(p => p.estado === 'urgente') ? 'Che, comprá urgente' : 'Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (${G.le} ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
   const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0); const valorTotTxt = k.valorTotal != null ? fmtU(k.valorTotal, 0) : valorTxt;
   const n0 = x => Math.abs(x).toLocaleString('es-AR', { maximumFractionDigits: 0 }); const sg = x => x >= 0 ? '+' : '−';
@@ -7388,16 +7404,14 @@ const Intercambio = {
   /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
   DESC_MAX: 120, NOTA_MAX: 300,
   partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
-  nombreArchivo() { return `cartera-${D.today()}.md`; },
+  nombreArchivo() { const d = new Date(); return `cartera-${D.today()}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`; },
   /** Markdown legible (tablas) + bloque JSON exacto + instrucciones y esquema de respuesta */
-  exportar() {
+  exportar(pendientes = []) {
     const k = E.cartera(); const s = state.settings; const hoy = D.today(); const hora = new Date();
     const n = v => v == null ? '' : Number(v).toFixed(2); const pct = v => v == null ? '' : (v * 100).toFixed(1) + ' %';
     const pctO = v => v == null ? 's/d' : pct(v);
     const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera con dividendos ${pctO(v.rend.realDiv)} · precio contra precio: cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : `- **${nombre}**: no disponible`;
     const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, carteraConDividendos: { acumulado: v.rend.realDiv, tirAnual: v.rend.tirRealDiv, dividendosUSD: +v.rend.dividendosVentana.toFixed(2) }, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
-    const posRows = k.posiciones.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${fmtAcc(p.acciones)} | ${n(p.ppc)} | ${n(p.precio)} | ${n(p.valor)} | ${pct(p.rendTotal)}${p.dividendos ? ` (precio ${pct(p.rendPrecio)} + div ${n(p.dividendos)} USD)` : ''} | ${pct(p.peso)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.desc ? p.alerta.desc.replace(/\\|/g, '/') : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
-    const watchRows = k.watch.map(p => `| ${p.ticker} | ${p.cedear ? `${p.cedear.code} ${Cedears.ratioTxt(p.cedear)}` : ''} | ${n(p.precio)} | ${p.alerta && p.alerta.mirala ? n(p.alerta.mirala) : ''} | ${p.alerta && p.alerta.urgente ? n(p.alerta.urgente) : ''} | ${p.objetivo ? n(p.objetivo) : ''} | ${p.alerta && p.alerta.desc ? p.alerta.desc.replace(/\\|/g, '/') : ''} | ${p.alerta && p.alerta.nota ? p.alerta.nota.replace(/\|/g, '/') : ''} |`).join('\n');
     const cerrRows = k.cerradas.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${n(p.dividendos)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} |`).join('\n');
     const ops = k.ops.slice().reverse().slice(0, 40).map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
     const json = {
@@ -7409,32 +7423,34 @@ const Intercambio = {
       watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
-    const md = `# Cartera de ${esc(s.nombre || 'mi cartera')} — exportada el ${D.fmt(hoy, { year: true })} ${pad2(hora.getHours())}:${pad2(hora.getMinutes())}
+    const c = ctxPartes(pendientes);
+    const tesis = [...k.posiciones, ...k.watch].filter(p => p.alerta && (p.alerta.desc || p.alerta.nota)).map(p => `- **${p.ticker}**${p.acciones ? '' : ' (watchlist)'} \u2014 ${p.alerta.desc ? esc(p.alerta.desc) + ' ' : ''}${p.alerta.nota ? `_${esc(p.alerta.nota)}_` : ''}`).join('\n');
+    const md = `# Cartera y mercado de ${esc(s.nombre || 'mi cartera')} \u2014 ${c.cuando}
 
-App "Gestor de gastos" v${BUILD}. Precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR') : 's/d'} · MEP $ ${fmtARS.format(k.mep)} · CCL $ ${fmtARS.format(k.ccl)} · SPY ${n(k.spyHoy)}.
+App "Gestor de gastos" v${BUILD}. ${c.estado}
+
+${c.verdad}
 
 ## Resumen
-- Valor: **US$ ${n(k.valor)}** · costo (lotes FIFO) US$ ${n(k.costo)} · resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) · **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD · rendimiento total sobre el costo de lo que tenés ${pct(k.rendTotal)} · valor total (acciones + caja US$ ${n(k.caja)}: dividendos + ventas a caja − compras pagadas con la caja) US$ ${n(k.valorTotal)}
-- Dividendos cobrados US$ ${n(k.dividendos)} · resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
-${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operación)' : l)).join('\n')}
-- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo día. La comparación es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera − sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por año); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posición = (precio hoy − PPC + dividendos cobrados) / costo.
+- Valor: **US$ ${n(k.valor)}** \u00b7 costo (lotes FIFO) US$ ${n(k.costo)} \u00b7 resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) \u00b7 **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD \u00b7 rendimiento total sobre el costo de lo que ten\u00e9s ${pct(k.rendTotal)} \u00b7 valor total (acciones + caja US$ ${n(k.caja)}: dividendos + ventas a caja \u2212 compras pagadas con la caja) US$ ${n(k.valorTotal)}
+- Dividendos cobrados US$ ${n(k.dividendos)} \u00b7 resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
+${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operaci\u00f3n)' : l)).join('\n')}
+- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo d\u00eda. La comparaci\u00f3n es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera \u2212 sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por a\u00f1o); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posici\u00f3n = (precio hoy \u2212 PPC + dividendos cobrados) / costo.
+- Sueldo neto $ ${fmtARS.format(Number(s.ingreso) || 0)} por mes \u00b7 presupuesto de gasto $ ${fmtARS.format(Number(s.presupuesto) || 0)}
 
-## Posiciones (${k.posiciones.length})
-| Ticker | CEDEAR (ratio) | Acciones | PPC | Precio | Valor | Rdo total % (precio + dividendos) | Peso | Alfa vs SPY (USD) | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Qué hace | Tesis / nota |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-${posRows}
+${c.tablaPx}
 
-## Watchlist (alertas sin posición) (${k.watch.length})
-| Ticker | CEDEAR (ratio) | Precio | 🟡 mirala ≤ | 🔴 urgente ≤ | Objetivo | Qué hace | Nota |
-|---|---|---|---|---|---|---|---|
-${watchRows || '| — | | | | | | | |'}
+## Qu\u00e9 hace cada una y mi tesis
+${tesis || '\u2014'}
+
+${c.tablaF}
 
 ## Posiciones cerradas
 | Ticker | Realizado USD | Dividendos | Alfa vs SPY |
 |---|---|---|---|
-${cerrRows || '| — | | | |'}
+${cerrRows || '| \u2014 | | | |'}
 
-## Últimas operaciones (${Math.min(40, k.ops.length)} de ${k.ops.length})
+## \u00daltimas operaciones (${Math.min(40, k.ops.length)} de ${k.ops.length})
 | Fecha | Tipo | Ticker | Acciones | Precio USD (o monto) | Detalle |
 |---|---|---|---|---|---|
 ${ops}
@@ -7445,10 +7461,12 @@ ${JSON.stringify(json, null, 1)}
 \`\`\`
 
 ## Instrucciones para Claude
-Sos mi asesor de inversiones (perfil: largo plazo, value/growth de calidad, Buffett y Lynch, objetivo: ganarle al S&P 500). Con los datos de arriba:
+Sos mi asesor de inversiones (perfil: largo plazo, calidad a buen precio, Buffett y Lynch; la vara es ganarle al S&P 500). Criterio de mis zonas: \u201cmirala\u201d es zona razonable para acumular, \u201curgente\u201d es descuento con margen de seguridad, siempre en USD del subyacente.
+
+**Si te pregunto algo puntual** (una acci\u00f3n, en qu\u00e9 poner un aporte), respond\u00e9 eso con estos datos y no hagas la revisi\u00f3n completa. **Si te pido revisar la cartera:**
 1. Analizá la cartera: concentración y pesos, calidad de cada tesis, qué posiciones aportan alfa y cuáles lo destruyen, riesgos, qué falta y qué sobra. Sé directo y objetivo.
 2. Revisá las alertas: proponé niveles **🟡 mirala** (zona de acumulación razonable) y **🔴 comprá urgente** (descuento profundo, margen de seguridad) en **USD del subyacente**, y un **precio objetivo a 12 meses** por ticker, con una línea de tesis. Podés agregar tickers a la watchlist (CEDEARs disponibles en BYMA) o quitar los que no tengan sentido.
-3. Al final de tu respuesta, devolvé **un solo bloque \`\`\`json** con este formato exacto para que la app lo importe (solo los tickers que cambian; \`null\` en un ticker lo saca de las alertas/watchlist; los campos que no mandás no se tocan):
+3. Si cambi\u00e1s niveles, al final de tu respuesta devolv\u00e9 **un solo bloque \`\`\`json** con este formato exacto para que la app lo importe (solo los tickers que cambian; \`null\` en un ticker lo saca de las alertas/watchlist; los campos que no mandás no se tocan):
 \`\`\`json
 { "tipo": "${Intercambio.FORMATO}", "version": ${Intercambio.VERSION}, "fecha": "${hoy}",
   "alertas": {
@@ -7501,16 +7519,6 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
     Persist.save();
   },
 };
-function formExportar() {
-  const md = Intercambio.exportar(); const nombre = Intercambio.nombreArchivo();
-  const puedeCompartir = !!(navigator.share);
-  Modal.open({ title: 'Exportar para Claude', submit: '', body: `<div class="stack">
-    <p class="small muted">Un archivo con tu cartera, rendimiento vs S&P 500, alertas, watchlist y operaciones, más las instrucciones para que Claude lo analice y te devuelva un bloque de cambios que la app puede importar.</p>
-    <div class="row" style="gap:8px">${puedeCompartir ? `<button type="button" class="btn primary" data-act="export-share">Compartir archivo</button>` : ''}<button type="button" class="btn ${puedeCompartir ? '' : 'primary'}" data-act="export-copy">Copiar texto</button></div>
-    <p class="small muted">Pegalo en un chat del proyecto <b>Inversiones</b> (o adjuntá el archivo). Cuando Claude responda, copiá su bloque JSON y usá "Cargar actualizaciones".</p>
-    <textarea class="input textarea" id="export-md" readonly style="min-height:200px">${esc(md)}</textarea>
-  </div>` });
-}
 /* ---------- CONTEXTO DE MERCADO PARA CLAUDE ----------
  * Distinto de "Exportar para Claude" (la revision completa de cartera, con instrucciones y un JSON de vuelta):
  * esto es la foto del mercado de hoy para abrir un chat y analizar una accion sin que Claude use precios
@@ -7525,12 +7533,14 @@ function mercadoNY() {
 /** actualiza dolar, precios y los fundamentales que falten o tengan mas de 30 dias.
  *  Finnhub gratis permite 60 llamadas por minuto: los precios son una por ticker y cada ficha son cuatro,
  *  asi que se traen hasta 6 fichas por toque y el resto queda anotado. */
+/** un precio traido hace menos de esto cuenta como de hoy: si el auto-refresco corrio segundos antes del toque, no es viejo */
+const CTX_FRESCO = 10 * 60000;
 async function ctxActualizar(paso) {
   paso('Actualizando d\u00f3lar y precios\u2026');
   const t0 = Date.now(); ui.ctxT0 = t0;
   const okPrecios = await Precios.actualizar(true);
   // un 429 de Finnhub saltea el ticker y le deja el precio viejo: se reintenta una vez, de a uno
-  const viejos = () => Precios.tickers().filter(t => { const q = state.cartera.precios[t]; return !q || !(q.t >= t0); });
+  const viejos = () => Precios.tickers().filter(t => { const q = state.cartera.precios[t]; return !q || !(q.t >= t0 - CTX_FRESCO); });
   const fallaron = viejos();
   if (fallaron.length) {
     paso(`Reintentando ${fallaron.length} precio${fallaron.length === 1 ? '' : 's'}\u2026`);
@@ -7552,7 +7562,8 @@ async function ctxActualizar(paso) {
   return { okPrecios, pendientes: faltan.slice(ahora.length), preciosViejos: viejos() };
 }
 
-function contextoClaude(pendientes = []) {
+/** piezas del texto de mercado que usa Exportar para Claude */
+function ctxPartes(pendientes = []) {
   const k = E.cartera(); const s = state.settings; const ahora = new Date(); const ny = mercadoNY();
   const n2 = v => v == null || !Number.isFinite(v) ? '\u2014' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const n1 = v => v == null || !Number.isFinite(v) ? '\u2014' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 });
@@ -7571,9 +7582,9 @@ function contextoClaude(pendientes = []) {
     const al = p.alerta || {}; const b = Fund.balance(p.ticker);
     const zonas = [al.mirala ? `mirala \u2264 ${n2(al.mirala)}` : '', al.urgente ? `urgente \u2264 ${n2(al.urgente)}` : ''].filter(Boolean).join(' \u00b7 ') || '\u2014';
     const estado = p.estado === 'urgente' ? ' **EN ZONA urgente**' : p.estado === 'mirala' ? ' **EN ZONA mirala**' : '';
-    const q = state.cartera.precios[p.ticker]; const viejo = q && ui.ctxT0 && !(q.t >= ui.ctxT0);
+    const q = state.cartera.precios[p.ticker]; const viejo = q && ui.ctxT0 && !(q.t >= ui.ctxT0 - CTX_FRESCO);
     const pxTxt = p.precio == null ? 'sin precio' : viejo ? `${n2(p.precio)} (viejo: de ${D.fmt(D.iso(new Date(q.t)))} ${hhmm(new Date(q.t))})` : n2(p.precio);
-    return `| ${p.ticker} | ${al.desc ? al.desc.replace(/\|/g, '/') : '\u2014'} | ${p.tengo ? `tengo \u00b7 ${pc(p.peso)}` : 'watchlist'} | ${pxTxt} | ${p.dp != null && !viejo ? pcS(p.dp) : '\u2014'} | ${p.tengo ? n2(p.ppc) : '\u2014'} | ${p.tengo && p.rendTotal != null ? `${p.rendTotal >= 0 ? '+' : ''}${pc(p.rendTotal)}` : '\u2014'} | ${c ? `${ars(porCedear != null ? porCedear * k.ccl : null)} (${Cedears.ratioTxt(c)})` : 'no es CEDEAR'} | ${d.min52 != null ? `${n2(d.min52)}\u2013${n2(d.max52)}` : '\u2014'} | ${rango != null ? pc(rango) : '\u2014'} | ${zonas}${estado} | ${al.objetivo ? n2(al.objetivo) : '\u2014'} | ${b ? `${D.fmt(b.fecha, { year: true })} (en ${b.dias} d)` : '\u2014'} |`;
+    return `| ${p.ticker} | ${al.desc ? al.desc.replace(/\|/g, '/') : '\u2014'} | ${p.tengo ? `tengo \u00b7 ${pc(p.peso)}` : 'watchlist'} | ${pxTxt} | ${p.dp != null && !viejo ? pcS(p.dp) : '\u2014'} | ${p.tengo ? n2(p.ppc) : '\u2014'} | ${p.tengo && p.valor != null ? `${n2(p.valor)}${p.alfaUSD != null ? ` (${p.alfaUSD >= 0 ? '+' : '\u2212'}${n2(Math.abs(p.alfaUSD))})` : ''}` : '\u2014'} | ${p.tengo && p.rendTotal != null ? `${p.rendTotal >= 0 ? '+' : ''}${pc(p.rendTotal)}` : '\u2014'} | ${c ? `${ars(porCedear != null ? porCedear * k.ccl : null)} (${Cedears.ratioTxt(c)})` : 'no es CEDEAR'} | ${d.min52 != null ? `${n2(d.min52)}\u2013${n2(d.max52)}` : '\u2014'} | ${rango != null ? pc(rango) : '\u2014'} | ${zonas}${estado} | ${al.objetivo ? n2(al.objetivo) : '\u2014'} | ${b ? `${D.fmt(b.fecha, { year: true })} (en ${b.dias} d)` : '\u2014'} |`;
   }).join('\n');
 
   const filasF = todas.map(p => {
@@ -7581,34 +7592,21 @@ function contextoClaude(pendientes = []) {
     return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${pc(d.roicAct)} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5 ?? d.crecEps5)} | ${n2(d.deudaPat)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${d.yieldDiv ? pc(d.yieldDiv) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
-  const va = k.ventanas.anio, vi = k.ventanas.inicio;
-  const lineaRend = (v, nombre) => v && v.disponible ? `${nombre}: cartera ${pc(v.rend.realDiv)} con dividendos \u00b7 precio contra precio ${pc(v.rend.real)} vs S&P 500 ${pc(v.rend.sombra)}` : `${nombre}: s/d`;
 
   const ba = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ahora);
-  return `# Contexto de mercado \u2014 ${D.fmt(D.iso(ahora), { year: true })}, ${ba} (Buenos Aires)
-
-Precios de Finnhub ${pf ? `al ${D.fmt(D.iso(pf))} ${hhmm(pf)}` : 's/d'} \u00b7 Mercado de NY ${ny.abierto ? 'ABIERTO' : 'CERRADO'} (hora de NY ${ny.hora}${ny.habil ? '' : ', no h\u00e1bil'}) \u00b7 SPY ${spy ? `US$ ${n2(spy.c)}${spy.dp != null ? ` (${pcS(spy.dp)} hoy)` : ''}` : 's/d'} \u00b7 CCL $ ${fmtARS.format(k.ccl)} \u00b7 MEP $ ${fmtARS.format(k.mep)}
-
-**Us\u00e1 estos precios y estos n\u00fameros como la verdad de hoy.** No uses precios ni m\u00faltiplos de tu entrenamiento: est\u00e1n desactualizados. Si para analizar necesit\u00e1s un dato que no est\u00e1 ac\u00e1, ped\u00edmelo antes de concluir. Opero CEDEARs en pesos en Balanz: el precio de cada CEDEAR en pesos est\u00e1 calculado al CCL de arriba.
-
-## Precios, mi posici\u00f3n y mis zonas (${k.posiciones.length} en cartera, ${k.watch.length} en watchlist)
-| Ticker | Qu\u00e9 hace | Estado \u00b7 peso | Precio USD | Hoy | Mi PPC | Mi resultado | CEDEAR en pesos (ratio) | 52 semanas | Posici\u00f3n en el rango | Mis zonas de compra | Objetivo | Pr\u00f3ximo balance |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-${filasPx}
-
-## Fundamentales (Finnhub, balances presentados a la SEC)
+  return {
+    cuando: `${D.fmt(D.iso(ahora), { year: true })}, ${ba} (Buenos Aires)`,
+    estado: `Precios de Finnhub ${pf ? `al ${D.fmt(D.iso(pf))} ${hhmm(pf)}` : 's/d'} \u00b7 Mercado de NY ${ny.abierto ? 'ABIERTO' : 'CERRADO'} (hora de NY ${ny.hora}${ny.habil ? '' : ', no h\u00e1bil'}) \u00b7 SPY ${spy ? `US$ ${n2(spy.c)}${spy.dp != null ? ` (${pcS(spy.dp)} hoy)` : ''}` : 's/d'} \u00b7 CCL $ ${fmtARS.format(k.ccl)} \u00b7 MEP $ ${fmtARS.format(k.mep)}`,
+    verdad: '**Us\u00e1 estos precios y estos n\u00fameros como la verdad de hoy.** No uses precios ni m\u00faltiplos de tu entrenamiento: est\u00e1n desactualizados. Si para analizar necesit\u00e1s un dato que no est\u00e1 ac\u00e1, ped\u00edmelo antes de concluir. Opero CEDEARs en pesos en Balanz: el precio de cada CEDEAR en pesos est\u00e1 calculado al CCL de arriba.',
+    tablaPx: `## Precios, mi posici\u00f3n y mis zonas (${k.posiciones.length} en cartera, ${k.watch.length} en watchlist)
+| Ticker | Qu\u00e9 hace | Estado \u00b7 peso | Precio USD | Hoy | Mi PPC | Mi valor USD (alfa vs SPY) | Mi resultado | CEDEAR en pesos (ratio) | 52 semanas | Posici\u00f3n en el rango | Mis zonas de compra | Objetivo | Pr\u00f3ximo balance |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+${filasPx}`,
+    tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
 | Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-${filasF}
-${pendientes.length ? `\nSin fundamentales en esta foto (Finnhub da 60 consultas por minuto; se est\u00e1n completando): ${pendientes.join(', ')}. Si necesit\u00e1s alguno, ped\u00edmelo.\n` : ''}
-## Mi cartera
-- Valor US$ ${n2(k.valorTotal != null ? k.valorTotal : k.valor)}${k.caja > 0.005 ? ` (incluye US$ ${n2(k.caja)} de caja)` : ''} \u00b7 costo US$ ${n2(k.costo)} \u00b7 resultado total ${k.gpTotal != null ? `${k.gpTotal >= 0 ? '+' : '\u2212'}US$ ${n2(Math.abs(k.gpTotal))}` : 's/d'}
-- ${lineaRend(va, 'En el a\u00f1o')}
-- ${lineaRend(vi, 'Desde el inicio')}
-- Sueldo neto $ ${fmtARS.format(Number(s.ingreso) || 0)} por mes \u00b7 presupuesto de gasto $ ${fmtARS.format(Number(s.presupuesto) || 0)}
-
-Perfil: largo plazo, calidad a buen precio, Buffett y Lynch; la vara es ganarle al S&P 500. Criterio de mis zonas: \u201cmirala\u201d es zona razonable para acumular, \u201curgente\u201d es descuento con margen de seguridad, siempre en USD del subyacente.
-`;
+${filasF}${pendientes.length ? `\n\nSin fundamentales en esta foto (Finnhub da 60 consultas por minuto; se est\u00e1n completando): ${pendientes.join(', ')}. Si necesit\u00e1s alguno, ped\u00edmelo.` : ''}`,
+  };
 }
 
 /** cuantas fichas utiles hay (las parciales no cuentan) y cuales faltan */
@@ -7623,31 +7621,35 @@ function ctxResumenFund() {
   if (por) por.textContent = c.faltan.length ? `Completando ${c.faltan.join(', ')}. Finnhub da 60 consultas por minuto: se van sumando solas, pod\u00e9s esperar o copiar ya.` : 'Todas al d\u00eda.';
   return c;
 }
-function formContexto() {
-  Modal.open({ title: 'Contexto para Claude', submit: '', body: `<div class="stack" id="ctx-box"><div class="ctx-paso"><span class="dot info"></span><span id="ctx-paso">Preparando\u2026</span></div></div>` });
+/* Exportar para Claude: un solo archivo con la foto del mercado de hoy (precios recien traidos, fundamentales,
+ * CEDEAR en pesos) y la cartera completa (rendimiento vs sombra, tesis, operaciones, JSON e instrucciones).
+ * Sirve para preguntar por una accion o para la revision completa. Primero actualiza todo. */
+function formExportar() {
+  Modal.open({ title: 'Exportar para Claude', submit: '', body: `<div class="stack" id="ctx-box"><div class="ctx-paso"><span class="dot info"></span><span id="ctx-paso">Preparando\u2026</span></div></div>` });
   const paso = t => { const el = $('#ctx-paso'); if (el) el.textContent = t; };
-  ctxActualizar(paso).then(({ okPrecios, preciosViejos }) => {
+  const listo = () => { if (!(Precios.tickers().length && (state.settings.finnhubKey || '').trim())) return Promise.resolve({ okPrecios: false, preciosViejos: [], sinClave: true }); return ctxActualizar(paso); };
+  listo().then(({ okPrecios, preciosViejos, sinClave }) => {
     const box = $('#ctx-box'); if (!box) return;
-    const md = contextoClaude(ctxCobertura().faltan); const k = E.cartera();
+    const md = Intercambio.exportar(ctxCobertura().faltan); const k = E.cartera();
     const pf = k.preciosFecha ? new Date(k.preciosFecha) : null;
     const minutos = pf ? Math.max(0, Math.round((Date.now() - pf.getTime()) / 60000)) : null;
     const puedeCompartir = !!navigator.share;
     box.innerHTML = `
       <div class="hoja"><div class="f-sec">
-        <div class="r"><span class="k">Precios</span><span class="v ${okPrecios && !preciosViejos.length ? '' : 'mid'}">${!okPrecios ? 'sin actualizar' : preciosViejos.length ? `${Precios.tickers().length - preciosViejos.length} de ${Precios.tickers().length}` : minutos != null && minutos < 2 ? 'reci\u00e9n' : `hace ${minutos} min`}</span>${!okPrecios ? '<span class="por">No se pudo consultar Finnhub: el texto usa los \u00faltimos precios guardados, cada uno con su hora.</span>' : preciosViejos.length ? `<span class="por">No se pudo actualizar ${preciosViejos.join(', ')}: en el texto van con la hora de su \u00faltimo precio, para que Claude no los tome como de hoy.</span>` : ''}</div>
-        <div class="r"><span class="k">Empresas</span><span class="v">${k.posiciones.length + k.watch.length}</span><span class="por">${k.posiciones.length} en cartera \u00b7 ${k.watch.length} en watchlist</span></div>
+        <div class="r"><span class="k">Precios</span><span class="v ${okPrecios && !preciosViejos.length ? '' : 'mid'}">${!okPrecios ? 'sin actualizar' : preciosViejos.length ? `${Precios.tickers().length - preciosViejos.length} de ${Precios.tickers().length}` : minutos != null && minutos < 2 ? 'reci\u00e9n' : `hace ${minutos} min`}</span>${sinClave ? '<span class="por">Sin clave de Finnhub: el texto usa los \u00faltimos precios guardados.</span>' : !okPrecios ? '<span class="por">No se pudo consultar Finnhub: el texto usa los \u00faltimos precios guardados, cada uno con su hora.</span>' : preciosViejos.length ? `<span class="por">No se pudo actualizar ${preciosViejos.join(', ')}: en el texto van con la hora de su \u00faltimo precio, para que Claude no los tome como de hoy.</span>` : ''}</div>
+        <div class="r"><span class="k">Empresas</span><span class="v">${k.posiciones.length + k.watch.length}</span><span class="por">${k.posiciones.length} en cartera \u00b7 ${k.watch.length} en watchlist \u00b7 ${k.ops.length} operaciones</span></div>
         <div class="r"><span class="k">Con fundamentales</span><span class="v" id="ctx-fund-v"></span><span class="por" id="ctx-fund-por"></span></div>
       </div></div>
-      <div class="row" style="gap:8px">${puedeCompartir ? '<button type="button" class="btn primary" data-act="ctx-share">Compartir archivo</button>' : ''}<button type="button" class="btn ${puedeCompartir ? '' : 'primary'}" data-act="ctx-copy">Copiar texto</button></div>
-      <p class="ob-nota" style="margin-top:0">Pegalo al empezar el chat, antes de preguntar por una acci\u00f3n.</p>
-      <textarea class="input textarea" id="ctx-md" readonly style="min-height:180px">${esc(md)}</textarea>`;
+      <div class="row" style="gap:8px">${puedeCompartir ? '<button type="button" class="btn primary" data-act="export-share">Compartir archivo</button>' : ''}<button type="button" class="btn ${puedeCompartir ? '' : 'primary'}" data-act="export-copy">Copiar texto</button></div>
+      <p class="ob-nota" style="margin-top:0">Pegalo o adjuntalo al empezar un chat del proyecto Inversiones: sirve para preguntar por una acci\u00f3n o para la revisi\u00f3n completa. Si Claude cambia niveles, us\u00e1 "Cargar actualizaciones".</p>
+      <textarea class="input textarea" id="export-md" readonly style="min-height:180px">${esc(md)}</textarea>`;
     // lo que falte se completa en segundo plano y el texto se rehace solo
-    if (ctxResumenFund().faltan.length) Fund.calentar(30, 65000);
+    if (ctxResumenFund().faltan.length && !sinClave) Fund.calentar(30, 65000);
   });
 }
 window.addEventListener('fund-listo', () => {
-  const t = $('#ctx-md'); if (!t) return;
-  const c = ctxResumenFund(); t.value = contextoClaude(c.faltan);
+  const t = $('#export-md'); if (!t) return;
+  const c = ctxResumenFund(); t.value = Intercambio.exportar(c.faltan);
 });
 
 function formImportar() {
@@ -7870,10 +7872,6 @@ const Actions = {
   'edit-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (o) formOp({ ...o }); },
   'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
   'export-claude'() { formExportar(); },
-  'claude-contexto'() { formContexto(); },
-  'ctx-copy'() { const t = $('#ctx-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo al empezar el chat.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
-  async 'ctx-share'() { const t = $('#ctx-md'); if (!t) return; const d = new Date(); const nombre = `mercado-${D.today()}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`;
-    try { const file = new File([t.value], nombre, { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Contexto de mercado' }); else await navigator.share({ text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') Actions['ctx-copy'](); } },
   'import-claude'() { formImportar(); },
   'export-copy'() { const t = $('#export-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo en un chat del proyecto Inversiones.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
   async 'export-share'() { const t = $('#export-md'); if (!t) return; try { const file = new File([t.value], Intercambio.nombreArchivo(), { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Cartera para Claude' }); else await navigator.share({ title: 'Cartera para Claude', text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') toast('No se pudo compartir; usá Copiar texto'); } },
@@ -7887,7 +7885,7 @@ const Actions = {
   'cmp-toggle'(t) { cmpToggle(t); },
   'new-watch'() { formWatch(); },
   'del-alerta'(t) { delete state.cartera.alertas[t]; Persist.save(); Modal.close(); render(); toast(`Alerta de ${t} quitada`); },
-  'precios-update'() { toast('Buscando precios…'); Precios.actualizar(false); },
+  'precios-update'() { const b = $('[data-act="precios-update"]'); if (b) b.classList.add('girando'); Precios.actualizar(false).finally(() => { const x = $('[data-act="precios-update"]'); if (x) x.classList.remove('girando'); }); },
   'go-config'() { go('config'); },
   'switch-gasto'() { formMov(); },
   'pick-destino'(d) { const el = $('#i-destino'); if (el) el.value = d; },
