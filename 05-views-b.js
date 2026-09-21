@@ -331,28 +331,30 @@ function viewCartera() {
  *  el color es solo jerarquia, que es lo unico que una rampa secuencial sabe hacer.
  *  items: [{ label, peso (0..1), der, act, id }] — `der` es la cifra chica de la derecha.
  *  otras: { n, peso } o null. */
-function mapaBloques(items, otras = null) {
-  const top = items.slice(0, 9); if (!top.length) return '';
+function mapaBloques(items, otras = null, todas = false) {
+  const top = todas ? items.slice() : items.slice(0, 9); if (!top.length) return '';
   const TK = [14, 12, 11], NM = [10.5, 9.5, 9], PD = [9, 8, 7];
   // flex-grow reparte el espacio libre solo hasta donde suman los factores: con pesos de 0 a 1
   // la suma queda por debajo de 1 y los bloques no llegan a llenar la fila. Se escalan.
   const G = 1000, grow = x => Math.max(x * G, 0.01);
   // con pocos items no tiene sentido forzar tres filas: quedan tiras de 20 px ilegibles
-  const porFila = 3, nFilas = top.length <= 3 ? 1 : top.length <= 6 ? 2 : 3;
+  const porFila = 3, nFilas = top.length <= 3 ? 1 : top.length <= 6 ? 2 : Math.ceil(top.length / porFila);
   const filas = Array.from({ length: nFilas }, (_, r) => top.slice(r * porFila, (r + 1) * porFila)).filter(f => f.length).map((fila, r) => {
     const bs = fila.map(it => {
       const i = top.indexOf(it);
       // rampa de cian por opacidad: por debajo de alfa 0,62 el texto oscuro ya no se lee
       const attrs = it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}" style="cursor:pointer;` : ' style="';
-      return `<div class="cmap-b"${attrs}flex-grow:${grow(it.peso)};background:var(--c${i + 1});color:${i < 3 ? 'var(--on-fill)' : '#FFFFFF'};padding:${PD[r]}px">
-        <b style="font-size:${TK[r]}px">${esc(it.label)}</b>
-        <span class="n" style="font-size:${NM[r]}px"><i>${M.pct(it.peso, 1)}</i><em>${it.der || ''}</em></span>
+      return `<div class="cmap-b"${attrs}flex-grow:${grow(it.peso)};background:var(--c${Math.min(i, 8) + 1});color:${i < 3 ? 'var(--on-fill)' : '#FFFFFF'};padding:${PD[Math.min(r, 2)]}px">
+        <b style="font-size:${TK[Math.min(r, 2)]}px">${esc(it.label)}</b>
+        <span class="n" style="font-size:${NM[Math.min(r, 2)]}px"><i>${M.pct(it.peso, 1)}</i><em>${it.der || ''}</em></span>
       </div>`;
     }).join('');
     return `<div class="cmap-row" style="flex-grow:${grow(sum(fila.map(x => x.peso)))}">${bs}</div>`;
   }).join('');
-  const franja = otras && otras.n ? `<div class="cmap-otras"><span>${esc(otras.label)}</span><span>${M.pct(otras.peso, 1)}</span></div>` : '';
-  return `<div class="cmap">${filas}${franja}</div>`;
+  // la franja del resto se toca: abre el mapa con todas las posiciones (y vuelve)
+  const franja = otras && otras.n ? `<div class="cmap-otras"${otras.act ? ` data-act="${otras.act}" role="button" style="cursor:pointer"` : ''}><span>${esc(otras.label)}</span><span>${otras.der != null ? otras.der : M.pct(otras.peso, 1)}</span></div>` : '';
+  // con todas, el alto crece con las filas: 210 px para tres, ~52 por fila de ahi en mas
+  return `<div class="cmap"${nFilas > 3 ? ` style="height:${Math.max(210, nFilas * 52)}px"` : ''}>${filas}${franja}</div>`;
 }
 
 function mapaCartera(k) {
@@ -360,9 +362,14 @@ function mapaCartera(k) {
   const resto = k.posiciones.slice(9);
   // sin color a proposito: si el mapa se pinta de verde y rojo compite con el semaforo del resto
   const dpTxt = p => p.dp == null ? '\u00B1x,xx %' : `${p.dp > 0 ? '+' : ''}${MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} %`;
-  return mapaBloques(
-    top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), act: 'pos', id: p.ticker })),
-    resto.length ? { n: resto.length, peso: sum(resto.map(p => p.peso)), label: `Otras ${resto.length} ${resto.length === 1 ? 'posici\u00f3n' : 'posiciones'}` } : null);
+  // el resto no entra al mapa: con pesos de 1-4 % el area deja de leerse (una sola en la ultima fila
+  // quedaba mas grande que MELI). Se abre debajo como lista, con la barra relativa a la mayor del resto.
+  const todas = !!ui.cmapTodas && resto.length > 0;
+  const pesoResto = sum(resto.map(p => p.peso));
+  const franja = resto.length ? { n: resto.length, peso: pesoResto, label: todas ? `Otras ${resto.length} \u00b7 ocultar` : `Otras ${resto.length} ${resto.length === 1 ? 'posici\u00f3n' : 'posiciones'} \u00b7 ver`, act: 'cmap-todas' } : null;
+  const mx = Math.max(...resto.map(p => p.peso || 0), 0.0001);
+  const lista = todas ? `<div class="cmap-lista">${resto.map(p => `<div class="cl-r" data-act="pos" data-id="${esc(p.ticker)}"><b>${esc(p.ticker)}</b><span class="cl-bar"><i style="width:${Math.max(2, Math.round((p.peso || 0) / mx * 100))}%"></i></span><span class="cl-p">${M.pct(p.peso, 1)}</span><span class="cl-d">${dpTxt(p)}</span></div>`).join('')}</div>` : '';
+  return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), act: 'pos', id: p.ticker })), franja) + lista;
 }
 
 function renderEvolucion(k, seg) {

@@ -141,7 +141,9 @@ const E = {
       const g = L.grupoDeCat(m.catId).id; agg.byGrupo[g] = (agg.byGrupo[g] || 0) + v;
       agg.byNec[m.necesidad || 1] += v;
       agg.byMedio[m.medio] = (agg.byMedio[m.medio] || 0) + v;
-      const d = Number(row.fecha.slice(8, 10)); const dd = D.ym(row.fecha) === ym ? d : 1; agg.byDay[dd] = (agg.byDay[dd] || 0) + v;
+      // las cuotas de compras viejas ya estan comprometidas el 1 del mes: si se dibujan en el dia de la compra
+      // original, las que caen despues de hoy quedan fuera del ritmo del mes (y la proyeccion arranca corta)
+      const d = Number(row.fecha.slice(8, 10)); const dd = row.cuotaRow || D.ym(row.fecha) !== ym ? 1 : d; agg.byDay[dd] = (agg.byDay[dd] || 0) + v;
       if (m.medio === 'tarjeta') agg.tarjeta += v;
     }
     agg.variable = agg.compras; agg.comprometido = agg.fijo + agg.cuotas; agg.innecesario = agg.byNec[3];

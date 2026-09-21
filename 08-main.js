@@ -38,6 +38,11 @@ function render() {
  *  y el FAB se va mientras bajas (flotaba sobre el contenido todo el recorrido y tapaba cifras).
  *  Vuelve al frenar o al subir. */
 let _scrollY = 0, _fabT = null;
+/** tocar la pestaña en la que ya estás te lleva arriba del todo (como en iOS); cambiar de pestaña ya arranca arriba */
+function arriba() {
+  const m = window.innerWidth <= 900 ? $('.main') : null;
+  if (m) m.scrollTo({ top: 0, behavior: 'smooth' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 function headLine() {
   const m = $('.main'); if (!m) return;
   const h = $('.mobile-head'); if (h) h.classList.toggle('scrolled', m.scrollTop > 4);
@@ -131,6 +136,7 @@ const Actions = {
   'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
   'export-claude'() { formExportar(); },
   'import-claude'() { formImportar(); },
+  'cmap-todas'() { ui.cmapTodas = !ui.cmapTodas; render(); },
   'export-copy'() { const t = $('#export-md'); if (!t) return; navigator.clipboard.writeText(t.value).then(() => toast('Copiado. Pegalo en un chat del proyecto Inversiones.'), () => { t.select(); document.execCommand('copy'); toast('Copiado'); }); },
   async 'export-share'() { const t = $('#export-md'); if (!t) return; try { const file = new File([t.value], Intercambio.nombreArchivo(), { type: 'text/markdown' }); if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Cartera para Claude' }); else await navigator.share({ title: 'Cartera para Claude', text: t.value }); } catch (e) { if (e && e.name !== 'AbortError') toast('No se pudo compartir; usá Copiar texto'); } },
   'import-apply'() { const d = Intercambio._pendiente; if (!d) { toast('Primero tocá Analizar'); return; } try { Intercambio.aplicar(d); } catch (e) { toast('No se pudo aplicar: ' + e.message, 5000); return; } Intercambio._pendiente = null; Modal.close(); toast(`${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''} aplicado${d.cambios.length > 1 ? 's' : ''}`); render(); },
@@ -195,7 +201,7 @@ const Actions = {
 
 /* ---------- global events ---------- */
 document.addEventListener('click', e => {
-  const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); go(go_.dataset.go); return; }
+  const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
   const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); lastView = null; render(); return; }
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }

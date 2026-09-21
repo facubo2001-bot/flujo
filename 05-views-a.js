@@ -66,7 +66,9 @@ function viewResumen() {
 
   // ritmo + margen
   const days = D.daysIn(ym); const labels = Array.from({ length: days }, (_, i) => String(i + 1));
-  const cum = (agg, upto) => { let a = 0; return labels.map((_, i) => { if (i + 1 > upto) return null; a += (agg.byDay[i + 1] || 0); return a; }); };
+  // lo que tenga fecha posterior a hoy (un fijo confirmado por adelantado, una compra cargada a futuro) entra hoy:
+  // el ultimo punto del grafico tiene que ser igual a "Gastos del mes", si no la proyeccion y el cruce mienten
+  const cum = (agg, upto) => { let a = 0; const resto = sum(Object.entries(agg.byDay).filter(([d]) => Number(d) > upto).map(([, v]) => v)); return labels.map((_, i) => { if (i + 1 > upto) return null; a += (agg.byDay[i + 1] || 0) + (i + 1 === upto ? resto : 0); return a; }); };
   const curVals = cum(c, isCur ? dia : days);
   const avgVals = avg.vals ? avg.vals.slice(0, days) : labels.map(() => null);
   let projVals = labels.map(() => null);
@@ -76,7 +78,7 @@ function viewResumen() {
   if (pres) { const iReal = curVals.findIndex(v => v != null && v >= pres); const iProj = iReal < 0 ? projVals.findIndex(v => v != null && v >= pres) : -1;
     if (iReal >= 0) cruce = { i: iReal, label: String(iReal + 1), color: 'var(--crit)', pasado: true }; else if (iProj >= 0) cruce = { i: iProj, label: String(iProj + 1), color: 'var(--warn)', pasado: false }; }
   html += `<div class="grid g-21 section">
-    <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : 'Acumulado por día de compra'}</span></div>
+    <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : 'Cuotas desde el 1 · compras por día'}</span></div>
       ${ChartQ.reg(w => Charts.line({ w, labels, h: 230, cruce, tipTitle: i => `Día ${labels[i]}`, refY: margen.presupuesto || null, refLabel: margen.presupuesto ? 'Presupuesto' : '', series: [
         ...(avg.vals ? [{ name: `Promedio ${avg.n} ${avg.n === 1 ? 'mes' : 'meses'}`, color: 'var(--line-2)', values: avgVals }] : []),
         { name: D.monthName(ym).split(' ')[0], color: 'var(--accent)', values: curVals, area: true, strong: true },
