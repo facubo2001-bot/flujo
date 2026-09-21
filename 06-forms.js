@@ -52,7 +52,7 @@ function formMov(m = null, opts = {}) {
     <details class="full" ${base.primerPago ? 'open' : ''}><summary class="small muted" style="cursor:pointer">Ajustes avanzados</summary><div class="form-grid" style="margin-top:8px">${F.field('Primer resumen (mes de pago)', F.input('f-primer', base.primerPago || '', 'type="month"'), 'Dejalo vacío para calcularlo por el cierre de la tarjeta')}</div></details>
   </div>`;
   Modal.open({ title: virtual ? `Confirmar ${base.desc} de ${D.monthName(base.mesRec, true)}` : isNew ? 'Nuevo gasto' : 'Editar gasto', body, submit: isNew || virtual ? 'Guardar gasto' : 'Guardar cambios',
-    extra: !isNew && !virtual ? `<button class="btn danger" data-act="del-from-modal" data-id="${m.id}">Borrar</button>` : '',
+    extra: !isNew && !virtual ? `<button class="btn danger" data-act="del-from-modal" data-id="${m.id}">Borrar</button><button class="btn" data-act="dup" data-id="${m.id}">Duplicar</button>` : '',
     onSubmit: () => {
       const desc = Modal.val('f-desc').trim(); const monto = M.parse(Modal.val('f-monto'));
       if (!desc) { toast('Falta la descripción'); return false; } if (!monto) { toast('Falta el monto'); return false; }
@@ -468,73 +468,98 @@ function formOpCalc() {
   box.hidden = false; box.innerHTML = html + ver; box.classList.toggle('crit', nivel === 'block'); box.classList.toggle('amber', nivel === 'warn');
 }
 /* ---------- ficha de fundamentales dentro del detalle de una posición / watchlist ---------- */
-function fundHTML(t, precio) {
+/** Ficha de empresa: una hoja continua, no siete cajas apiladas dentro de un modal de 390 px.
+ *  El unico bloque con borde es el rango de 52 semanas, porque es un control visual y no una lista.
+ *  El valor lleva color solo cuando es un juicio; debajo, una linea que dice por que. */
+function fundHTML(t, pos) {
+  const precio = pos && pos.precio != null ? pos.precio : null;
   const d = Fund.de(t);
-  const pct1 = v => v == null ? '—' : `${v >= 0 ? '' : '−'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
-  const num = (v, n = 1) => v == null ? '—' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+  const pct1 = v => v == null ? '\u2014' : `${v >= 0 ? '' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+  const num = (v, n = 1) => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
   const sem = (v, bueno, malo, inv) => v == null ? '' : inv ? (v <= bueno ? 'ok' : v <= malo ? 'mid' : 'bad') : (v >= bueno ? 'ok' : v >= malo ? 'mid' : 'bad');
-  const r = (k, v, cls, n) => `<div class="r"><span class="k">${k}${n ? ` <span class="n">${n}</span>` : ''}</span><span class="v ${cls || ''}">${v}</span></div>`;
-  if (!d) return `<div class="fund" id="fund-box"><div class="grp"><div class="t">Fundamentales</div><div class="small muted">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos…' : 'Cargá tu clave de Finnhub en Ajustes, sección Cartera, para ver los fundamentales.'}</div></div></div>`;
-  const cap = d.capUSD ? 'US$ ' + (d.capUSD >= 1e12 ? `${num(d.capUSD / 1e12, 2)} billones` : d.capUSD >= 1e9 ? `${num(d.capUSD / 1e9, 0)} mil M` : `${num(d.capUSD / 1e6, 0)} M`) : '—';
-  // rango de 52 semanas
+  /** k: clave · v: valor · cls: color solo si hay juicio · por: la linea de abajo que explica el juicio */
+  const r = (k, v, cls, por) => `<div class="r"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span>${por ? `<span class="por">${por}</span>` : ''}</div>`;
+  const sec = (titulo, filas) => `<div class="f-sec"><div class="t">${titulo}</div>${filas}</div>`;
+
+  const ced = pos && pos.cedear ? pos.cedear : Cedears.de(t);
+  const ident = [d && d.nombre ? esc(d.nombre) : null, d && d.mercado ? esc(d.mercado) : (ced ? esc(ced.mercado || '') : null),
+    ced ? `CEDEAR ${Cedears.ratioTxt(ced)}` : null].filter(Boolean).join(' \u00b7 ');
+  const dp = pos && pos.dp != null ? pos.dp : null;
+  const cab = `<div class="f-head">
+    <div><h3>${esc(t)}</h3>${ident ? `<div class="n">${ident}</div>` : ''}</div>
+    <div class="f-px">${precio != null ? `<b>${fmtU(precio)}</b>` : '<b class="muted">US$ x.xxx</b>'}
+      ${dp != null ? `<span class="dp ${dp > 0 ? 'up' : dp < 0 ? 'down' : ''}">${dp > 0 ? '+' : ''}${MENOS(dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} % hoy</span>` : ''}</div>
+  </div>`;
+
+  if (!d) return `<div class="fund hoja" id="fund-box">${cab}<div class="n">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes, secci\u00f3n Cartera, para ver los fundamentales.'}</div></div>`;
+
+  const cap = d.capUSD ? 'US$ ' + (d.capUSD >= 1e12 ? `${num(d.capUSD / 1e12, 2)} billones` : d.capUSD >= 1e9 ? `${num(d.capUSD / 1e9, 0)} mil M` : `${num(d.capUSD / 1e6, 0)} M`) : '\u2014';
+
+  // rango de 52 semanas: el unico con borde, porque es un control visual
   let rango = '';
   if (d.min52 != null && d.max52 != null && precio != null && d.max52 > d.min52) {
-    const pos = clamp((precio - d.min52) / (d.max52 - d.min52), 0, 1);
-    rango = `<div class="grp"><div class="t">Rango 52 semanas</div>
-      <div class="rng"><i style="left:${(pos * 100).toFixed(1)}%"></i></div>
-      <div class="r" style="padding:0"><span class="n">${fmtU(d.min52)}</span><span class="n">${(pos * 100).toFixed(0)} % del rango</span><span class="n">${fmtU(d.max52)}</span></div></div>`;
+    const p52 = clamp((precio - d.min52) / (d.max52 - d.min52), 0, 1);
+    rango = `<div class="f-rng"><div class="t">Rango 52 semanas</div>
+      <div class="rng"><i style="left:${(p52 * 100).toFixed(1)}%"></i></div>
+      <div class="f-rng-pies"><span>${fmtU(d.min52)}</span><span>${(p52 * 100).toFixed(0)} % del rango</span><span>${fmtU(d.max52)}</span></div></div>`;
   }
-  // calidad del negocio (criterio Buffett: retorno sobre el capital, márgenes estables, poca deuda, caja real)
+
+  // calidad del negocio (Buffett: retorno sobre el capital, margenes estables, poca deuda, caja real)
   const margenVs = d.margenNeto != null && d.margenNeto5 ? d.margenNeto / d.margenNeto5 - 1 : null;
-  const calidad = `<div class="grp"><div class="t">Calidad del negocio</div>
-    ${r('ROIC', pct1(d.roicAct), sem(d.roicAct, 0.15, 0.10), d.roicProm5 != null ? `prom 5A ${pct1(d.roicProm5)}` : '')}
-    ${r('ROE', pct1(d.roe), sem(d.roe, 0.15, 0.10))}
-    ${r('Margen neto', pct1(d.margenNeto), sem(margenVs, -0.05, -0.25), d.margenNeto5 != null ? `prom 5A ${pct1(d.margenNeto5)}` : '')}
-    ${r('Margen bruto / operativo', `${pct1(d.margenBruto)} / ${pct1(d.margenOper)}`)}
-    ${r('Deuda / patrimonio', d.deudaPat != null ? num(d.deudaPat, 2) : '—', d.deudaPat == null ? '' : (d.deudaPat < 0 ? 'mid' : sem(d.deudaPat, 0.6, 1.5, true)), d.deudaPat < 0 ? 'patrimonio negativo' : '')}
-    ${r('Caja libre / ganancia', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '×' : '—', sem(d.fcfSobreNeto, 0.9, 0.6), 'la ganancia declarada, ¿es caja?')}
-    ${d.accionesCambio ? r('Acciones en circulación', pct1(d.accionesCambio.pct), d.accionesCambio.pct <= -0.01 ? 'ok' : d.accionesCambio.pct >= 0.02 ? 'bad' : '', `${d.accionesCambio.desde}–${d.accionesCambio.hasta} · ${d.accionesCambio.pct < 0 ? 'recompra' : 'dilución'}`) : ''}
-  </div>`;
-  // crecimiento (criterio Lynch: que crezca de verdad y que el precio no se lo haya comido)
-  const crec = `<div class="grp"><div class="t">Crecimiento</div>
-    ${r('Ventas', pct1(d.cagrVentas5 ?? d.crecVentas5), sem(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), d.cagrVentas10 != null ? `10A ${pct1(d.cagrVentas10)}` : 'CAGR 5 años')}
-    ${r('Ganancia neta', pct1(d.cagrNeto5), sem(d.cagrNeto5, 0.10, 0.04), d.cagrNeto10 != null ? `10A ${pct1(d.cagrNeto10)}` : 'CAGR 5 años')}
-    ${r('EPS', pct1(d.cagrEps5 ?? d.crecEps5), sem(d.cagrEps5 ?? d.crecEps5, 0.10, 0.04), 'CAGR 5 años')}
-  </div>`;
-  // valuación (contra sí misma, igual criterio que tus zonas de alerta)
+  const calidad = sec('Calidad del negocio', [
+    r('ROIC', pct1(d.roicAct), sem(d.roicAct, 0.15, 0.10), d.roicProm5 != null ? `Su promedio de 5 a\u00f1os es ${pct1(d.roicProm5)}` : 'Lo que rinde cada d\u00f3lar puesto en el negocio'),
+    r('ROE', pct1(d.roe), sem(d.roe, 0.15, 0.10), ''),
+    r('Margen neto', pct1(d.margenNeto), sem(margenVs, -0.05, -0.25), d.margenNeto5 != null ? `${margenVs > 0.05 ? 'Mejor' : margenVs < -0.05 ? 'Peor' : 'En l\u00ednea'} que su promedio de 5 a\u00f1os (${pct1(d.margenNeto5)})` : ''),
+    r('Margen bruto / operativo', `${pct1(d.margenBruto)} / ${pct1(d.margenOper)}`, '', ''),
+    r('Deuda / patrimonio', d.deudaPat != null ? num(d.deudaPat, 2) : '\u2014', d.deudaPat == null ? '' : (d.deudaPat < 0 ? 'mid' : sem(d.deudaPat, 0.6, 1.5, true)), d.deudaPat < 0 ? 'Patrimonio negativo: el ratio no dice nada' : ''),
+    r('Caja libre / ganancia', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', sem(d.fcfSobreNeto, 0.9, 0.6), 'La ganancia declarada, \u00bfse convierte en caja?'),
+    d.accionesCambio ? r('Acciones en circulaci\u00f3n', pct1(d.accionesCambio.pct), d.accionesCambio.pct <= -0.01 ? 'ok' : d.accionesCambio.pct >= 0.02 ? 'bad' : '', `${d.accionesCambio.desde}\u2013${d.accionesCambio.hasta}: ${d.accionesCambio.pct < 0 ? 'recompra acciones' : 'diluye'}`) : '',
+  ].join(''));
+
+  // crecimiento (Lynch: que crezca de verdad)
+  const crec = sec('Crecimiento', [
+    r('Ventas', pct1(d.cagrVentas5 ?? d.crecVentas5), sem(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), `CAGR de 5 a\u00f1os${d.cagrVentas10 != null ? `; a 10 a\u00f1os, ${pct1(d.cagrVentas10)}` : ''}`),
+    r('Ganancia neta', pct1(d.cagrNeto5), sem(d.cagrNeto5, 0.10, 0.04), `CAGR de 5 a\u00f1os${d.cagrNeto10 != null ? `; a 10 a\u00f1os, ${pct1(d.cagrNeto10)}` : ''}`),
+    r('EPS', pct1(d.cagrEps5 ?? d.crecEps5), sem(d.cagrEps5 ?? d.crecEps5, 0.10, 0.04), 'CAGR de 5 a\u00f1os'),
+  ].join(''));
+
+  // valuacion: contra si misma, el mismo criterio que tus zonas de alerta
   const peVs = d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null;
-  const val = `<div class="grp"><div class="t">Valuación</div>
-    ${r('P/E', num(d.pe, 1), sem(peVs, -0.10, 0.20, true), d.peMediana ? `mediana 10A ${num(d.peMediana, 1)}${peVs != null ? ` · ${pct1(peVs)}` : ''}` : '')}
-    ${r('PEG', num(d.peg, 2), sem(d.peg, 1, 2, true), 'Lynch: por debajo de 1 es barata')}
-    ${d.pb != null ? r('P/B', num(d.pb, 2)) : ''}
-    ${d.yieldDiv ? r('Dividendo', pct1(d.yieldDiv), '', `payout ${pct1(d.payout)}${d.divCrec5 != null ? ` · crece ${pct1(d.divCrec5)}/año` : ''}`) : ''}
-  </div>`;
-  // próximo balance
-  const b = Fund.balance(t);
-  const bal = b ? `<div class="grp"><div class="t">Próximo balance</div>
-    ${r(D.fmt(b.fecha, { year: true }), b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : `en ${b.dias} días`, b.dias <= 7 ? 'mid' : '', b.epsEst != null ? `EPS esperado ${fmtU(b.epsEst)}` : '')}
-  </div>` : '';
-  // ganancia neta por año (la serie larga de los balances presentados a la SEC)
+  const val = sec('Valuaci\u00f3n', [
+    r('P/E', num(d.pe, 1), sem(peVs, -0.10, 0.20, true), d.peMediana ? `${peVs > 0.2 ? 'Caro' : peVs < -0.1 ? 'Barata' : 'En l\u00ednea'} contra su propia mediana de 10 a\u00f1os (${num(d.peMediana, 1)})` : ''),
+    r('PEG', num(d.peg, 2), sem(d.peg, 1, 2, true), 'Lynch: por debajo de 1 es barata para lo que crece'),
+    d.pb != null ? r('P/B', num(d.pb, 2), '', '') : '',
+    d.yieldDiv ? r('Dividendo', pct1(d.yieldDiv), '', `Payout ${pct1(d.payout)}${d.divCrec5 != null ? ` \u00b7 crece ${pct1(d.divCrec5)} por a\u00f1o` : ''}`) : '',
+    r('Capitalizaci\u00f3n', cap, '', d.beta ? `Beta ${num(d.beta, 2)}${d.sector ? ` \u00b7 ${esc(d.sector)}` : ''}` : (d.sector ? esc(d.sector) : '')),
+  ].join(''));
+
+  // ganancia neta por año: la serie larga de los balances presentados a la SEC
   let serie = '';
   const fs = (d.filas || []).filter(f => Number.isFinite(f.neto));
   if (fs.length > 3) {
     const mx = Math.max(...fs.map(f => Math.abs(f.neto)));
-    serie = `<div class="grp"><div class="t">Ganancia neta por año</div>
-      <div class="nibars">${fs.map(f => `<i class="${f.neto < 0 ? 'neg' : ''}" style="height:${Math.max(2, Math.abs(f.neto) / mx * 100)}%" title="${f.anio}: ${fmtU(f.neto / 1e6, 0)} M"></i>`).join('')}</div>
-      <div class="r" style="padding:2px 0 0"><span class="n">${fs[0].anio}</span><span class="n">${fmtU(fs[fs.length - 1].neto / 1e6, 0)} M en ${fs[fs.length - 1].anio}</span><span class="n">${fs[fs.length - 1].anio}</span></div></div>`;
+    const barras = fs.map((f, i) => `<i class="${f.neto < 0 ? 'neg' : ''}" style="height:${Math.max(2, Math.abs(f.neto) / mx * 100)}%;opacity:${(0.30 + 0.70 * (i / Math.max(1, fs.length - 1))).toFixed(2)}" title="${f.anio}: ${fmtU(f.neto / 1e6, 0)} M"></i>`).join('');
+    serie = `<div class="f-sec"><div class="t">Ganancia neta por a\u00f1o</div>
+      <div class="nibars">${barras}</div>
+      <div class="f-rng-pies" style="margin-top:6px"><span>${fs[0].anio}</span><span>${fmtU(fs[fs.length - 1].neto / 1e6, 0)} M en ${fs[fs.length - 1].anio}</span><span>${fs[fs.length - 1].anio}</span></div></div>`;
   }
-  return `<div class="fund" id="fund-box">
-    <div class="f-h"><div><b>${esc(d.nombre || t)}</b><div class="n">${esc(d.sector || '')}${d.beta ? ` · beta ${num(d.beta, 2)}` : ''}</div></div><div class="n" style="text-align:right">cap ${cap}</div></div>
-    ${rango}${calidad}${crec}${val}${bal}${serie}
-    <div class="n">Datos de Finnhub (balances presentados a la SEC${d.aniosDatos ? `, ${d.aniosDatos.desde}–${d.aniosDatos.hasta}` : ''}) · actualizado ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</div>
+
+  // proximo balance: una fila con punto, sin caja
+  const b = Fund.balance(t);
+  const bal = b ? `<div class="f-bal"><span class="dot warn"></span><span>Pr\u00f3ximo balance <b>${D.fmt(b.fecha, { year: true })}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}</span>${b.epsEst != null ? `<span class="n">EPS esperado ${fmtU(b.epsEst)}</span>` : ''}</div>` : '';
+
+  const faltan = [d.roicAct, d.roe, d.margenNeto, d.deudaPat, d.fcfSobreNeto, d.cagrNeto5, d.pe, d.peg].filter(v => v == null).length;
+  return `<div class="fund hoja" id="fund-box">
+    ${cab}${rango}${calidad}${crec}${val}${serie}${bal}
+    <div class="f-pie">Datos de Finnhub (balances presentados a la SEC${d.aniosDatos ? `, ${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta}`: ''}) \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}${faltan ? ` \u00b7 ${faltan} valor${faltan === 1 ? '' : 'es'} sin datos, marcado${faltan === 1 ? '' : 's'} con \u2014` : ''}</div>
   </div>`;
 }
 /** refresca los fundamentales del ticker y repinta solo ese bloque */
-async function fundRefrescar(t, precio) {
+async function fundRefrescar(t, pos) {
   if (!(state.settings.finnhubKey || '').trim()) return;
   try { await Fund.traer(t); } catch (e) {}
   const box = $('#fund-box'); if (!box) return;
-  const tmp = document.createElement('div'); tmp.innerHTML = fundHTML(t, precio);
+  const tmp = document.createElement('div'); tmp.innerHTML = fundHTML(t, pos);
   box.replaceWith(tmp.firstElementChild);
 }
 function formPosicion(ticker) {
@@ -542,33 +567,127 @@ function formPosicion(ticker) {
   const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
   const al = p.alerta || {};
   const body = `<div class="stack">
-    ${p.cedear ? `<div class="small muted">CEDEAR <b>${esc(p.cedear.code)}</b> · ratio ${Cedears.ratioTxt(p.cedear)}${p.acciones ? ` · tenés ~<b>${fmtAcc(Cedears.aCedears(p.acciones, p.cedear))} CEDEARs</b>` : ''}${p.lotes && p.lotes.length ? ` · ${p.lotes.length} lote${p.lotes.length > 1 ? 's' : ''} abierto${p.lotes.length > 1 ? 's' : ''} (FIFO)` : ''}</div>` : ''}
-    ${p.acciones ? `<div class="sim-result">
-      <div class="box"><div class="l">Tenés</div><div class="v">${fmtAcc(p.acciones)} acc</div></div>
-      <div class="box"><div class="l">PPC</div><div class="v">${fmtU(p.ppc)}</div></div>
-      <div class="box"><div class="l">Precio hoy</div><div class="v">${p.precio != null ? fmtU(p.precio) : '—'}</div></div>
-      <div class="box"><div class="l">Valor</div><div class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</div></div>
-      <div class="box"><div class="l">Resultado total</div><div class="v ${p.gpTotal > 0 ? 'up' : p.gpTotal < 0 ? 'down' : ''}">${p.gpTotal != null ? (p.gpTotal >= 0 ? '+' : '−') + fmtU(Math.abs(p.gpTotal), 0) : '—'}</div><div class="l">${p.rendTotal != null ? pctS(p.rendTotal) : ''}${p.dividendos && p.rendPrecio != null ? ` = precio ${pctS(p.rendPrecio)} + div ${pctS(p.rendDiv)}` : ''}${p.realizado ? ` · realizado ${p.realizado >= 0 ? '+' : '−'}${fmtU(Math.abs(p.realizado), 0)}` : ''}</div></div>
-      <div class="box"><div class="l">vs S&P 500</div><div class="v ${p.alfaUSD > 0 ? 'up' : p.alfaUSD < 0 ? 'down' : ''}">${p.alfaUSD != null ? (p.alfaUSD >= 0 ? '+' : '−') + fmtU(Math.abs(p.alfaUSD), 0) : '—'}</div><div class="l">${p.alfaUSD != null ? 'mismas compras en SPY' : ''}</div></div>
-    </div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
+    ${fundHTML(ticker, p)}
+    ${p.acciones ? `<div class="hoja"><div class="f-sec"><div class="t">Tu tenencia</div>
+      <div class="r"><span class="k">Tenés</span><span class="v">${fmtAcc(p.acciones)} acc</span><span class="por">PPC ${fmtU(p.ppc)}</span></div>
+      <div class="r"><span class="k">Valor hoy</span><span class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</span>${p.precio != null ? `<span class="por">${fmtAcc(p.acciones)} × ${fmtU(p.precio)}</span>` : ''}</div>
+      <div class="r"><span class="k">Resultado total</span><span class="v ${p.gpTotal > 0 ? 'ok' : p.gpTotal < 0 ? 'bad' : ''}">${p.gpTotal != null ? (p.gpTotal >= 0 ? '+' : '−') + fmtU(Math.abs(p.gpTotal), 0) : '—'}</span><span class="por">${p.rendTotal != null ? pctS(p.rendTotal) : ''}${p.dividendos ? ` · incluye ${fmtU(p.dividendos, 2)} de dividendos` : ''}</span></div>
+      <div class="r"><span class="k">vs S&P 500</span><span class="v ${p.alfaUSD > 0 ? 'ok' : p.alfaUSD < 0 ? 'bad' : ''}">${p.alfaUSD != null ? (p.alfaUSD >= 0 ? '+' : '−') + fmtU(Math.abs(p.alfaUSD), 0) : '—'}</span><span class="por">${p.alfaUSD != null ? 'Las mismas compras hechas en SPY' : ''}</span></div>
+    </div></div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
     ${p.objetivo ? `<div class="small"><b>Precio objetivo:</b> ${fmtU(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside)} desde hoy)` : ''}</div>` : ''}
     ${al.nota ? `<div class="callout" style="font-size:13px"><b>Tesis / nota:</b> ${esc(al.nota)}</div>` : ''}
-    ${fundHTML(ticker, p.precio)}
     <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas y objetivo (USD)</div></div>
       ${F.field('<span class="dot warn"></span>Che, mirala ' + G.le, F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
       ${F.field('<span class="dot crit"></span>Comprá urgente ' + G.le, F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
       ${F.field('Precio objetivo 12 m', F.input('a-objetivo', al.objetivo || '', 'inputmode="decimal" placeholder="opcional"'))}
       ${F.field('Tesis / nota', F.input('a-nota', al.nota || '', 'placeholder="por qué la tenés, qué mirar"'))}
     </div>
-    <div class="row" style="gap:8px"><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
+    <div class="row" style="gap:8px"><button type="button" class="btn sm" data-act="comparar" data-id="${esc(ticker)}">Comparar</button><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
     ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(tocá para editar)</span></div>${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><span class="mono op-amt">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0), 2)}</span></div>`).join('')}</div>` : ''}
   </div>`;
-  Modal.open({ title: ticker, body, submit: 'Guardar', onSubmit: () => {
+  Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), nota = Modal.val('a-nota').trim();
     if (!mirala && !urgente && !objetivo && !nota) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, nota: nota || null };
     Persist.save(); toast('Guardado'); render();
   } });
-  fundRefrescar(ticker, p.precio);  // siempre al abrir: se ve lo guardado y se actualiza atrás
+  fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atrás
+}
+/* ---------- COMPARAR EMPRESAS ----------
+ * Hasta tres tickers de la cartera o la watchlist, las mismas metricas que la ficha, una al lado de la otra.
+ * La pregunta aca es "cual es mejor", no "esta es buena": por eso no hay semaforo. Los valores van en gris
+ * y el que lidera cada fila va en blanco con un punto. Al pie, en cuantas filas lidera cada una. */
+const CMP_MAX = 3;
+const cmpPct = v => v == null ? '\u2014' : `${v < 0 ? '\u2212' : ''}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+const cmpNum = n => v => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+const CMP_FILAS = [
+  { sec: 'Calidad del negocio' },
+  { k: 'ROIC', v: d => d.roicAct, f: cmpPct, mejor: 1 },
+  // con recompras fuertes el patrimonio se achica y el ROE se dispara sin que el negocio mejore:
+  // arriba de 100 % o con patrimonio negativo se muestra, pero no compite
+  { k: 'ROE', v: d => d.roe, f: cmpPct, mejor: 1, valido: (v, d) => v <= 1 && !(d.deudaPat < 0), ns: true },
+  { k: 'Margen neto', v: d => d.margenNeto, f: cmpPct, mejor: 1 },
+  { k: 'Deuda / patrimonio', v: d => d.deudaPat, f: cmpNum(2), mejor: -1, valido: v => v >= 0, ns: true },
+  { k: 'Caja libre / ganancia', v: d => d.fcfSobreNeto, f: v => v == null ? '\u2014' : cmpNum(2)(v) + '\u00d7', mejor: 1 },
+  { sec: 'Crecimiento, CAGR 5 a\u00f1os' },
+  { k: 'Ventas', v: d => d.cagrVentas5 ?? d.crecVentas5, f: cmpPct, mejor: 1 },
+  { k: 'Ganancia neta', v: d => d.cagrNeto5, f: cmpPct, mejor: 1 },
+  { k: 'EPS', v: d => d.cagrEps5 ?? d.crecEps5, f: cmpPct, mejor: 1 },
+  { sec: 'Valuaci\u00f3n' },
+  { k: 'P/E', v: d => d.pe, f: cmpNum(1), mejor: -1, valido: v => v > 0 },
+  // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
+  { k: 'P/E vs su mediana', v: d => d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
+  { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
+  { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
+  { k: 'Dividendo', v: d => d.yieldDiv || null, f: cmpPct, mejor: 0 },
+  { k: 'Capitalizaci\u00f3n', v: d => d.capUSD || null, f: v => v == null ? '\u2014' : v >= 1e12 ? `${cmpNum(1)(v / 1e12)} bill.` : `${cmpNum(0)(v / 1e9)} mil M`, mejor: 0 },
+];
+
+function cmpUniverso() {
+  const k = E.cartera();
+  const pos = k.posiciones.map(p => p.ticker), watch = k.watch.map(p => p.ticker).filter(t => !pos.includes(t));
+  const px = {}; [...k.posiciones, ...k.watch].forEach(p => { if (p.precio != null) px[p.ticker] = { c: p.precio, dp: p.dp, estado: p.estado }; });
+  return { tickers: [...pos, ...watch], watch, px };
+}
+
+function cmpBody() {
+  const sel = ui.cmp || [];
+  const { tickers, watch, px } = cmpUniverso();
+  const chips = `<div class="chips filtros" style="margin-bottom:4px">${tickers.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}">${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>`;
+  if (sel.length < 2) return `<div class="hoja">${chips}${empty({ kind: 'periodo bare-top', icon: 'chart', head: sel.length ? 'Eleg\u00ed otra para comparar' : 'Eleg\u00ed dos o tres empresas', sub: 'De tu cartera o de la watchlist. Se comparan con las mismas m\u00e9tricas de la ficha.' })}</div>`;
+
+  const datos = sel.map(t => ({ t, d: Fund.de(t), px: px[t] ? px[t].c : null, dp: px[t] ? px[t].dp : null, estado: px[t] ? px[t].estado : null }));
+  const cargando = datos.filter(x => !x.d).map(x => x.t);
+  const lidera = Object.fromEntries(sel.map(t => [t, 0])); let filasConLider = 0;
+
+  const filas = CMP_FILAS.map(fila => {
+    if (fila.sec) return `<tr class="sec"><td colspan="${sel.length + 1}">${fila.sec}</td></tr>`;
+    const crudo = datos.map(x => { const v = x.d ? fila.v(x.d, x.px) : null; return v == null || !Number.isFinite(v) ? null : v; });
+    const vals = crudo.map((v, i) => v != null && fila.valido && !fila.valido(v, datos[i].d) ? null : v);
+    let lider = -1;
+    const validos = vals.filter(v => v != null);
+    if (fila.mejor && validos.length >= 2) {
+      const obj = fila.mejor > 0 ? Math.max(...validos) : Math.min(...validos);
+      // empate es mismo valor a la vista: nadie lidera por un decimal que no se muestra
+      const idx = vals.map((v, i) => v != null && fila.f(v) === fila.f(obj) ? i : -1).filter(i => i >= 0);
+      if (idx.length === 1) { lider = idx[0]; lidera[sel[lider]]++; filasConLider++; }
+    }
+    return `<tr><td class="k">${fila.k}</td>${datos.map((x, i) => `<td class="${i === lider ? 'lider' : crudo[i] != null && vals[i] == null && fila.ns ? 'ns' : ''}">${!x.d ? '\u2026' : fila.f(crudo[i])}</td>`).join('')}</tr>`;
+  }).join('');
+
+  const maxL = Math.max(...Object.values(lidera));
+  const cab = `<tr class="cab"><th></th>${datos.map(x => `<th><b>${esc(x.t)}</b><span>${x.px != null ? fmtU(x.px) : 'US$ x.xxx'}</span>${x.estado ? `<span class="dot ${x.estado === 'urgente' ? 'crit' : 'warn'}" title="en zona de compra"></span>` : ''}</th>`).join('')}</tr>`;
+  const score = `<tr class="score"><td class="k">Lidera en</td>${sel.map(t => `<td class="${lidera[t] === maxL && maxL > 0 ? 'top' : ''}">${lidera[t]} de ${filasConLider}</td>`).join('')}</tr>`;
+  return `<div class="hoja">${chips}
+    <div class="cmp-wrap"><table class="cmp-t"><thead>${cab}</thead><tbody>${filas}${score}</tbody></table></div>
+    <div class="f-pie">${cargando.length ? `Trayendo ${cargando.join(', ')} de Finnhub\u2026 \u00b7 ` : ''}Lidera: el mejor valor de la fila entre las elegidas, sin juzgar si es bueno en absoluto; eso lo dice la ficha de cada una. Rango 52 semanas: m\u00e1s bajo es m\u00e1s cerca del m\u00ednimo. Tachado: no compite, por patrimonio negativo o ROE arriba de 100 % (recompras que achican el patrimonio).</div>
+  </div>`;
+}
+
+/** trae los fundamentales que falten o esten viejos y repinta si el comparador sigue abierto */
+async function cmpTraer() {
+  const tok = ui.cmpTok = (ui.cmpTok || 0) + 1;
+  const viejo = Date.now() - 6 * 86400000;
+  for (const t of (ui.cmp || []).slice()) {
+    const d = Fund.de(t); if (d && d.at > viejo) continue;
+    try { await Fund.traer(t); } catch (e) {}
+    if (ui.cmpTok !== tok) return;
+    const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody();
+  }
+  Persist.save();
+}
+function cmpToggle(t) {
+  const sel = ui.cmp || (ui.cmp = []);
+  const i = sel.indexOf(t);
+  if (i >= 0) sel.splice(i, 1);
+  else if (sel.length >= CMP_MAX) { toast(`Hasta ${CMP_MAX} a la vez: sac\u00e1 una primero`); return; }
+  else sel.push(t);
+  const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody();
+  cmpTraer();
+}
+function formComparar(t) {
+  ui.cmp = t ? [t] : (ui.cmp || []).slice(0, CMP_MAX);
+  Modal.open({ title: 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: 'Listo', onSubmit: () => {} });
+  cmpTraer();
 }
 function formWatch() {
   Modal.open({ title: 'Vigilar un ticker', body: `<div class="form-grid">${F.field('Ticker', F.input('w-ticker', '', 'placeholder="TSM" autofocus autocapitalize="characters" style="text-transform:uppercase"'), 'Sin tenerlo: solo para que la app y el bot te avisen.', 'full')}${F.field('<span class="dot warn"></span>Che, mirala ' + G.le + ' (USD)', F.input('w-mirala', '', 'inputmode="decimal"'))}${F.field('<span class="dot crit"></span>Comprá urgente ' + G.le + ' (USD)', F.input('w-urgente', '', 'inputmode="decimal"'))}</div>`, submit: 'Guardar', onSubmit: () => {

@@ -48,7 +48,7 @@ function renderCierreBanner() {
 function viewResumen() {
   const ym = ui.mes; const isCur = ym === D.thisMonth();
   const c = E.consumo(ym), prev = E.consumo(D.addMonths(ym, -1)), ing = E.ingreso(ym), proj = E.proyeccion(ym);
-  if (!state.settings.ingreso && !state.movimientos.length && !state.recurrentes.length) return viewOnboarding();
+  if (sinDatos()) return viewOnboarding();
   const dia = Number(D.today().slice(8, 10));
   const avg = E.promedioAcumulado(ym);
   const avgToDate = avg.vals ? avg.vals[(isCur ? dia : D.daysIn(ym)) - 1] : null;
@@ -139,22 +139,141 @@ function renderInsights(list) {
   return list.map(i => `<div class="insight ${i.level}"><div class="ic">${ICONS[i.icon] || ICONS.spark}</div><div><div class="t">${esc(i.title)}</div><p>${esc(i.text)}${i.view ? ` <a href="#" data-go="${i.view}">Ver ${G.to}</a>` : ''}${i.action === 'detectar' ? ` <a href="#" data-act="detectar">Revisar ${G.to}</a>` : ''}</p></div></div>`).join('');
 }
 
+/** Arranque: sin sueldo, sin movimientos y sin fijos la app muestra el onboarding y nada mas. */
+const sinDatos = () => !state.settings.ingreso && !state.movimientos.length && !state.recurrentes.length;
+
+const TARJETAS_PRESET = [
+  { nombre: 'Visa BBVA', banco: 'BBVA', cierre: 28, vencimiento: 10 },
+  { nombre: 'Mercado Pago', banco: 'MP', cierre: 27, vencimiento: 5 },
+  { nombre: 'Visa Galicia', banco: 'Galicia', cierre: 20, vencimiento: 5 },
+  { nombre: 'Visa Santander', banco: 'Santander', cierre: 22, vencimiento: 8 },
+  { nombre: 'Visa Macro', banco: 'Macro', cierre: 25, vencimiento: 10 },
+];
+
+/** Lee lo que haya en pantalla al borrador antes de re-renderizar: el paso cambia la vista entera. */
+function obLeer() {
+  const ob = ui.ob; if (!ob) return;
+  const ing = $('#ob-ingreso'); if (ing) ob.ingreso = M.parse(ing.value);
+  const dia = $('#ob-dia'); if (dia) ob.diaCobro = clamp(Number(dia.value) || 10, 1, 31);
+  const r = $('#ob-pres-range'); if (r) ob.presuPct = Number(r.value);
+  $$('.ob-card').forEach((row, i) => {
+    const t = ob.tarjetas[i]; if (!t) return;
+    const n = row.querySelector('[data-f="nombre"]'), c = row.querySelector('[data-f="cierre"]'), v = row.querySelector('[data-f="venc"]');
+    if (n) t.nombre = n.value;
+    if (c) t.cierre = clamp(Number(c.value) || t.cierre, 1, 31);
+    if (v) t.vencimiento = clamp(Number(v.value) || t.vencimiento, 1, 31);
+  });
+}
+/** El slider se mueve sin re-renderizar: solo cambian tres textos. */
+function obPresu() {
+  const ob = ui.ob; if (!ob) return;
+  const monto = Math.round(ob.ingreso * ob.presuPct / 100);
+  const m = $('#ob-pres-monto'), pc = $('#ob-pres-pct'), iv = $('#ob-pres-inv');
+  if (m) m.textContent = M.f(monto);
+  if (pc) pc.textContent = `${ob.presuPct} % del sueldo`;
+  if (iv) iv.textContent = `Te quedar\u00edan ${M.f(Math.max(0, ob.ingreso - monto))} por mes para invertir`;
+  const r = $('#ob-pres-range'); if (r) r.style.setProperty('--p', `${Math.round((ob.presuPct - 30) / 50 * 100)}%`);
+}
+
+/** Tres pasos, no nueve campos: con el sueldo solo la app ya funciona, el resto puede esperar.
+ *  El dolar MEP no se pregunta: lo trae dolarapi. */
 function viewOnboarding() {
-  return `<div class="onboard fade">
-    <div class="hero"><div class="eyebrow">Bienvenido</div><h1>¿Cuánto te queda este mes?</h1><p>La app sigue lo que gastás con tarjeta, te dice en qué resumen cae cada compra, cuánto ya tenés comprometido en cuotas y cuánto te queda para invertir.</p></div>
-    <div class="card"><div class="card-head"><h2>Arranquemos con lo básico</h2></div>
-      <div class="form-grid">
-        <div class="field"><label>Sueldo neto mensual (ARS)</label><input class="input" id="ob-ingreso" inputmode="numeric" placeholder="2.500.000"></div>
-        <div class="field"><label>Dólar MEP de referencia</label><input class="input" id="ob-tc" inputmode="numeric" value="${state.settings.tc}"></div>
-        <div class="field"><label>Tarjeta 1 · nombre</label><input class="input" id="ob-t1" placeholder="Visa Galicia"></div>
-        <div class="field"><label>Cierre / vencimiento (día del mes)</label><div class="row" style="flex-wrap:nowrap"><input class="input" id="ob-t1c" inputmode="numeric" value="20"><input class="input" id="ob-t1v" inputmode="numeric" value="5"></div></div>
-        <div class="field"><label>Tarjeta 2 · nombre (opcional)</label><input class="input" id="ob-t2" placeholder="Mastercard Santander"></div>
-        <div class="field"><label>Cierre / vencimiento</label><div class="row" style="flex-wrap:nowrap"><input class="input" id="ob-t2c" inputmode="numeric" value="22"><input class="input" id="ob-t2v" inputmode="numeric" value="8"></div></div>
-        <div class="field"><label>Cuánto querés gastar por mes (presupuesto)</label><input class="input" id="ob-pres" inputmode="numeric" placeholder="1.600.000"></div>
+  const ob = ui.ob || (ui.ob = { paso: 1, ingreso: 0, diaCobro: 31, presuPct: 50, tarjetas: [] });
+  const paso = ob.paso;
+  const barra = `<div class="ob-steps">${[1, 2, 3].map(n => `<i class="${n <= paso ? 'on' : ''}"${n < paso ? ` data-act="ob-paso" data-id="${n}" style="cursor:pointer"` : ''}></i>`).join('')}</div>`;
+  let cuerpo = '';
+
+  if (paso === 1) {
+    cuerpo = `<div class="eyebrow">Paso 1 de 3</div>
+      <h1>\u00bfCu\u00e1nto cobr\u00e1s por mes?</h1>
+      <p class="ob-sub">Neto, lo que te entra. Es lo \u00fanico que la app necesita para arrancar.</p>
+      <div class="ob-amt"><span class="cur">$</span><input class="ob-big" id="ob-ingreso" inputmode="numeric" placeholder="2.500.000" value="${ob.ingreso ? fmtARS.format(ob.ingreso) : ''}"></div>
+      <div class="eyebrow" style="margin-top:22px">Qu\u00e9 d\u00eda lo cobr\u00e1s</div>
+      <div class="choice" style="margin-top:8px">
+        <button type="button" data-act="ob-cobro" data-id="ultimo" class="${ob.diaCobro >= 28 ? 'on' : ''}">El \u00faltimo d\u00eda</button>
+        <button type="button" data-act="ob-cobro" data-id="otro" class="${ob.diaCobro < 28 ? 'on' : ''}">Otro d\u00eda</button>
       </div>
-      <div class="row between" style="margin-top:16px"><button class="btn" data-act="demo">Ver con datos de ejemplo</button><button class="btn primary" data-act="onboard">Empezar</button></div>
-      <p class="small muted" style="margin-top:10px">Todo se guarda en esta página. Podés cambiar cualquier cosa después desde Configuración.</p>
-    </div></div>`;
+      ${ob.diaCobro < 28 ? `<div class="field" style="margin-top:10px;max-width:130px"><label>D\u00eda del mes</label><input class="input sm" id="ob-dia" inputmode="numeric" value="${ob.diaCobro}"></div>` : ''}
+      <p class="ob-nota">Ese d\u00eda la app te pregunta cu\u00e1nto cobraste y recalcula todo.</p>
+      <div class="row between" style="margin-top:22px;gap:10px">
+        <button class="btn" data-act="demo">Probar con datos de ejemplo</button>
+        <button class="btn primary" data-act="ob-paso" data-id="2">Seguir</button>
+      </div>`;
+  } else if (paso === 2) {
+    const monto = Math.round(ob.ingreso * ob.presuPct / 100);
+    cuerpo = `<div class="eyebrow">Paso 2 de 3</div>
+      <h1>\u00bfCu\u00e1nto quer\u00e9s gastar?</h1>
+      <p class="ob-sub">Mov\u00e9 la barra. Lo que no gast\u00e1s es lo que te queda para invertir.</p>
+      <div class="row between" style="align-items:baseline;margin-top:20px">
+        <span class="ob-num" id="ob-pres-monto">${M.f(monto)}</span>
+        <span class="ob-pct" id="ob-pres-pct">${ob.presuPct} % del sueldo</span>
+      </div>
+      <input type="range" id="ob-pres-range" min="30" max="80" step="1" value="${ob.presuPct}" style="margin-top:6px;--p:${Math.round((ob.presuPct - 30) / 50 * 100)}%">
+      <div class="row" style="gap:0;margin-top:4px"><span class="dot info"></span><span class="small muted" id="ob-pres-inv">Te quedar\u00edan ${M.f(Math.max(0, ob.ingreso - monto))} por mes para invertir</span></div>
+      <p class="ob-nota">Despu\u00e9s lo cambi\u00e1s cuando quieras desde Ajustes.</p>
+      <div class="row between" style="margin-top:22px;gap:10px">
+        <button class="btn ghost" data-act="ob-paso" data-id="1">Atr\u00e1s</button>
+        <button class="btn primary" data-act="ob-paso" data-id="3">Seguir</button>
+      </div>`;
+  } else {
+    const puesta = n => ob.tarjetas.some(t => t.preset === n);
+    cuerpo = `<div class="eyebrow">Paso 3 de 3</div>
+      <h1>\u00bfCon qu\u00e9 pag\u00e1s?</h1>
+      <p class="ob-sub">Eleg\u00ed las tuyas. El cierre y el vencimiento vienen puestos y los pod\u00e9s corregir.</p>
+      <div class="chips" style="margin-top:16px">
+        ${TARJETAS_PRESET.map(t => `<button type="button" data-act="ob-card" data-id="${esc(t.nombre)}" class="${puesta(t.nombre) ? 'on' : ''}">${esc(t.nombre)}</button>`).join('')}
+        <button type="button" data-act="ob-card" data-id="otra">+ Otra</button>
+      </div>
+      ${ob.tarjetas.length ? `<div style="margin-top:14px">${ob.tarjetas.map((t, i) => `<div class="ob-card">
+        <input class="input sm" data-f="nombre" value="${esc(t.nombre)}" placeholder="Nombre de la tarjeta">
+        <label>cierra<input class="input sm" data-f="cierre" inputmode="numeric" value="${t.cierre}"></label>
+        <label>vence<input class="input sm" data-f="venc" inputmode="numeric" value="${t.vencimiento}"></label>
+        <button class="mini-btn" data-act="ob-card-del" data-id="${i}" title="Quitar">${ICONS.trash}</button>
+      </div>`).join('')}</div>` : ''}
+      <p class="ob-nota">Con el cierre real, cada compra cae en el resumen que le toca.</p>
+      <div class="row between" style="margin-top:22px;gap:10px">
+        <button class="btn ghost" data-act="ob-fin" data-id="skip">Saltear, agrego despu\u00e9s</button>
+        <button class="btn primary" data-act="ob-fin" data-id="ok">Listo</button>
+      </div>`;
+  }
+
+  return `<div class="onboard fade">${barra}<div class="card">${cuerpo}</div>
+    <p class="small muted" style="margin-top:14px;text-align:center">Todo queda en tu tel\u00e9fono. Pod\u00e9s cambiarlo desde Ajustes.</p></div>`;
+}
+
+/** Movimientos en mobile: encabezado de dia, descripcion con sus tags, categoria y medio abajo,
+ *  monto a la derecha. Las filas de cuota pesan menos: no son una compra de hoy, son el eco de
+ *  una compra vieja. Las acciones salen de la fila (en una lista de 48 movimientos eran 144 botones):
+ *  tocar abre el detalle, que ya trae borrar y duplicar. */
+function renderMovLista(rows, opts, key) {
+  const DIAS = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
+  const porDia = !opts.compact && key === 'fecha';
+  let html = '<div class="mlist">';
+  rows.forEach((m, i) => {
+    if (porDia && (i === 0 || rows[i - 1].fecha !== m.fecha)) {
+      const totDia = sum(rows.filter(x => x.fecha === m.fecha).map(E.rowAmount));
+      html += `<div class="mday"><span class="eyebrow">${DIAS[D.dow(m.fecha)]} ${m.fecha.slice(8, 10)}</span><b>${M.f(totDia)}</b></div>`;
+    }
+    const ars = E.rowAmount(m), total = M.toARS(m.monto, m.moneda), enCuotas = (m.cuotas || 1) > 1;
+    const tags = [];
+    if (m.cuotaRow) tags.push(`cuota ${m.cuotaIdx}/${m.cuotaN}`);
+    else if (enCuotas) tags.push(`1/${m.cuotas} cuotas`);
+    if (m.recId) tags.push('fijo');
+    if (m.virtual) tags.push('estimado');
+    const act = m.virtual ? `data-act="confirmar" data-id="${m.id}"`
+      : m.cuotaRow ? `data-act="edit" data-id="${esc(m.origId)}"` : `data-act="edit" data-id="${esc(m.id)}"`;
+    const sub = [L.cat(m.catId).nombre, medioLabel(m)];
+    if (m.moneda === 'USD') sub.push(`US$ ${fmtAcc(m.monto)}`);
+    if (!porDia) sub.unshift(D.fmt(m.fecha));
+    html += `<div class="mv ${m.cuotaRow ? 'cuota' : ''}${m.virtual ? ' virtual' : ''}" ${act}>
+      <div style="min-width:0">
+        <div class="m1"><b>${esc(m.desc)}</b>${tags.map(t => `<span class="tg">${t}</span>`).join('')}</div>
+        <div class="m2">${sub.map(x => esc(x)).join(' \u00b7 ')}</div>
+      </div>
+      <div class="mm">${M.f(ars)}${enCuotas && !m.cuotaRow ? `<span class="sub">total ${M.f(total)}</span>` : ''}</div>
+    </div>`;
+  });
+  return html + '</div>';
 }
 
 /* ---------- MOVIMIENTOS ---------- */
@@ -165,6 +284,9 @@ function renderMovTable(movs, opts = {}) {
   const s = ui.sort; const key = s.key;
   const val = m => key === 'monto' ? E.rowAmount(m) : key === 'cat' ? L.cat(m.catId).nombre : key === 'nec' ? (m.necesidad || 1) : key === 'desc' ? norm(m.desc) : m.fecha + (m.id || '');
   const rows = opts.compact ? movs : movs.slice().sort((a, b) => { const va = val(a), vb = val(b); return (va > vb ? 1 : va < vb ? -1 : 0) * s.dir; });
+  // en 390 px la tabla de siete columnas no entra: hoy se resolvia escondiendo columnas,
+  // o sea que la tabla existia para no mostrarse. En mobile es una lista.
+  if (window.innerWidth <= 700) return renderMovLista(rows, opts, key);
   const th = (k, label, cls = '') => opts.compact ? `<th class="${cls}">${label}</th>` : `<th class="${cls} ${key === k ? 'sorted' : ''}" data-sort="${k}">${label}${key === k ? (s.dir > 0 ? ' ' + G.up : ' ' + G.down) : ''}</th>`;
   return `<div class="table-wrap"><table class="responsive ${!opts.compact && key === 'fecha' ? 'grouped' : ''}"><thead><tr>${th('fecha', 'Fecha')}${th('desc', 'Descripción')}${th('cat', 'Categoría')}<th>Medio</th>${th('nec', 'Nec.')}${th('monto', 'Monto', 'r')}<th></th></tr></thead><tbody>
   ${rows.map((m, i) => { const ars = E.rowAmount(m); const dayHead = !opts.compact && key === 'fecha' && (i === 0 || rows[i - 1].fecha !== m.fecha) ? `<tr class="day"><td colspan="7">${['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][D.dow(m.fecha)]} ${D.fmt(m.fecha)}<span>${M.f(sum(rows.filter(x => x.fecha === m.fecha).map(E.rowAmount)))}</span></td></tr>` : ''; const total = M.toARS(m.monto, m.moneda); const cuotas = (m.cuotas || 1) > 1; const t = L.tarjeta(m.tarjetaId); const pago = m.medio === 'tarjeta' && t && !m.cuotaRow ? E.primerPago(m) : null;
@@ -189,14 +311,17 @@ function viewMovimientos() {
   const total = sum(movs.map(E.rowAmount)); const innec = sum(movs.filter(m => (m.necesidad || 1) === 3).map(E.rowAmount));
   const sel = (id, opts, cur, ph) => `<select class="input sm" data-filter="${id}"><option value="">${ph}</option>${opts.map(o => `<option value="${o[0]}" ${cur === o[0] ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
   return `<div class="card">
-    <div class="filters">
-      <input class="input sm" style="min-width:180px;flex:1" placeholder="Buscar…" data-filter="q" value="${esc(f.q || '')}">
-      ${sel('cat', state.categorias.map(c => [c.id, c.nombre]), f.cat, 'Todas las categorías')}
-      ${sel('medio', [['tarjeta', 'Tarjeta (todas)'], ...state.tarjetas.map(t => ['t:' + t.id, t.nombre]), ['debito', 'Débito'], ['efectivo', 'Efectivo'], ['transferencia', 'Transferencia / MP']], f.medio, 'Todos los medios')}
-      ${sel('nec', [['1', 'Necesario'], ['2', 'Útil'], ['3', 'Innecesario']], f.nec, 'Necesidad')}
-      ${sel('tipo', [['variables', 'Solo compras'], ['fijos', 'Solo fijos'], ['cuotas', 'Solo cuotas']], f.tipo, 'Todo (compras, fijos, cuotas)')}
-      ${Object.values(f).some(Boolean) ? '<button class="btn ghost sm" data-act="clear-filters">Limpiar</button>' : ''}
-    </div>
+    ${(() => {
+      const chip = (k, v, label) => `<button type="button" data-act="filtro" data-id="${k}:${v}" class="${(f[k] || '') === v ? 'on' : ''}">${esc(label)}</button>`;
+      return `<div class="chips filtros">
+        <input class="input sm" placeholder="Buscar…" data-filter="q" value="${esc(f.q || '')}">
+        ${chip('tipo', '', 'Todo')}${chip('tipo', 'variables', 'Compras')}${chip('tipo', 'fijos', 'Fijos')}${chip('tipo', 'cuotas', 'Cuotas')}
+        ${chip('nec', '3', 'Innecesario')}
+        ${sel('cat', state.categorias.map(c => [c.id, c.nombre]), f.cat, 'Categoría')}
+        ${sel('medio', [['tarjeta', 'Tarjeta (todas)'], ...state.tarjetas.map(t => ['t:' + t.id, t.nombre]), ['debito', 'Débito'], ['efectivo', 'Efectivo'], ['transferencia', 'Transferencia / MP']], f.medio, 'Medio de pago')}
+        ${Object.values(f).some(Boolean) ? '<button type="button" class="limpiar" data-act="clear-filters">Limpiar</button>' : ''}
+      </div>`;
+    })()}
     <div class="row between small muted" style="margin-bottom:8px"><span>${movs.length} movimientos · <b class="mono" style="color:var(--ink)">${M.f(total)}</b></span><span>Innecesario: <b class="mono">${M.f(innec)}</b> (${M.pct(innec / (total || 1))})</span></div>
     ${renderMovTable(movs)}
     <p class="small muted" style="margin-top:10px">Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en él (monto de la cuota, no el total). Las filas con borde ámbar son fijos estimados: tocá <b>Confirmar</b> para cargar el monto real. <kbd>N</kbd> abre un gasto nuevo.</p>
@@ -220,8 +345,8 @@ function viewCuotas() {
   html += `<div class="card section"><div class="card-head"><h2>Carga mensual de los próximos 12 meses</h2><span class="hint">Lo que ya sabés que vas a pagar, contra tu presupuesto</span></div>
     ${ChartQ.reg(w => Charts.stacked({ w, h: 250, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }, { name: 'Compras', color: 'var(--line-2)', values: hz.map(h => h.nuevo) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 250)}
     ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Compras del mes', color: 'var(--line-2)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Umbral ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
-    <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Mes</th><th class="r">Fijos</th><th class="r">Cuotas</th><th class="r">Fijos + cuotas</th><th class="r">% presup.</th><th class="r">Libre para compras</th></tr></thead><tbody>
-      ${hz.map(h => `<tr><td style="text-transform:capitalize">${D.monthName(h.ym)}</td><td class="amount r">${M.f(h.fijos)}</td><td class="amount r">${M.f(h.cuotas)}</td><td class="amount r"><b>${M.f(h.comprometido)}</b></td><td class="r">${h.presupuesto ? `<span class="pill ${pctPresu(h.pct)}">${M.pct(h.pct)}</span>` : '—'}</td><td class="amount r">${h.presupuesto ? M.f(h.libre) : '—'}</td></tr>`).join('')}
+    <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Mes</th><th class="r det">Fijos</th><th class="r det">Cuotas</th><th class="r">Fijos + cuotas</th><th class="r">%</th><th class="r">Libre</th></tr></thead><tbody>
+      ${hz.map(h => `<tr><td style="text-transform:capitalize">${D.monthName(h.ym)}</td><td class="amount r det">${M.f(h.fijos)}</td><td class="amount r det">${M.f(h.cuotas)}</td><td class="amount r"><b>${M.f(h.comprometido)}</b></td><td class="r">${h.presupuesto ? `<span class="pill ${pctPresu(h.pct)}">${M.pct(h.pct)}</span>` : '—'}</td><td class="amount r">${h.presupuesto ? M.f(h.libre) : '—'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Cuotas en curso</h2><span class="hint">${act.length} planes</span></div>

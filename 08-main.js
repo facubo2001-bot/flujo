@@ -25,7 +25,9 @@ function render() {
   const fns = { resumen: viewResumen, movimientos: viewMovimientos, cuotas: viewCuotas, tarjetas: viewTarjetas, cartera: viewCartera, plan: viewPlan, tendencias: viewTendencias, config: viewConfig };
   let body = '';
   try { body = fns[ui.view](); } catch (e) { console.error(e); body = `<div class="card">${empty({ kind: 'is-error', icon: 'warn', head: 'No pudimos dibujar esta vista', sub: 'Tus datos están a salvo. Probá de nuevo o cambiá de mes.', trace: e.message, btn: 'Reintentar', action: 'reload', ghost: true })}</div>`; }
-  $('#view').innerHTML = renderTopbar() + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
+  const onb = ui.view === 'resumen' && sinDatos();
+  document.body.classList.toggle('onboarding', onb);
+  $('#view').innerHTML = (onb ? '' : renderTopbar()) + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
   if (window.innerWidth > 900) $('#btn-new-desktop').style.display = '';
   ChartQ.mount();
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
@@ -86,6 +88,7 @@ const Actions = {
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
   'clear-filters'() { ui.filtros = {}; render(); },
+  filtro(kv) { const i = String(kv).indexOf(':'); ui.filtros[kv.slice(0, i)] = kv.slice(i + 1); render(); },
   simular() {
     const monto = M.parse($('#sim-monto').value); const cuotas = clamp(Number($('#sim-cuotas').value) || 1, 1, 60); const tarjetaId = $('#sim-tarjeta').value || undefined; const desde = $('#sim-mes').value || D.thisMonth();
     if (!monto) { toast('Ingresá un monto'); return; }
@@ -136,6 +139,8 @@ const Actions = {
   'del-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (!o) return; confirmar(`¿Borrar ${o.tipo} de ${o.ticker} del ${D.fmt(o.fecha, { year: true })}?`, () => { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); render(); }); },
   'del-op-modal'(id) { state.cartera.operaciones = state.cartera.operaciones.filter(x => x.id !== id); Persist.save(); Modal.close(); render(); toast('Operación borrada'); },
   pos(t) { formPosicion(t); },
+  comparar(t) { formComparar(t); },
+  'cmp-toggle'(t) { cmpToggle(t); },
   'new-watch'() { formWatch(); },
   'del-alerta'(t) { delete state.cartera.alertas[t]; Persist.save(); Modal.close(); render(); toast(`Alerta de ${t} quitada`); },
   'precios-update'() { toast('Buscando precios…'); Precios.actualizar(false); },
@@ -150,13 +155,31 @@ const Actions = {
   reload() { location.reload(); },
   demo() { confirmar('Se van a cargar 5 meses de datos inventados (reemplazan lo que haya). Después podés borrar todo desde Configuración.', () => { cargarDemo(); ui.mes = D.thisMonth(); Persist.save(); toast('Datos de ejemplo cargados'); go('resumen'); }, 'Cargar ejemplo'); },
   reset() { confirmar('¿Borrar absolutamente todo? No se puede deshacer (exportá un respaldo antes).', () => { state = defaultState(); Persist.save(); render(); }); },
-  onboard() {
-    const ing = M.parse($('#ob-ingreso').value); state.settings.ingreso = ing; state.settings.tc = M.parse($('#ob-tc').value) || state.settings.tc; state.settings.presupuesto = M.parse($('#ob-pres').value) || Math.round(ing * 0.6);
-    const t1 = $('#ob-t1').value.trim(), t2 = $('#ob-t2').value.trim();
-    if (t1) state.tarjetas.push({ id: uid(), nombre: t1, cierre: Number($('#ob-t1c').value) || 20, vencimiento: Number($('#ob-t1v').value) || 5, color: CARD_COLORS[0] });
-    if (t2) state.tarjetas.push({ id: uid(), nombre: t2, cierre: Number($('#ob-t2c').value) || 22, vencimiento: Number($('#ob-t2v').value) || 8, color: CARD_COLORS[1] });
-    if (!ing && !t1) { toast('Cargá al menos tu sueldo'); return; }
-    Persist.save(); toast('Listo. Cargá tu primer gasto con el +'); render();
+  'ob-paso'(n) {
+    obLeer(); const p = Number(n);
+    if (p > 1 && !ui.ob.ingreso) { toast('Cargá tu sueldo para arrancar'); return; }
+    ui.ob.paso = p; render();
+  },
+  'ob-cobro'(v) { obLeer(); ui.ob.diaCobro = v === 'ultimo' ? 31 : (ui.ob.diaCobro < 28 ? ui.ob.diaCobro : 10); render(); },
+  'ob-card'(id) {
+    obLeer(); const ob = ui.ob;
+    const i = ob.tarjetas.findIndex(t => t.preset === id);
+    if (i >= 0) ob.tarjetas.splice(i, 1);
+    else { const p = TARJETAS_PRESET.find(t => t.nombre === id); ob.tarjetas.push(p ? { ...p, preset: id } : { nombre: '', banco: '', cierre: 20, vencimiento: 5 }); }
+    render();
+  },
+  'ob-card-del'(i) { obLeer(); ui.ob.tarjetas.splice(Number(i), 1); render(); },
+  'ob-fin'(modo) {
+    obLeer(); const ob = ui.ob;
+    if (!ob.ingreso) { toast('Cargá tu sueldo para arrancar'); ob.paso = 1; render(); return; }
+    state.settings.ingreso = ob.ingreso;
+    state.settings.diaCobro = ob.diaCobro;
+    state.settings.presupuesto = Math.round(ob.ingreso * ob.presuPct / 100);
+    if (modo !== 'skip') ob.tarjetas.filter(t => String(t.nombre).trim()).forEach((t, i) => state.tarjetas.push({
+      id: uid(), nombre: String(t.nombre).trim(), banco: t.banco || '',
+      cierre: Number(t.cierre) || 20, vencimiento: Number(t.vencimiento) || 5, color: CARD_COLORS[i % CARD_COLORS.length],
+    }));
+    ui.ob = null; Persist.save(); toast('Listo. Cargá tu primer gasto con el +'); render();
   },
   async export() {
     const json = JSON.stringify(state, null, 1); const filename = `gastos-${D.today()}.json`;
@@ -178,7 +201,8 @@ document.addEventListener('click', e => {
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.trendRange = Number(rg.dataset.range); render(); return; }
   if (e.target.closest('#fab')) { if (ui.view === 'cartera') formOp(); else formMov(); return; }
-  const ta = e.target.closest('tr[data-alerta]'); if (ta && !e.target.closest('button')) { formPosicion(ta.dataset.alerta); return; }
+  // cualquier fila de alerta abre la ficha (posicion o watchlist): antes buscaba tr[data-alerta] y la fila ya no es una tabla
+  const ta = e.target.closest('[data-alerta]'); if (ta && !e.target.closest('button')) { formPosicion(ta.dataset.alerta); return; }
   if (e.target.id === 'overlay') { Modal.close(); return; }
   const act = e.target.closest('[data-act]'); if (act) { e.preventDefault(); const fn = Actions[act.dataset.act]; if (fn) fn(act.dataset.id); return; }
   const tr = e.target.closest('tr[data-id]'); if (tr && !e.target.closest('button,select,input,a,label')) { const id = tr.dataset.id; if (id.startsWith('v:')) Actions.confirmar(id); else Actions.edit(id.split('#')[0]); return; }
@@ -195,7 +219,9 @@ document.addEventListener('change', e => {
   if (t.id === 'import-file') { const f = t.files[0]; if (!f) return; f.text().then(txt => { try { const j = JSON.parse(txt); if (!j || !j.v) throw new Error(); confirmar(`Importar ${j.movimientos?.length || 0} movimientos y reemplazar los datos actuales?`, () => { state = Persist.migrate(j); Persist.save(); toast('Datos importados'); go('resumen'); }, 'Importar'); } catch (e) { toast('El archivo no es un respaldo válido'); } }); return; }
   if (t.id === 'import-csv') { const f = t.files[0]; if (!f) return; f.text().then(importarCSV); return; }
 });
-document.addEventListener('input', e => { const t = e.target; if (t.dataset.filter === 'q') { clearTimeout(window._qT); window._qT = setTimeout(() => { ui.filtros.q = t.value; const pos = t.selectionStart; render(); const again = $('[data-filter="q"]'); if (again) { again.focus(); again.setSelectionRange(pos, pos); } }, 250); } });
+document.addEventListener('input', e => { const t = e.target;
+  if (t.id === 'ob-pres-range' && ui.ob) { ui.ob.presuPct = Number(t.value); obPresu(); return; }
+  if (t.dataset.filter === 'q') { clearTimeout(window._qT); window._qT = setTimeout(() => { ui.filtros.q = t.value; const pos = t.selectionStart; render(); const again = $('[data-filter="q"]'); if (again) { again.focus(); again.setSelectionRange(pos, pos); } }, 250); } });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('#overlay').classList.contains('open')) { Modal.close(); return; }
   if ($('#overlay').classList.contains('open')) { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && !e.target.closest('.choice')) { e.preventDefault(); Modal.submit(); } return; }
