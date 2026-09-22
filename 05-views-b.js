@@ -211,8 +211,9 @@ function viewConfig() {
     <div class="card"><div class="card-head"><h2>Datos</h2></div>
       <div class="stack">
         ${(() => { const g = Gist.cfg(); return g
-          ? `<div class="list-item"><div><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Conectada a tu GitHub (gist ${esc(String(g.id).slice(0, 8))}…). Sube al guardar y baja al abrir la app.</span></div><div class="row" style="gap:4px"><button class="btn sm" data-act="gist-pull">Traer ahora</button><button class="btn sm danger" data-act="gist-off">Desconectar</button></div></div>`
+          ? `<div class="list-item"><div><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Conectada a tu GitHub (gist ${esc(String(g.id).slice(0, 8))}…). Sube al guardar y baja al abrir la app.${(() => { const t = Gist.ultimoPush(); return t ? ` Última subida ${haceTxt(t)}.` : ''; })()} GitHub guarda cada versión y una copia mensual aparte.</span></div><div class="row" style="gap:4px"><button class="btn sm" data-act="gist-pull">Traer ahora</button><button class="btn sm danger" data-act="gist-off">Desconectar</button></div></div>`
           : `<div class="list-item" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Guarda tus datos en un gist privado de tu GitHub para verlos iguales en el celu y la PC. Creá un token clásico con permiso "gist" en github.com, en Settings, Developer settings, Personal access tokens, Tokens (classic), y pegalo acá (una vez por dispositivo).</span></div><div class="row" style="gap:6px;width:100%;margin-top:8px"><input class="input sm" type="password" id="g-token" placeholder="ghp_…" style="flex:1;min-width:160px"><button class="btn sm primary" data-act="gist-connect">Conectar</button></div></div>`; })()}
+        ${Gist.cfg() ? `<div class="list-item"><div><b style="font-weight:500">Volver a una versión anterior</b><span class="sub small muted">Elegí un día y hora del historial de GitHub; la app vuelve a como estaba entonces</span></div><button class="btn sm" data-act="gist-versiones">${ICONS.clock} Ver</button></div>` : ''}
         <div class="list-item"><div><b style="font-weight:500">Resumen para analizar con Claude</b><span class="sub small muted">Copia un informe del mes en texto para pegarlo en el chat del proyecto</span></div><button class="btn sm" data-act="copiar-resumen">${ICONS.copy} Copiar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Exportar respaldo</b><span class="sub small muted">Descarga todo en JSON (${state.movimientos.length} movimientos)</span></div><button class="btn sm" data-act="export">${ICONS.download} Exportar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Importar respaldo</b><span class="sub small muted">Reemplaza los datos actuales por un JSON exportado</span></div><label class="btn sm">${ICONS.upload} Importar<input type="file" accept="application/json" id="import-file" class="hidden"></label></div>
@@ -291,7 +292,7 @@ function viewCartera() {
       <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio · hoy</span><span>Valor · rdo.</span></div>
       ${k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balance(p.ticker); if (bal && bal.dias <= 7) avisos.push(`balance ${bal.dias === 0 ? 'hoy' : bal.dias === 1 ? 'mañana' : 'en ' + bal.dias + ' d'}`);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
-        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div><span class="pz-s">${p.cedear ? `${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs · ` : ''}${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
+        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div>${p.cedear ? `<span class="pz-s">${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs</span>` : ''}<span class="pz-s">${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
         <div class="pz-m">${p.precio != null ? `<span class="pz-px">${fmtU(p.precio)}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '—'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div>
         <div class="pz-r"><b>${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}<span class="pz-w">${M.pct(p.peso, 1)}</span></div>
       </div>`; }).join('')}
@@ -465,4 +466,16 @@ function renderPatrimonio(k) {
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
   </div>`;
+}
+
+
+/** "hace 3 min", "hace 2 h", "hace 5 días" */
+function haceTxt(t) { const m = Math.round((Date.now() - t) / 60000); if (m < 1) return 'recién'; if (m < 60) return `hace ${m} min`; const h = Math.round(m / 60); if (h < 36) return `hace ${h} h`; return `hace ${Math.round(h / 24)} días`; }
+
+/** aviso de respaldo: rojo si los datos viven solo en este dispositivo, ámbar si hace mucho que no suben */
+function renderRespaldoBanner() {
+  if (!state.movimientos.length && !(state.cartera && state.cartera.operaciones.length)) return '';
+  if (!Gist.cfg()) return `<div class="callout crit" style="margin-bottom:14px"><b>Tus datos viven solo en este dispositivo.</b> Si lo perdés o borrás el navegador, se pierden. Conectá tu GitHub en <a data-go="config" style="color:var(--accent);text-decoration:underline;cursor:pointer">Ajustes</a>: tarda 2 minutos y de ahí en más se guarda solo.</div>`;
+  const t = Gist.ultimoPush(); if (t && Date.now() - t > 7 * 86400000) return `<div class="callout amber" style="margin-bottom:14px"><b>Hace ${Math.round((Date.now() - t) / 86400000)} días que no sube a GitHub.</b> Abrí Ajustes y tocá "Traer ahora" para ver si hay un problema con el token.</div>`;
+  return '';
 }

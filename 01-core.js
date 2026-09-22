@@ -346,9 +346,32 @@ const Gist = {
   },
   async push() {
     const c = Gist.cfg(); if (!c) return false;
-    const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files: { [Gist.FILE]: { content: JSON.stringify(state) } } }) });
+    const files = { [Gist.FILE]: { content: JSON.stringify(state) } };
+    // copia mensual aparte, que no se pisa: respaldo-AAAA-MM.json (una por mes, en el mismo gist)
+    const mes = D.thisMonth(); const marca = 'flujo.gist.mes';
+    let ultimo = null; try { ultimo = localStorage.getItem(marca); } catch (e) {}
+    if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: JSON.stringify(state) };
+    const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
     return true;
+  },
+  ultimoPush() { try { return Number(localStorage.getItem('flujo.gist.push')) || 0; } catch (e) { return 0; } },
+  /** historial del gist: GitHub guarda una version por cada subida */
+  async versiones(n = 30) {
+    const c = Gist.cfg(); if (!c) return [];
+    const r = await fetch(`https://api.github.com/gists/${c.id}/commits?per_page=${n}`, { headers: Gist.hdr(c.token), cache: 'no-store' });
+    if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    const list = await r.json();
+    return (Array.isArray(list) ? list : []).map(x => ({ sha: x.version, fecha: x.committed_at, cambios: x.change_status ? (x.change_status.additions || 0) + (x.change_status.deletions || 0) : null }));
+  },
+  async version(sha) {
+    const c = Gist.cfg(); if (!c) return null;
+    const r = await fetch(`https://api.github.com/gists/${c.id}/${sha}`, { headers: Gist.hdr(c.token), cache: 'no-store' });
+    if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    const g = await r.json(); const f = g.files && g.files[Gist.FILE]; if (!f) return null;
+    let content = f.content; if (f.truncated && f.raw_url) { const rr = await fetch(f.raw_url); content = await rr.text(); }
+    return JSON.parse(content);
   },
   /** trae del gist si hay algo más nuevo; devuelve true si cambió el estado local */
   async refrescar(force = false) {

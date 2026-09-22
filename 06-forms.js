@@ -1031,6 +1031,33 @@ function formActivo(id) {
   ajustar(); $('#ac-tipo').addEventListener('change', ajustar);
 }
 
+/* Versiones anteriores del gist: elegir una, ver que tenia, restaurar */
+async function formVersiones() {
+  Modal.open({ title: 'Versiones guardadas en GitHub', submit: '', body: `<div class="ctx-paso"><span class="dot info"></span><span>Buscando el historial\u2026</span></div>` });
+  let vs = [];
+  try { vs = await Gist.versiones(40); } catch (e) { $('#modal .m-body, #modal').querySelector('.ctx-paso').innerHTML = `<span class="dot crit"></span><span>No pude leer el historial (${esc(String(e.message || e))}).</span>`; return; }
+  const fmt = iso => new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+  const filas = vs.map((v, i) => `<div class="ver-r" data-act="gist-ver" data-id="${esc(v.sha)}"><div><b>${fmt(v.fecha)}</b><span class="sub small muted">${i === 0 ? 'la m\u00e1s reciente' : haceTxt(new Date(v.fecha).getTime())}${v.cambios != null ? ` \u00b7 ${v.cambios} cambios` : ''}</span></div><span class="muted">\u203a</span></div>`).join('');
+  const box = $('#modal .ctx-paso'); if (!box) return;
+  box.outerHTML = `<div class="hoja"><p class="small muted" style="margin:0 0 8px">GitHub guarda una versi\u00f3n cada vez que la app sube tus datos. Toc\u00e1 una para ver qu\u00e9 ten\u00eda antes de restaurarla.</p>${filas || '<p class="muted">Todav\u00eda no hay versiones.</p>'}</div>`;
+}
+async function formVersion(sha) {
+  toast('Trayendo esa versi\u00f3n\u2026');
+  let d = null; try { d = await Gist.version(sha); } catch (e) { toast('No se pudo traer'); return; }
+  if (!d || !d.v) { toast('Esa versi\u00f3n no tiene datos'); return; }
+  const k = (o, k2) => o && o[k2] ? o[k2].length : 0;
+  const c = d.cartera || {};
+  const cuando = d.updatedAt ? new Date(d.updatedAt).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '\u2014';
+  Modal.open({ title: 'Restaurar esta versi\u00f3n', submit: 'Restaurar', body: `<div class="hoja"><div class="f-sec">
+      <div class="r"><span class="k">Guardada el</span><span class="v">${cuando}</span></div>
+      <div class="r"><span class="k">Movimientos</span><span class="v">${k(d, 'movimientos')} <span class="muted small">(hoy ${state.movimientos.length})</span></span></div>
+      <div class="r"><span class="k">Operaciones de cartera</span><span class="v">${k(c, 'operaciones')} <span class="muted small">(hoy ${state.cartera.operaciones.length})</span></span></div>
+      <div class="r"><span class="k">Alertas</span><span class="v">${Object.keys(c.alertas || {}).length} <span class="muted small">(hoy ${Object.keys(state.cartera.alertas).length})</span></span></div>
+      <div class="r"><span class="k">Otros activos</span><span class="v">${k(c, 'activos')}</span></div>
+    </div></div><p class="ob-nota">Reemplaza lo que hay ahora en la app por esta versi\u00f3n. Lo actual no se pierde: queda como una versi\u00f3n m\u00e1s en GitHub.</p>`,
+    onSubmit: () => { state = Persist.migrate(d); state.updatedAt = Date.now(); Persist.local(); Persist.save(); lastView = null; render(); toast('Versi\u00f3n restaurada'); } });
+}
+
 function formImportar() {
   Intercambio._pendiente = null;  // ventana nueva: siempre se analiza de cero (si no, un texto igual al de la última vez se aplicaba sin vista previa)
   Modal.open({ title: 'Cargar actualizaciones de Claude', submit: 'Analizar', body: `<div class="stack">

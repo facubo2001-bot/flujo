@@ -775,33 +775,32 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 /* posiciones: una sola grilla para que las columnas queden alineadas fila a fila */
 .pz-list{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:12px;align-items:center}
 .pz-cols{display:contents}
-.pz-cols>span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:6px 0 5px;border-bottom:1px solid var(--line);white-space:nowrap}
+.pz-cols>span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:6px 0 5px;border-bottom:1px solid var(--line);white-space:nowrap}
 .pz-cols>span:nth-child(2),.pz-cols>span:nth-child(3){text-align:right}
 .pz{display:contents;cursor:pointer}
 .pz>div{padding:9px 0;min-width:0}
 .pz:last-child>div{border-bottom:0}
 .pz-t{display:flex;align-items:center;gap:8px;min-width:0}
-.pz-t b{font-family:var(--font-display);font-size:17px;font-weight:900;letter-spacing:-.03em}
-.pz-zone{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;white-space:nowrap}
+.pz-t b{font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:-.03em}
+.pz-zone{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;white-space:nowrap}
 .pz-zone.urgente{background:var(--crit-soft);color:var(--crit-text)}
 .pz-zone.mirala{background:var(--warn-soft);color:var(--warn-text)}
-.pz-s{display:block;font-size:11.5px;color:var(--ink-3);line-height:1.3}
+.pz-s{display:block;font-size:12.5px;color:var(--ink-3);line-height:1.3}
 .pz-m{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-.pz-px{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;color:var(--ink-2);white-space:nowrap}
-.pz-dp{font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;padding:1px 6px;border-radius:6px;white-space:nowrap}
+.pz-px{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.pz-dp{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;padding:1px 6px;border-radius:6px;white-space:nowrap}
 .pz-dp.up{background:var(--good-soft);color:var(--good-text)} .pz-dp.down{background:var(--crit-soft);color:var(--crit-text)} .pz-dp.flat{color:var(--ink-3)}
 .pz-r{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
-.pz-r b{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
-.pz-rt{font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+.pz-r b{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:16px;letter-spacing:-.01em;white-space:nowrap}
+.pz-rt{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
 .pz-rt.up{color:var(--good-text)} .pz-rt.down{color:var(--crit-text)}
 .pz-rt i{font-style:normal;font-weight:400;color:var(--ink-3);font-size:10px;margin-left:2px}
-.pz-w{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pz-w{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .card-head .hint b.up{color:var(--good-text)} .card-head .hint b.down{color:var(--crit-text)}
 .kpi .mini b .soft{font-weight:400;color:var(--ink-3)}
 .kpi .value .mid{color:var(--warn-text)} .kpi .mini b.mid{color:var(--warn-text)}
 .kpi.tap{cursor:pointer}
-.g-kpi .kpi .mini b{font-size:14px}
-.g-kpi .kpi .mini .k{flex:1 1 auto;max-width:none;letter-spacing:.05em}
+.g-kpi .kpi .mini .k{flex:1 1 auto;max-width:none}
 
 /* novedades: tarjeta ancha, del alto de las dos de arriba */
 .kpi.nov{grid-column:1/-1;gap:7px}
@@ -812,11 +811,15 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 .nov-l i.bal{background:var(--accent)}
 .nov-z{margin-top:2px}
 .nov-chips{display:flex;flex-wrap:wrap;gap:6px;white-space:normal!important;overflow:visible!important}
-.nov-chip{font-size:12px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:99px;cursor:pointer}
+.nov-chip{font-size:13px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:99px;cursor:pointer}
 .nov-chip.urgente{background:var(--crit-soft);color:var(--crit-text)}
 .nov-chip.mirala{background:var(--warn-soft);color:var(--warn-text)}
 .nov-chip.bal{background:rgba(45,226,240,.14);color:var(--accent)}
 .nov-chip i{font-style:normal;font-weight:600;font-size:10px;opacity:.75;margin-left:3px}
+.ver-r{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.ver-r:last-child{border-bottom:0}
+.ver-r>div{display:flex;flex-direction:column}
+.ver-r b{font-size:14px}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -4621,7 +4624,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609222259';
+const BUILD = '202609222311';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -4802,9 +4805,32 @@ const Gist = {
   },
   async push() {
     const c = Gist.cfg(); if (!c) return false;
-    const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files: { [Gist.FILE]: { content: JSON.stringify(state) } } }) });
+    const files = { [Gist.FILE]: { content: JSON.stringify(state) } };
+    // copia mensual aparte, que no se pisa: respaldo-AAAA-MM.json (una por mes, en el mismo gist)
+    const mes = D.thisMonth(); const marca = 'flujo.gist.mes';
+    let ultimo = null; try { ultimo = localStorage.getItem(marca); } catch (e) {}
+    if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: JSON.stringify(state) };
+    const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
     return true;
+  },
+  ultimoPush() { try { return Number(localStorage.getItem('flujo.gist.push')) || 0; } catch (e) { return 0; } },
+  /** historial del gist: GitHub guarda una version por cada subida */
+  async versiones(n = 30) {
+    const c = Gist.cfg(); if (!c) return [];
+    const r = await fetch(`https://api.github.com/gists/${c.id}/commits?per_page=${n}`, { headers: Gist.hdr(c.token), cache: 'no-store' });
+    if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    const list = await r.json();
+    return (Array.isArray(list) ? list : []).map(x => ({ sha: x.version, fecha: x.committed_at, cambios: x.change_status ? (x.change_status.additions || 0) + (x.change_status.deletions || 0) : null }));
+  },
+  async version(sha) {
+    const c = Gist.cfg(); if (!c) return null;
+    const r = await fetch(`https://api.github.com/gists/${c.id}/${sha}`, { headers: Gist.hdr(c.token), cache: 'no-store' });
+    if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
+    const g = await r.json(); const f = g.files && g.files[Gist.FILE]; if (!f) return null;
+    let content = f.content; if (f.truncated && f.raw_url) { const rr = await fetch(f.raw_url); content = await rr.text(); }
+    return JSON.parse(content);
   },
   /** trae del gist si hay algo más nuevo; devuelve true si cambió el estado local */
   async refrescar(force = false) {
@@ -6233,7 +6259,7 @@ function viewResumen() {
   const margen = E.margen(ym); const mesN = D.monthName(ym).split(' ')[0];
   const projPct = margen.presupuesto ? proj.total / margen.presupuesto : 0; const pres = margen.presupuesto; const comp = margen.fijos + c.cuotas;
 
-  let html = renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
+  let html = renderRespaldoBanner() + renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
   html += `<div class="grid g-kpi">`;
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${avgToDate ? deltaPill(c.total, avgToDate) : ''} <span>${avgToDate ? `vs promedio${isCur ? ' al mismo día' : ''} (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})` : ''} · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
   html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg' : ''}">${M.f(proj.total)}</span>`, sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
@@ -6775,8 +6801,9 @@ function viewConfig() {
     <div class="card"><div class="card-head"><h2>Datos</h2></div>
       <div class="stack">
         ${(() => { const g = Gist.cfg(); return g
-          ? `<div class="list-item"><div><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Conectada a tu GitHub (gist ${esc(String(g.id).slice(0, 8))}…). Sube al guardar y baja al abrir la app.</span></div><div class="row" style="gap:4px"><button class="btn sm" data-act="gist-pull">Traer ahora</button><button class="btn sm danger" data-act="gist-off">Desconectar</button></div></div>`
+          ? `<div class="list-item"><div><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Conectada a tu GitHub (gist ${esc(String(g.id).slice(0, 8))}…). Sube al guardar y baja al abrir la app.${(() => { const t = Gist.ultimoPush(); return t ? ` Última subida ${haceTxt(t)}.` : ''; })()} GitHub guarda cada versión y una copia mensual aparte.</span></div><div class="row" style="gap:4px"><button class="btn sm" data-act="gist-pull">Traer ahora</button><button class="btn sm danger" data-act="gist-off">Desconectar</button></div></div>`
           : `<div class="list-item" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b style="font-weight:500">Sincronización entre dispositivos</b><span class="sub small muted">Guarda tus datos en un gist privado de tu GitHub para verlos iguales en el celu y la PC. Creá un token clásico con permiso "gist" en github.com, en Settings, Developer settings, Personal access tokens, Tokens (classic), y pegalo acá (una vez por dispositivo).</span></div><div class="row" style="gap:6px;width:100%;margin-top:8px"><input class="input sm" type="password" id="g-token" placeholder="ghp_…" style="flex:1;min-width:160px"><button class="btn sm primary" data-act="gist-connect">Conectar</button></div></div>`; })()}
+        ${Gist.cfg() ? `<div class="list-item"><div><b style="font-weight:500">Volver a una versión anterior</b><span class="sub small muted">Elegí un día y hora del historial de GitHub; la app vuelve a como estaba entonces</span></div><button class="btn sm" data-act="gist-versiones">${ICONS.clock} Ver</button></div>` : ''}
         <div class="list-item"><div><b style="font-weight:500">Resumen para analizar con Claude</b><span class="sub small muted">Copia un informe del mes en texto para pegarlo en el chat del proyecto</span></div><button class="btn sm" data-act="copiar-resumen">${ICONS.copy} Copiar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Exportar respaldo</b><span class="sub small muted">Descarga todo en JSON (${state.movimientos.length} movimientos)</span></div><button class="btn sm" data-act="export">${ICONS.download} Exportar</button></div>
         <div class="list-item"><div><b style="font-weight:500">Importar respaldo</b><span class="sub small muted">Reemplaza los datos actuales por un JSON exportado</span></div><label class="btn sm">${ICONS.upload} Importar<input type="file" accept="application/json" id="import-file" class="hidden"></label></div>
@@ -6855,7 +6882,7 @@ function viewCartera() {
       <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio · hoy</span><span>Valor · rdo.</span></div>
       ${k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balance(p.ticker); if (bal && bal.dias <= 7) avisos.push(`balance ${bal.dias === 0 ? 'hoy' : bal.dias === 1 ? 'mañana' : 'en ' + bal.dias + ' d'}`);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
-        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div><span class="pz-s">${p.cedear ? `${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs · ` : ''}${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
+        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div>${p.cedear ? `<span class="pz-s">${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs</span>` : ''}<span class="pz-s">${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
         <div class="pz-m">${p.precio != null ? `<span class="pz-px">${fmtU(p.precio)}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '—'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div>
         <div class="pz-r"><b>${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}<span class="pz-w">${M.pct(p.peso, 1)}</span></div>
       </div>`; }).join('')}
@@ -7029,6 +7056,18 @@ function renderPatrimonio(k) {
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
   </div>`;
+}
+
+
+/** "hace 3 min", "hace 2 h", "hace 5 días" */
+function haceTxt(t) { const m = Math.round((Date.now() - t) / 60000); if (m < 1) return 'recién'; if (m < 60) return `hace ${m} min`; const h = Math.round(m / 60); if (h < 36) return `hace ${h} h`; return `hace ${Math.round(h / 24)} días`; }
+
+/** aviso de respaldo: rojo si los datos viven solo en este dispositivo, ámbar si hace mucho que no suben */
+function renderRespaldoBanner() {
+  if (!state.movimientos.length && !(state.cartera && state.cartera.operaciones.length)) return '';
+  if (!Gist.cfg()) return `<div class="callout crit" style="margin-bottom:14px"><b>Tus datos viven solo en este dispositivo.</b> Si lo perdés o borrás el navegador, se pierden. Conectá tu GitHub en <a data-go="config" style="color:var(--accent);text-decoration:underline;cursor:pointer">Ajustes</a>: tarda 2 minutos y de ahí en más se guarda solo.</div>`;
+  const t = Gist.ultimoPush(); if (t && Date.now() - t > 7 * 86400000) return `<div class="callout amber" style="margin-bottom:14px"><b>Hace ${Math.round((Date.now() - t) / 86400000)} días que no sube a GitHub.</b> Abrí Ajustes y tocá "Traer ahora" para ver si hay un problema con el token.</div>`;
+  return '';
 }
 
 
@@ -8065,6 +8104,33 @@ function formActivo(id) {
   ajustar(); $('#ac-tipo').addEventListener('change', ajustar);
 }
 
+/* Versiones anteriores del gist: elegir una, ver que tenia, restaurar */
+async function formVersiones() {
+  Modal.open({ title: 'Versiones guardadas en GitHub', submit: '', body: `<div class="ctx-paso"><span class="dot info"></span><span>Buscando el historial\u2026</span></div>` });
+  let vs = [];
+  try { vs = await Gist.versiones(40); } catch (e) { $('#modal .m-body, #modal').querySelector('.ctx-paso').innerHTML = `<span class="dot crit"></span><span>No pude leer el historial (${esc(String(e.message || e))}).</span>`; return; }
+  const fmt = iso => new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+  const filas = vs.map((v, i) => `<div class="ver-r" data-act="gist-ver" data-id="${esc(v.sha)}"><div><b>${fmt(v.fecha)}</b><span class="sub small muted">${i === 0 ? 'la m\u00e1s reciente' : haceTxt(new Date(v.fecha).getTime())}${v.cambios != null ? ` \u00b7 ${v.cambios} cambios` : ''}</span></div><span class="muted">\u203a</span></div>`).join('');
+  const box = $('#modal .ctx-paso'); if (!box) return;
+  box.outerHTML = `<div class="hoja"><p class="small muted" style="margin:0 0 8px">GitHub guarda una versi\u00f3n cada vez que la app sube tus datos. Toc\u00e1 una para ver qu\u00e9 ten\u00eda antes de restaurarla.</p>${filas || '<p class="muted">Todav\u00eda no hay versiones.</p>'}</div>`;
+}
+async function formVersion(sha) {
+  toast('Trayendo esa versi\u00f3n\u2026');
+  let d = null; try { d = await Gist.version(sha); } catch (e) { toast('No se pudo traer'); return; }
+  if (!d || !d.v) { toast('Esa versi\u00f3n no tiene datos'); return; }
+  const k = (o, k2) => o && o[k2] ? o[k2].length : 0;
+  const c = d.cartera || {};
+  const cuando = d.updatedAt ? new Date(d.updatedAt).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '\u2014';
+  Modal.open({ title: 'Restaurar esta versi\u00f3n', submit: 'Restaurar', body: `<div class="hoja"><div class="f-sec">
+      <div class="r"><span class="k">Guardada el</span><span class="v">${cuando}</span></div>
+      <div class="r"><span class="k">Movimientos</span><span class="v">${k(d, 'movimientos')} <span class="muted small">(hoy ${state.movimientos.length})</span></span></div>
+      <div class="r"><span class="k">Operaciones de cartera</span><span class="v">${k(c, 'operaciones')} <span class="muted small">(hoy ${state.cartera.operaciones.length})</span></span></div>
+      <div class="r"><span class="k">Alertas</span><span class="v">${Object.keys(c.alertas || {}).length} <span class="muted small">(hoy ${Object.keys(state.cartera.alertas).length})</span></span></div>
+      <div class="r"><span class="k">Otros activos</span><span class="v">${k(c, 'activos')}</span></div>
+    </div></div><p class="ob-nota">Reemplaza lo que hay ahora en la app por esta versi\u00f3n. Lo actual no se pierde: queda como una versi\u00f3n m\u00e1s en GitHub.</p>`,
+    onSubmit: () => { state = Persist.migrate(d); state.updatedAt = Date.now(); Persist.local(); Persist.save(); lastView = null; render(); toast('Versi\u00f3n restaurada'); } });
+}
+
 function formImportar() {
   Intercambio._pendiente = null;  // ventana nueva: siempre se analiza de cero (si no, un texto igual al de la última vez se aplicaba sin vista previa)
   Modal.open({ title: 'Cargar actualizaciones de Claude', submit: 'Analizar', body: `<div class="stack">
@@ -8262,6 +8328,8 @@ const Actions = {
     try { await Gist.conectar(token); const ch = await Gist.refrescar(true); if (!ch) { Persist.schedule(500); } toast('Sincronización conectada'); lastView = null; render(); }
     catch (e) { toast((e && e.message) || 'No se pudo conectar', 5000); }
   },
+  'gist-versiones'() { formVersiones(); },
+  'gist-ver'(sha) { formVersion(sha); },
   'gist-off'() { Gist.clear(); Persist.setStatus(state.movimientos.length ? 'local' : 'idle'); toast('Sincronización desconectada en este dispositivo'); render(); },
   async 'gist-pull'() { const ch = await Gist.refrescar(true); toast(ch ? 'Datos actualizados' : 'Ya estabas al día'); if (ch) { lastView = null; render(); } },
   'cierre-ok'(v) { const [tid, ym, fecha] = v.split('|'); const t = L.tarjeta(tid); if (!t) return; t.cierres = t.cierres || {}; t.cierres[ym] = fecha; Persist.save(); toast(`${t.nombre}: cierre ${D.fmt(fecha)} confirmado`); render(); },

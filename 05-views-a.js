@@ -56,7 +56,7 @@ function viewResumen() {
   const margen = E.margen(ym); const mesN = D.monthName(ym).split(' ')[0];
   const projPct = margen.presupuesto ? proj.total / margen.presupuesto : 0; const pres = margen.presupuesto; const comp = margen.fijos + c.cuotas;
 
-  let html = renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
+  let html = renderRespaldoBanner() + renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
   html += `<div class="grid g-kpi">`;
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${avgToDate ? deltaPill(c.total, avgToDate) : ''} <span>${avgToDate ? `vs promedio${isCur ? ' al mismo día' : ''} (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})` : ''} · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
   html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg' : ''}">${M.f(proj.total)}</span>`, sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });

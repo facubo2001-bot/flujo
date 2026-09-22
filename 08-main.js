@@ -107,6 +107,8 @@ const Actions = {
     try { await Gist.conectar(token); const ch = await Gist.refrescar(true); if (!ch) { Persist.schedule(500); } toast('Sincronización conectada'); lastView = null; render(); }
     catch (e) { toast((e && e.message) || 'No se pudo conectar', 5000); }
   },
+  'gist-versiones'() { formVersiones(); },
+  'gist-ver'(sha) { formVersion(sha); },
   'gist-off'() { Gist.clear(); Persist.setStatus(state.movimientos.length ? 'local' : 'idle'); toast('Sincronización desconectada en este dispositivo'); render(); },
   async 'gist-pull'() { const ch = await Gist.refrescar(true); toast(ch ? 'Datos actualizados' : 'Ya estabas al día'); if (ch) { lastView = null; render(); } },
   'cierre-ok'(v) { const [tid, ym, fecha] = v.split('|'); const t = L.tarjeta(tid); if (!t) return; t.cierres = t.cierres || {}; t.cierres[ym] = fecha; Persist.save(); toast(`${t.nombre}: cierre ${D.fmt(fecha)} confirmado`); render(); },
