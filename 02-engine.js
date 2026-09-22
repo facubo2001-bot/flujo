@@ -364,7 +364,52 @@ const E = {
     return den > 1e-9 ? (v1 - v0 - F) / den : null;
   },
   /** Ventanas de medición disponibles (como los rangos de un gráfico financiero) */
-  VENTANAS: [['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['5a', '5 A'], ['inicio', 'Todo']],
+  TIPOS_ACTIVO: { efectivo: 'Efectivo', fci: 'Fondo (Lecaps / money market)', letra: 'Letra', bono: 'Bono / ON', btc: 'Bitcoin', otro: 'Otro' },
+  /** Valua un activo hoy, en USD. Tasa: capital × (1 + TNA × días/365) desde la fecha de compra, o desde la última
+   *  corrección manual si la hay (interés simple, como cotiza una Lecap). Pesos → dólares al MEP. */
+  valuarActivo(a, mep, btcPx) {
+    const hoy = D.today(); const enUSD = (v, moneda) => moneda === 'ARS' ? (mep ? v / mep : null) : v;
+    const out = { id: a.id, tipo: a.tipo, nombre: a.nombre || E.TIPOS_ACTIVO[a.tipo] || 'Activo', moneda: a.moneda || 'ARS', detalle: '', valorMoneda: null, valorUSD: null, sinPrecio: false };
+    if (a.tipo === 'btc') {
+      const q = Number(a.cantidad) || 0; out.moneda = 'USD';
+      if (btcPx) { out.valorMoneda = q * btcPx.c; out.detalle = `${q} BTC \u00b7 US$ ${fmtARS.format(Math.round(btcPx.c))}${btcPx.dp ? ` (${btcPx.dp >= 0 ? '+' : '\u2212'}${Math.abs(btcPx.dp).toFixed(1)} % hoy)` : ''}`; }
+      else if (a.precioManual) { out.valorMoneda = q * a.precioManual; out.detalle = `${q} BTC a US$ ${fmtARS.format(a.precioManual)} (precio cargado a mano)`; }
+      else { out.sinPrecio = true; out.detalle = `${q} BTC \u00b7 sin precio todav\u00eda`; }
+    } else if (a.tipo === 'efectivo' || a.tipo === 'otro') {
+      out.valorMoneda = Number(a.monto) || 0; out.detalle = a.tipo === 'otro' && a.nota ? a.nota : (a.fecha ? `al ${D.fmt(a.fecha)}` : '');
+    } else {
+      // fci / letra / bono: devengamiento por tasa
+      const cap = Number(a.capital) || 0, tna = Number(a.tna) || 0;
+      const base = a.valorManual && a.valorManual.v && a.valorManual.fecha ? { v: Number(a.valorManual.v), desde: a.valorManual.fecha, manual: true } : { v: cap, desde: a.desde || hoy, manual: false };
+      const dias = Math.max(0, D.daysBetween(base.desde, hoy));
+      out.valorMoneda = base.v * (1 + tna / 100 * dias / 365);
+      const partes = [];
+      if (tna) partes.push(`TNA ${tna.toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`);
+      partes.push(base.manual ? `corregido el ${D.fmt(base.desde)}` : (a.desde ? `desde el ${D.fmt(a.desde)}` : 'sin fecha'));
+      if (a.vence) partes.push(`vence ${D.fmt(a.vence)}`);
+      out.detalle = partes.join(' \u00b7 ');
+      out.ganado = cap ? out.valorMoneda - cap : null;
+    }
+    out.valorUSD = out.valorMoneda != null ? enUSD(out.valorMoneda, out.moneda) : null;
+    return out;
+  },
+  /** Todo el patrimonio: CEDEARs + otros activos. La caja contable de la app (dividendos + ventas) no entra: esa plata ya está en alguno de estos activos. */
+  patrimonio(k) {
+    const mep = k.mep, btcPx = Btc.precio();
+    const activos = (state.cartera.activos || []).map(a => E.valuarActivo(a, mep, btcPx));
+    const grupos = [
+      { id: 'cedears', nombre: 'CEDEARs', color: 'var(--accent)', valor: k.valor || 0 },
+      { id: 'reserva', nombre: 'Efectivo y fondos', color: 'var(--c4)', valor: sum(activos.filter(a => (a.tipo === 'efectivo' || a.tipo === 'fci') && a.valorUSD).map(a => a.valorUSD)) },
+      { id: 'renta', nombre: 'Letras y bonos', color: 'var(--c6)', valor: sum(activos.filter(a => (a.tipo === 'letra' || a.tipo === 'bono') && a.valorUSD).map(a => a.valorUSD)) },
+      { id: 'btc', nombre: 'Bitcoin', color: '#F7931A', valor: sum(activos.filter(a => a.tipo === 'btc' && a.valorUSD).map(a => a.valorUSD)) },
+      { id: 'otro', nombre: 'Otros', color: 'var(--ink-3)', valor: sum(activos.filter(a => a.tipo === 'otro' && a.valorUSD).map(a => a.valorUSD)) },
+    ].filter(g => g.valor > 0);
+    const total = sum(grupos.map(g => g.valor));
+    const reserva = (grupos.find(g => g.id === 'reserva') || {}).valor || 0;
+    const objetivo = Number(state.settings.reservaObjetivo) || 10;
+    return { activos, grupos, total, mep, reserva, reservaPct: total ? reserva / total : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
+  },
+  VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
   /** Valuación conocida más reciente ≤ fecha: seed (c.inicio, 31-dic) o snapshot diario. Devuelve {fecha, V, spy, tipo} o null */
   valuacionEn(k, fecha) {
     const c = state.cartera; const cands = [];
@@ -386,15 +431,18 @@ const E = {
     let objetivo;  // fecha de arranque deseada
     if (modo === 'inicio') objetivo = k.primeraOp;
     else if (modo === 'anio') objetivo = `${Number(hoy.slice(0, 4)) - 1}-12-31`;
+    else if (modo.endsWith('m')) { const n = Number(modo.replace('m', '')); const d = D.parse(hoy); d.setMonth(d.getMonth() - n); objetivo = D.iso(d); }
     else { const n = Number(modo.replace('a', '')); const d = D.parse(hoy); d.setFullYear(d.getFullYear() - n); objetivo = D.iso(d); }
+    // cuanto puede alejarse la valuacion guardada de la fecha buscada: en un mes, una semana; en seis, un mes
+    const tolerancia = modo === '1m' ? 7 : modo === '6m' ? 30 : 45;
     let desde, V0 = 0, S0 = 0, spy0, esInicial = () => false, aprox = false, nota = '';
     if (modo === 'inicio' || objetivo <= k.primeraOp) {
       desde = k.primeraOp; spy0 = Spy.at(desde);
       if (k.legados) nota = `${k.legados} lote${k.legados > 1 ? 's' : ''} previo${k.legados > 1 ? 's' : ''} sin fecha real de compra (entran el 2/1/26): corregí la fecha tocando la operación para afinar esta comparación.`;
     } else {
       const val = E.valuacionEn(k, objetivo);
-      if (!val) return { disponible: false, modo, objetivo, motivo: `Todavía no hay una valuación guardada al ${D.fmt(objetivo, { year: true })}. La app guarda una por día desde que empezó a traer precios.` };
-      if (D.daysBetween(val.fecha, objetivo) > 45) { aprox = true; nota = `Sin valuación exacta al ${D.fmt(objetivo, { year: true })}: se usa la más cercana (${D.fmt(val.fecha, { year: true })}).`; }
+      if (!val || D.daysBetween(val.fecha, objetivo) > tolerancia) return { disponible: false, modo, objetivo, motivo: `Todavía no hay una valuación guardada cerca del ${D.fmt(objetivo, { year: true })}. La app guarda una por día hábil cuando trae precios: este rango se habilita solo.` };
+      if (D.daysBetween(val.fecha, objetivo) > 3) { aprox = true; nota = `Sin valuación exacta al ${D.fmt(objetivo, { year: true })}: se usa la más cercana (${D.fmt(val.fecha, { year: true })}).`; }
       desde = val.fecha; V0 = val.V; spy0 = val.spy; S0 = spy0 ? V0 / spy0 : 0; esInicial = val.esInicial;
     }
     if (!spy0 || !spyHoy) return { disponible: false, modo, motivo: 'Falta la cotización de SPY.' };
@@ -446,11 +494,12 @@ const E = {
   carteraSerie(k, modo = 'anio') {
     const v = k.ventanas[modo]; if (!v || !v.disponible) return null;
     const c = state.cartera; const hoy = D.today();
-    let fechas = Spy.fechas().filter(f => f >= v.desde && f <= hoy);
+    const hist = c.historial || {};
+    // dias de SPY + dias con foto de la cartera (una foto de un dia sin cierre de SPY guardado no se pierde)
+    let fechas = [...new Set([...Spy.fechas(), ...Object.keys(hist)])].filter(f => f >= v.desde && f <= hoy).sort();
     if (!fechas.length || fechas[0] !== v.desde) fechas.unshift(v.desde);
     if (fechas[fechas.length - 1] !== hoy) fechas.push(hoy);
     // en ventanas largas, quedarse con ~120 puntos para que el gráfico sea liviano
-    const hist = c.historial || {};
     const seedF = c.inicio ? c.inicio.fecha : null;
     if (fechas.length > 130) { const step = Math.ceil(fechas.length / 120); fechas = fechas.filter((f, i) => i % step === 0 || i === fechas.length - 1 || f === v.desde || f === seedF || !!hist[f]); }
     const fl = v.flujos.slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -471,7 +520,21 @@ const E = {
       else if (hist[f]) r = hist[f].v;
       real.push(r);
     }
-    return { fechas, sombra, invertido, real };
+    // La cartera solo se conoce en los dias con foto (arranque, seed, snapshots diarios, hoy). Unir fotos
+    // separadas por meses dibuja una recta que no existio: solo se unen fotos a <= 10 dias (fines de semana,
+    // un dia sin abrir la app) y el resto queda como punto suelto.
+    const TOPE = 10, dias = (a, b) => (D.parse(b) - D.parse(a)) / 86400000;
+    const conocidos = real.map((v, i) => v != null ? i : -1).filter(i => i >= 0);
+    const linea = real.map(() => null), sueltos = real.map(() => null);
+    let desdeDiario = null;
+    conocidos.forEach((i, n) => {
+      const ant = n > 0 ? conocidos[n - 1] : -1, sig = n < conocidos.length - 1 ? conocidos[n + 1] : -1;
+      const pegaAnt = ant >= 0 && dias(fechas[ant], fechas[i]) <= TOPE, pegaSig = sig >= 0 && dias(fechas[i], fechas[sig]) <= TOPE;
+      if (!pegaAnt && !pegaSig) { sueltos[i] = real[i]; return; }
+      linea[i] = real[i]; if (!desdeDiario) desdeDiario = fechas[i];
+      if (pegaSig) for (let x = i + 1; x < sig; x++) linea[x] = real[i] + (real[sig] - real[i]) * (x - i) / (sig - i);
+    });
+    return { fechas, sombra, invertido, real: linea, sueltos, desdeDiario, haySueltos: sueltos.some(v => v != null) };
   },
   /** Presupuesto del mes: lo que decidiste gastar (el resto del sueldo va a inversión/ahorro) */
   presupuesto(ym) { return Number(state.settings.presupuesto) || 0; },

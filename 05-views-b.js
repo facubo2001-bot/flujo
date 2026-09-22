@@ -298,7 +298,7 @@ function viewCartera() {
     </div>`;
   };
   const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));
-  html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
+  html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><button class="icon-btn" data-act="balances" aria-label="Calendario de balances" title="Calendario de balances">${ICONS.cuotas}</button><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
     ${ordenAl.length ? ordenAl.map(alRow).join('') : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
   </div>`;
   // operaciones
@@ -315,6 +315,7 @@ function viewCartera() {
     <div class="list-item"><div><b style="font-weight:500">Operaciones con advertencias</b><span class="sub small muted">${conAviso ? `marcadas ${G.warn} en la lista: tocá para revisar` : 'cada operación se verifica contra NY, CCL, ratio y SPY al guardarla'}</span></div>${conAviso ? `<span class="pill warn">${conAviso}</span>` : `<span class="pill good">0</span>`}</div>
   </div>`;
   // trabajar con Claude
+  html += renderPatrimonio(k);
   html += `<div class="card section"><div class="card-head"><h2>Trabajar con Claude</h2><span class="hint">análisis y niveles</span></div>
     <div class="row" style="gap:8px"><button class="btn primary" data-act="export-claude">Exportar para Claude</button><button class="btn" data-act="import-claude">Cargar actualizaciones</button></div>
   </div>`;
@@ -381,13 +382,18 @@ function renderEvolucion(k, seg) {
   const serie = E.carteraSerie(k, modo);
   let chart = '';
   if (serie && serie.fechas.length > 2) {
-    const mesLabels = (w) => { const meses = serie.fechas.length > 260 ? 3 : (w < 520 ? 2 : 1); let n = -1; return serie.fechas.map((f, i) => { const ym = D.ym(f); const prev = i ? D.ym(serie.fechas[i - 1]) : null; if (i === 0 || ym === prev || i > serie.fechas.length - 4) return ''; n++; return n % meses === 0 ? (serie.fechas.length > 260 ? D.monthName(ym, true) : D.monthName(ym, true).split(' ')[0]) : ''; }); };
+    // en ventanas cortas (≤ 45 días) el eje va por día en vez de por mes: 1 M con un solo "sep" no dice nada
+    const diaLabels = (w) => { const cada = w < 520 ? 7 : 5; return serie.fechas.map((f, i) => (i % cada === 0 && i < serie.fechas.length - 2) ? String(Number(f.slice(8, 10))) : ''); };
+    const corta = serie.fechas.length && D.daysBetween(serie.fechas[0], serie.fechas[serie.fechas.length - 1]) <= 45;
+    const mesLabels = (w) => { if (corta) return diaLabels(w); const meses = serie.fechas.length > 260 ? 3 : (w < 520 ? 2 : 1); let n = -1; return serie.fechas.map((f, i) => { const ym = D.ym(f); const prev = i ? D.ym(serie.fechas[i - 1]) : null; if (i === 0 || ym === prev || i > serie.fechas.length - 4) return ''; n++; return n % meses === 0 ? (serie.fechas.length > 260 ? D.monthName(ym, true) : D.monthName(ym, true).split(' ')[0]) : ''; }); };
     const yFmt = x => MENOS(Math.abs(x) >= 1000 ? (x / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' k' : Math.round(x).toString());
     chart = ChartQ.reg(w => Charts.line({ w, labels: mesLabels(w), h: 220, yFmt, xSparse: true, tipFmt: x => fmtU(x, 0), tipTitle: i => D.fmt(serie.fechas[i], { year: true }), series: [
       { name: 'Invertido (neto)', color: 'var(--ink-3)', values: serie.invertido, dashed: true },
       { name: 'Sombra S&P 500', color: 'var(--c4)', values: serie.sombra },
-      { name: 'Tu cartera', color: 'var(--accent)', values: serie.real, connect: true, dots: true, strong: true },
-    ] }), 220) + Charts.legend([{ name: 'Tu cartera', color: 'var(--accent)', kind: 'line' }, { name: 'Sombra S&P 500', color: 'var(--c4)', kind: 'line' }, { name: 'Invertido neto', color: 'var(--ink-3)', kind: 'dash' }]);
+      { name: 'Tu cartera', color: 'var(--accent)', values: serie.real, strong: true },
+      { name: 'Tu cartera', color: 'var(--accent)', values: serie.sueltos, dots: true },
+    ] }), 220) + Charts.legend([{ name: 'Tu cartera', color: 'var(--accent)', kind: 'line' }, { name: 'Sombra S&P 500', color: 'var(--c4)', kind: 'line' }, { name: 'Invertido neto', color: 'var(--ink-3)', kind: 'dash' }])
+      + (serie.haySueltos ? `<p class="small muted" style="margin:8px 0 0">${serie.desdeDiario ? `Tu cartera se registra d\u00eda a d\u00eda desde el ${D.fmt(serie.desdeDiario)}` : 'Tu cartera se empieza a registrar d\u00eda a d\u00eda desde hoy'}; antes solo hay puntos sueltos (el arranque y las fotos guardadas). Los n\u00fameros de arriba s\u00ed cuentan todo el per\u00edodo: salen de tus operaciones.</p>` : '');
   }
   // alfa por posición (mismas compras hechas en SPY): quién suma y quién resta
   const conAlfa = [...k.posiciones, ...k.cerradas].filter(p => p.alfaUSD != null).sort((a, b) => b.alfaUSD - a.alfaUSD);
@@ -421,4 +427,26 @@ function infoEvolucion(modo) {
     <p><b>Sombra S&P 500.</b> ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}; después` : `Arranca en cero el ${D.fmt(v.desde, { year: true })} y`} cada compra o venta se replica el mismo día en SPY por el mismo monto. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día. Alfa = cartera − sombra, en puntos y en dólares.</p>
     ${v.nota ? `<p class="callout amber" style="margin:0">${esc(v.nota)}</p>` : ''}
   </div>` });
+}
+
+
+/* ---------- Toda tu plata: CEDEARs + efectivo, fondos, letras, bonos y bitcoin ---------- */
+function renderPatrimonio(k) {
+  const pt = E.patrimonio(k); const hay = pt.activos.length > 0;
+  const fmtM = (v, moneda) => moneda === 'ARS' ? `$ ${fmtARS.format(Math.round(v))}` : fmtU(v, 0);
+  const fila = a => `<div class="act-r" data-act="activo" data-id="${a.id}"><div class="act-l"><b>${esc(a.nombre)}</b><span class="sub">${esc(E.TIPOS_ACTIVO[a.tipo] || '')}${a.detalle ? ' \u00b7 ' + esc(a.detalle) : ''}</span></div><div class="act-v"><b>${a.valorUSD != null ? fmtU(a.valorUSD, 0) : '\u2014'}</b><span class="sub">${a.valorMoneda != null && a.moneda === 'ARS' ? fmtM(a.valorMoneda, 'ARS') : (pt.total && a.valorUSD != null ? M.pct(a.valorUSD / pt.total, 1) : '')}</span></div></div>`;
+  const leyenda = pt.grupos.map(g => `<div class="pat-g"><i style="background:${g.color}"></i><span>${esc(g.nombre)}</span><b>${M.pct(g.valor / pt.total, 1)}</b><span class="sub">${fmtU(g.valor, 0)}</span></div>`).join('');
+  const reservaCls = pt.reservaPct == null ? '' : pt.reservaPct >= pt.reservaObjetivo ? 'ok' : pt.reservaPct >= pt.reservaObjetivo * 0.6 ? 'mid' : 'bad';
+  return `<div class="card section"><div class="card-head"><h2>Toda tu plata</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
+    ${hay ? `
+    <div class="pat-top">
+      <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
+      <div class="pat-leg">${leyenda}</div>
+    </div>
+    <div class="pat-res"><span>Reserva (efectivo + fondos)</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
+    ${pt.mep ? `<p class="small muted" style="margin:0 0 6px">Total en pesos al MEP ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los CEDEARs valen lo de arriba; los pesos se pasan a d\u00f3lares al MEP. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.</p>` : ''}
+    ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
+    <div class="act-list">${pt.activos.map(fila).join('')}</div>`
+    : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
+  </div>`;
 }

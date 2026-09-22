@@ -254,6 +254,7 @@ const Persist = {
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
     for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
     for (const k of ['alertas', 'precios', 'historial', 'spy', 'fund']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
+    if (!Array.isArray(s.cartera.activos)) s.cartera.activos = [];  // otros activos: efectivo, fondos, letras, bonos, bitcoin
     for (const o of s.cartera.operaciones) if (o && o.fecha) { const h = D.habil(o.fecha); if (h !== o.fecha) o.fecha = h; }
     for (const o of s.cartera.operaciones) if (o && o.deDividendos > 0 && o.deCaja == null) { o.deCaja = o.deDividendos; delete o.deDividendos; }
     // alertas v2: `desc` (qué hace) separado de `nota` (tier + tesis). Nota vieja "qué hace | tesis" se parte una sola vez.
@@ -391,6 +392,18 @@ const TC = {
   },
 };
 
+/* ---------- Bitcoin (CoinGecko, gratis y sin clave) ---------- */
+const Btc = {
+  async actualizar() {
+    try {
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', { cache: 'no-store' }); if (!r.ok) throw new Error(r.status);
+      const j = await r.json(); const c = Number(j && j.bitcoin && j.bitcoin.usd); if (!c) throw new Error('sin valor');
+      state.cartera.btc = { c, dp: Number(j.bitcoin.usd_24h_change) || 0, t: Date.now() }; Persist.save(); return true;
+    } catch (e) { return false; }
+  },
+  precio() { const b = state.cartera.btc; return b && b.c ? b : null; },
+};
+
 /* ---------- CEDEARs (tabla BYMA embebida + copia online en el repo: cedears.json) ---------- */
 const Cedears = {
   _src: null, byCode: {}, byUs: {},
@@ -453,6 +466,7 @@ const Precios = {
   },
   async _actualizar(silencioso = false) {
     try { await TC.actualizar(true); } catch (e) {}
+    if ((state.cartera.activos || []).some(a => a.tipo === 'btc')) { try { await Btc.actualizar(); } catch (e) {} }
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }
     const tickers = Precios.tickers(); if (!tickers.length) return false;
@@ -488,9 +502,13 @@ const Fund = {
   _v(arr, nombres) {
     if (!Array.isArray(arr)) return null;
     for (const n of nombres) { const h = arr.find(x => x.concept === n); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
-    for (const n of nombres) { const h = arr.find(x => (x.concept || '').includes(n)); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    // parcial: el concepto empieza con el nombre y lo que sigue no lo cambia de significado. Antes "NetIncomeLoss"
+    // caia en NetIncomeLossAttributableToNoncontrollingInterest (PFE, CEG, PEP, GEV: caja libre / ganancia de 200x)
+    for (const n of nombres) { const h = arr.find(x => { const c = x.concept || ''; return c.startsWith(n) && !/Noncontrolling|Minority|PerShare|Attributable|Other|Extraordinary/.test(c.slice(n.length)); }); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
     return null;
   },
+  /** suma de todos los conceptos de una lista que aparezcan (cada uno una sola vez) */
+  _sum(arr, nombres) { if (!Array.isArray(arr)) return null; let t = null; for (const n of nombres) { const h = arr.find(x => x.concept === n); if (h && Number.isFinite(Number(h.value))) t = (t || 0) + Number(h.value); } return t; },
   C: {
     ventas: ['Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax', 'RevenueFromContractWithCustomerIncludingAssessedTax', 'SalesRevenueNet', 'SalesRevenueGoodsNet'],
     neto: ['NetIncomeLoss', 'ProfitLoss'],
@@ -499,10 +517,16 @@ const Fund = {
     impuesto: ['IncomeTaxExpenseBenefit'],
     antesImp: ['IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxes'],
     patrimonio: ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
-    deuda: ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebt'],
+    deuda: ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligations'],
+    // deuda total como la cuenta TradingView: largo plazo + porcion corriente + corto plazo + leases
+    deudaCorriente: ['LongTermDebtCurrent', 'LongTermDebtAndCapitalLeaseObligationsCurrent', 'LongTermDebtAndFinanceLeaseObligationsCurrent', 'DebtCurrent', 'ShortTermDebtAndCurrentPortionOfLongTermDebt'],
+    deudaCorto: ['ShortTermBorrowings', 'CommercialPaper', 'OtherShortTermBorrowings'],
+    leases: ['OperatingLeaseLiabilityNoncurrent', 'OperatingLeaseLiabilityCurrent', 'FinanceLeaseLiabilityNoncurrent', 'FinanceLeaseLiabilityCurrent'],
+    patrimonioTotal: ['StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
+    minoritarios: ['MinorityInterest', 'StockholdersEquityAttributableToNoncontrollingInterest'],
     caja: ['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'],
     cfo: ['NetCashProvidedByUsedInOperatingActivities', 'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations'],
-    capex: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets'],
+    capex: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets', 'PaymentsForCapitalImprovements', 'PaymentsToAcquireOtherPropertyPlantAndEquipment', 'PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets'],
     acciones: ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic', 'CommonStockSharesOutstanding'],
   },
   /** una fila por año fiscal, de más viejo a más nuevo */
@@ -517,16 +541,78 @@ const Fund = {
       const tasa = pre && imp != null && pre > 0 ? clamp(imp / pre, 0, 0.6) : 0.21;
       const invertido = pat != null ? pat + deu - caj : null;
       return {
-        anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: d.endDate || '',
+        anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
         ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
         acciones: V(ic, C.acciones) || V(bs, C.acciones),
-        roic: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
+        roicNopat: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
+        capital: Fund.capitalTotal(bs),
       };
     }).filter(f => f.anio && (f.ventas || f.neto));
     const vistos = {}; for (const f of filas) if (!vistos[f.anio] || f.fin > vistos[f.anio].fin) vistos[f.anio] = f;
-    return Object.values(vistos).sort((a, b) => a.anio - b.anio);
+    const out = Object.values(vistos).sort((a, b) => a.anio - b.anio);
+    // ROIC como lo publica TradingView: ganancia neta / promedio del capital total (patrimonio + deuda total) de dos periodos
+    out.forEach((f, i) => { const prev = i ? out[i - 1] : null; f.roic = Fund.roicTV(f.neto, f.capital, prev && prev.anio === f.anio - 1 ? prev.capital : null); });
+    return out;
+  },
+  /** capital total de un balance: patrimonio (incluyendo minoritarios) + deuda total (largo plazo, porcion corriente, corto plazo y leases). null si no hay patrimonio. */
+  capitalTotal(bs) {
+    const V = Fund._v, C = Fund.C;
+    let pat = V(bs, C.patrimonioTotal);
+    if (pat == null) { const p = V(bs, C.patrimonio); if (p == null) return null; pat = p + (Fund._sum(bs, C.minoritarios) || 0); }
+    const lp = V(bs, C.deuda) || 0, cor = V(bs, C.deudaCorriente) || 0, corto = Fund._sum(bs, C.deudaCorto) || 0, leases = Fund._sum(bs, C.leases) || 0;
+    // si el filer informa "LongTermDebt" total (sin Noncurrent) ya incluye la porcion corriente
+    const h = Array.isArray(bs) && bs.find(x => x.concept === 'LongTermDebtNoncurrent' || x.concept === 'LongTermDebtAndCapitalLeaseObligationsNoncurrent');
+    const deuda = (h ? lp + cor : Math.max(lp, cor)) + corto + leases;
+    return { patrimonio: pat, deuda, total: pat + deuda };
+  },
+  /** ganancia neta / promedio del capital total de dos periodos; vacio si el capital promedio no es positivo o el resultado es absurdo */
+  roicTV(neto, cap, capPrev) {
+    if (neto == null || !cap) return null;
+    const base = capPrev && capPrev.total != null ? (cap.total + capPrev.total) / 2 : cap.total;
+    if (!(base > 0)) return null;
+    const r = neto / base; return Math.abs(r) <= 3 ? r : null;
+  },
+  /** filas trimestrales (10-Q y 10-K) con periodo en meses, de mas vieja a mas nueva */
+  trimestres(finQ) {
+    if (!finQ || !Array.isArray(finQ.data)) return [];
+    const V = Fund._v, C = Fund.C;
+    return finQ.data.filter(d => d.report && (d.report.ic || d.report.bs) && d.endDate).map(d => {
+      const ic = d.report.ic || [], bs = d.report.bs || [];
+      const fin = String(d.endDate).slice(0, 10), ini = String(d.startDate || '').slice(0, 10);
+      const meses = ini && D.parse(ini) ? Math.round((D.parse(fin) - D.parse(ini)) / (30.4 * 86400000)) : null;
+      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), capital: Fund.capitalTotal(bs) };
+    }).sort((a, b) => a.fin.localeCompare(b.fin));
+  },
+  /** Ganancia neta de los ultimos 12 meses y capital promedio (hoy y hace un anio) a partir de 10-K + 10-Q.
+   *  Soporta 10-Q con valores del trimestre (3 meses) o acumulados del anio (6/9 meses). null si no cierra. */
+  ttm(filasAnuales, trims) {
+    if (!trims.length || !filasAnuales.length) return null;
+    const q = trims.filter(t => t.neto != null);
+    const ult = q[q.length - 1]; if (!ult) return null;
+    const ultAnual = filasAnuales[filasAnuales.length - 1];
+    if (ult.fin <= ultAnual.fin) return { neto: ultAnual.neto, hasta: ultAnual.fin, capital: ultAnual.capital, capitalPrev: (filasAnuales[filasAnuales.length - 2] || {}).capital || null, base: 'anual' };
+    // valor de los meses transcurridos desde el cierre anual (YTD) en un periodo dado
+    const ytdDesde = (cierre, hasta, nMax = 4) => {
+      const tramo = q.filter(t => t.fin > cierre && t.fin <= hasta).slice(0, nMax);
+      if (!tramo.length) return null;
+      const u = tramo[tramo.length - 1];
+      if (u.meses != null && u.meses >= 5) return u.neto;               // el 10-Q ya viene acumulado
+      if (tramo.every(t => t.meses == null || t.meses <= 4)) return sum(tramo.map(t => t.neto));  // trimestres sueltos
+      return null;
+    };
+    const nTramo = q.filter(t => t.fin > ultAnual.fin && t.fin <= ult.fin).length;
+    const ytd = ytdDesde(ultAnual.fin, ult.fin);
+    // el mismo tramo del anio anterior: los cierres fiscales se corren unos dias (NVDA cierra 27/28 de julio), por eso el margen
+    const finPrev = (filasAnuales[filasAnuales.length - 2] || {}).fin; const hastaPrev = D.addDays(ult.fin, -365);
+    const ytdPrev = finPrev ? ytdDesde(finPrev, D.addDays(hastaPrev, 20), nTramo) : null;
+    if (ytd == null || ytdPrev == null || ultAnual.neto == null) return null;
+    const neto = ultAnual.neto + ytd - ytdPrev;
+    if (ultAnual.neto && Math.abs(neto / ultAnual.neto) > 4) return null;  // algo se leyo mal
+    // balance de hace un anio: el trimestre mas cercano a esa fecha (a lo sumo 45 dias de diferencia)
+    const prev = q.filter(t => t.capital && Math.abs(D.parse(t.fin) - D.parse(hastaPrev)) <= 45 * 86400000).sort((a, b) => Math.abs(D.parse(a.fin) - D.parse(hastaPrev)) - Math.abs(D.parse(b.fin) - D.parse(hastaPrev)))[0];
+    return { neto, hasta: ult.fin, capital: ult.capital, capitalPrev: prev ? prev.capital : null, base: 'ttm' };
   },
   /** CAGR entre el primero y el último valor positivo de la serie (n años) */
   cagr(filas, campo, n) {
@@ -543,11 +629,13 @@ const Fund = {
     const s = encodeURIComponent(Precios.simbolo(t));
     const get = async q => { try { const r = await fetch(`https://finnhub.io/api/v1/${q}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; return await r.json(); } catch (e) { return null; } };
     const hoy = D.today(); const hasta = D.iso(new Date(D.parse(hoy).getTime() + 200 * 86400000));
-    const [perfil, met, fin, cal] = await Promise.all([
+    const desdeQ = D.addDays(hoy, -800);
+    const [perfil, met, fin, cal, finQ] = await Promise.all([
       get(`stock/profile2?symbol=${s}`),
       get(`stock/metric?symbol=${s}&metric=all`),
       get(`stock/financials-reported?symbol=${s}&freq=annual&from=2008-01-01&to=${hoy}`),
       get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
+      get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${desdeQ}&to=${hoy}`),
     ]);
     if (!perfil && !met && !fin) return null;
     // Si Finnhub corto por limite (la llamada falla, no viene vacia), la ficha nueva esta incompleta.
@@ -574,18 +662,40 @@ const Fund = {
       deudaPat: Number(m['totalDebt/totalEquityQuarterly'] ?? m['totalDebt/totalEquityAnnual']) || null,
       yieldDiv: Number(m.dividendYieldIndicatedAnnual ?? m.currentDividendYieldTTM) / 100 || null,
       divCrec5: Number(m.dividendGrowthRate5Y) / 100 || null, payout: Number(m.payoutRatioTTM) / 100 || null,
-      crecVentas5: Number(m.revenueGrowth5Y) / 100 || null, crecEps5: Number(m.epsGrowth5Y) / 100 || null,
+      crecVentas5: Number(m.revenueGrowth5Y) / 100 || null, crecEps5: Number(m.epsGrowth5Y) / 100 || null, roiFinnhub: Number(m.roiTTM) / 100 || null,
       beta: Number(m.beta) || null,
       balance: bal ? { fecha: bal.date, hora: bal.hour || '', epsEst: bal.epsEstimate ?? null, trimestre: bal.quarter ?? null } : null,
-      filas: filas.slice(-12).map(f => ({ anio: f.anio, ventas: f.ventas, neto: f.neto, eps: f.eps, fcf: f.fcf, acciones: f.acciones, roic: f.roic })),
+      filas: filas.slice(-12).map(f => ({ anio: f.anio, ventas: f.ventas, neto: f.neto, eps: f.eps, fcf: f.fcf, acciones: f.acciones, roic: f.roic, capital: f.capital ? f.capital.total : null })),
     };
     // calculados sobre los balances reportados a la SEC (lo que Finnhub no da hecho)
-    d.cagrVentas5 = Fund.cagr(filas, 'ventas', 5); d.cagrNeto5 = Fund.cagr(filas, 'neto', 5); d.cagrEps5 = Fund.cagr(filas, 'eps', 5);
+    d.avisos = [];
+    d.cagrVentas5 = Fund.cagr(filas, 'ventas', 5); d.cagrNeto5 = Fund.cagr(filas, 'neto', 5);
     d.cagrVentas10 = Fund.cagr(filas, 'ventas', 10); d.cagrNeto10 = Fund.cagr(filas, 'neto', 10);
-    d.roicProm5 = Fund.prom(filas.filter(f => f.roic != null), 'roic', 5);
+    // EPS: el de los balances no esta ajustado por splits (NVDA, GOOGL, AMZN daban negativo). Manda el de Finnhub;
+    // el propio solo si Finnhub no lo da y ademas es coherente con la ganancia neta
+    const epsPropio = Fund.cagr(filas, 'eps', 5);
+    d.cagrEps5 = d.crecEps5 != null ? d.crecEps5 : (epsPropio != null && d.cagrNeto5 != null && Math.abs(epsPropio - d.cagrNeto5) <= 0.25 ? epsPropio : null);
+    d.epsFuente = d.crecEps5 != null ? 'finnhub' : (d.cagrEps5 != null ? 'sec' : null);
+    if (epsPropio != null && d.cagrEps5 == null) d.avisos.push('EPS: la serie de la SEC no esta ajustada por splits; sin dato confiable');
+    // ROIC (formula de TradingView): ganancia neta / capital total promedio. Actual = ultimos 12 meses (10-K + 10-Q),
+    // si no el ultimo anual, si no el ROI que calcula Finnhub. Promedio 5 anios con la misma formula.
+    const trims = Fund.trimestres(finQ); const ttm = Fund.ttm(filas, trims);
     const u = filas[filas.length - 1];
-    d.roicAct = u && u.roic != null ? u.roic : (Number(m.roiTTM) / 100 || null);  // respaldo: el ROI que ya calcula Finnhub (empresas con patrimonio negativo)
+    let roic = null, fuente = null, cuenta = null;
+    if (ttm && ttm.base === 'ttm') { roic = Fund.roicTV(ttm.neto, ttm.capital, ttm.capitalPrev); if (roic != null) { fuente = 'ttm'; cuenta = { neto: ttm.neto, hasta: ttm.hasta, capital: ttm.capital.total, capitalPrev: ttm.capitalPrev ? ttm.capitalPrev.total : null }; } }
+    if (roic == null && u && u.roic != null) { roic = u.roic; fuente = 'anual'; const pv = filas[filas.length - 2]; cuenta = { neto: u.neto, hasta: u.fin, capital: u.capital.total, capitalPrev: pv && pv.capital ? pv.capital.total : null }; }
+    if (roic == null) { const f = Number(m.roiTTM) / 100; if (Number.isFinite(f) && f !== 0 && Math.abs(f) <= 3) { roic = f; fuente = 'finnhub'; } }
+    if (roic == null && u && u.capital && !(u.capital.total > 0)) d.avisos.push('ROIC: capital total negativo (recompras); TradingView tampoco lo publica');
+    d.roicAct = roic; d.roicFuente = fuente; d.roicCuenta = cuenta;
+    const roics = filas.filter(f => f.roic != null).slice(-5).map(f => f.roic);
+    d.roicProm5 = roics.length >= 3 ? sum(roics) / roics.length : (Number(m.roi5Y) / 100 || null);
+    d.roicProm5Fuente = roics.length >= 3 ? 'sec' : (d.roicProm5 != null ? 'finnhub' : null);
+    d.roicSerie = filas.slice(-10).filter(f => f.roic != null).map(f => ({ anio: f.anio, roic: f.roic }));
     d.fcfSobreNeto = u && u.fcf != null && u.neto ? u.fcf / u.neto : null;
+    if (d.fcfSobreNeto != null && Math.abs(d.fcfSobreNeto) > 15) { d.avisos.push(`Caja libre / ganancia: ${Math.round(d.fcfSobreNeto)}x no es creible; se oculta`); d.fcfSobreNeto = null; }
+    // rango de 52 semanas: Finnhub a veces manda el de otro listado (BRK-A por BRK-B, VIST en pesos mexicanos, TSM en Taiwan)
+    const px = state.cartera.precios[t] && state.cartera.precios[t].c;
+    if (d.min52 != null && d.max52 != null && px && (px < d.min52 * 0.8 || px > d.max52 * 1.2 || d.max52 / d.min52 > 8)) { d.avisos.push(`Rango 52 semanas: ${Math.round(d.min52)}\u2013${Math.round(d.max52)} no corresponde a este listado; se oculta`); d.min52 = d.max52 = null; }
     const accIni = filas.filter(f => f.acciones).slice(0, 1)[0], accFin = filas.filter(f => f.acciones).slice(-1)[0];
     d.accionesCambio = accIni && accFin && accIni.acciones && accIni.anio !== accFin.anio ? { desde: accIni.anio, hasta: accFin.anio, pct: accFin.acciones / accIni.acciones - 1 } : null;
     d.aniosDatos = filas.length ? { desde: filas[0].anio, hasta: filas[filas.length - 1].anio } : null;
@@ -597,6 +707,15 @@ const Fund = {
     Persist.save();
     return d;
   },
+  /** respuestas crudas de Finnhub (recortadas) para revisar una cuenta contra TradingView */
+  async crudo(t) {
+    const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
+    const s = encodeURIComponent(Precios.simbolo(t)); const hoy = D.today();
+    const get = async q => { try { const r = await fetch(`https://finnhub.io/api/v1/${q}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return { error: r.status }; return await r.json(); } catch (e) { return { error: String(e) }; } };
+    const [met, fin, finQ] = await Promise.all([get(`stock/metric?symbol=${s}&metric=all`), get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -2200)}&to=${hoy}`), get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${D.addDays(hoy, -800)}&to=${hoy}`)]);
+    const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
+    return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
+  },
   /** refresca en segundo plano los tickers de la cartera con datos viejos (para los avisos de balance) */
   async actualizarCartera(max = 8, diasFrescura = 6) {
     if (!(state.settings.finnhubKey || '').trim()) return 0;
@@ -606,7 +725,7 @@ const Fund = {
     return n;
   },
   /** Mantiene tibias las fichas de toda la cartera y la watchlist: tandas de 8 cada 65 s hasta que no
-   *  quede ninguna vieja. Finnhub gratis corta a las 60 llamadas por minuto y cada ficha son cuatro.
+   *  quede ninguna vieja. Finnhub gratis corta a las 60 llamadas por minuto y cada ficha son cinco (perfil, metricas, anual, calendario, trimestral).
    *  Una sola corrida a la vez; cada ficha que llega avisa con el evento 'fund-listo'. */
   _calentando: null,
   calentar(diasFrescura = 6, pausaInicial = 0) {

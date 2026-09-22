@@ -476,6 +476,7 @@ function fundHTML(t, pos) {
   const d = Fund.de(t);
   const pct1 = v => v == null ? '\u2014' : `${v >= 0 ? '' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
   const num = (v, n = 1) => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+  const enM = v => Math.abs(v) >= 1e7 ? `${fmtU(v / 1e6, 0)} M` : fmtU(v, 0);
   const sem = (v, bueno, malo, inv) => v == null ? '' : inv ? (v <= bueno ? 'ok' : v <= malo ? 'mid' : 'bad') : (v >= bueno ? 'ok' : v >= malo ? 'mid' : 'bad');
   /** k: clave · v: valor · cls: color solo si hay juicio · por: la linea de abajo que explica el juicio */
   const r = (k, v, cls, por) => `<div class="r"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span>${por ? `<span class="por">${por}</span>` : ''}</div>`;
@@ -507,7 +508,8 @@ function fundHTML(t, pos) {
   // calidad del negocio (Buffett: retorno sobre el capital, margenes estables, poca deuda, caja real)
   const margenVs = d.margenNeto != null && d.margenNeto5 ? d.margenNeto / d.margenNeto5 - 1 : null;
   const calidad = sec('Calidad del negocio', [
-    r('ROIC', pct1(d.roicAct), sem(d.roicAct, 0.15, 0.10), d.roicProm5 != null ? `Su promedio de 5 a\u00f1os es ${pct1(d.roicProm5)}` : 'Lo que rinde cada d\u00f3lar puesto en el negocio'),
+    r('ROIC', pct1(d.roicAct), sem(d.roicAct, 0.15, 0.10), `${d.roicFuente === 'ttm' ? '\u00daltimos 12 meses' : d.roicFuente === 'anual' ? '\u00daltimo balance anual' : d.roicFuente === 'finnhub' ? 'ROI seg\u00fan Finnhub' : 'Lo que rinde cada d\u00f3lar puesto en el negocio'}${d.roicProm5 != null ? ` \u00b7 promedio 5 a\u00f1os ${pct1(d.roicProm5)}` : ''}${d.roicCuenta ? ` <button type="button" class="link-btn" data-act="fund-cuenta" data-id="${esc(t)}">ver cuenta</button>` : ''}`),
+    d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">Ganancia neta ${d.roicFuente === 'ttm' ? '\u00faltimos 12 meses' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })}: <b>${enM(d.roicCuenta.neto)}</b><br>Capital total (patrimonio + deuda): <b>${enM(d.roicCuenta.capital)}</b>${d.roicCuenta.capitalPrev != null ? ` \u00b7 un a\u00f1o antes ${enM(d.roicCuenta.capitalPrev)}` : ' (sin el a\u00f1o anterior: no se promedia)'}<br>ROIC = ganancia \u00f7 capital promedio = <b>${pct1(d.roicAct)}</b>. Misma f\u00f3rmula que TradingView.${d.roicSerie && d.roicSerie.length > 1 ? `<br>Por a\u00f1o: ${d.roicSerie.map(x => `${x.anio} ${pct1(x.roic)}`).join(' \u00b7 ')}` : ''}</div>` : '',
     r('ROE', pct1(d.roe), sem(d.roe, 0.15, 0.10), ''),
     r('Margen neto', pct1(d.margenNeto), sem(margenVs, -0.05, -0.25), d.margenNeto5 != null ? `${margenVs > 0.05 ? 'Mejor' : margenVs < -0.05 ? 'Peor' : 'En l\u00ednea'} que su promedio de 5 a\u00f1os (${pct1(d.margenNeto5)})` : ''),
     r('Margen bruto / operativo', `${pct1(d.margenBruto)} / ${pct1(d.margenOper)}`, '', ''),
@@ -520,7 +522,7 @@ function fundHTML(t, pos) {
   const crec = sec('Crecimiento', [
     r('Ventas', pct1(d.cagrVentas5 ?? d.crecVentas5), sem(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), `CAGR de 5 a\u00f1os${d.cagrVentas10 != null ? `; a 10 a\u00f1os, ${pct1(d.cagrVentas10)}` : ''}`),
     r('Ganancia neta', pct1(d.cagrNeto5), sem(d.cagrNeto5, 0.10, 0.04), `CAGR de 5 a\u00f1os${d.cagrNeto10 != null ? `; a 10 a\u00f1os, ${pct1(d.cagrNeto10)}` : ''}`),
-    r('EPS', pct1(d.cagrEps5 ?? d.crecEps5), sem(d.cagrEps5 ?? d.crecEps5, 0.10, 0.04), 'CAGR de 5 a\u00f1os'),
+    r('EPS', pct1(d.cagrEps5), sem(d.cagrEps5, 0.10, 0.04), d.cagrEps5 == null ? 'Sin dato confiable' : `CAGR de 5 a\u00f1os${d.epsFuente === 'finnhub' ? ' (Finnhub, ajustado por splits)' : ''}`),
   ].join(''));
 
   // valuacion: contra si misma, el mismo criterio que tus zonas de alerta
@@ -551,7 +553,8 @@ function fundHTML(t, pos) {
   const faltan = [d.roicAct, d.roe, d.margenNeto, d.deudaPat, d.fcfSobreNeto, d.cagrNeto5, d.pe, d.peg].filter(v => v == null).length;
   return `<div class="fund hoja" id="fund-box">
     ${cab}${rango}${calidad}${crec}${val}${serie}${bal}
-    <div class="f-pie">Datos de Finnhub (balances presentados a la SEC${d.aniosDatos ? `, ${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta}`: ''}) \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}${faltan ? ` \u00b7 ${faltan} valor${faltan === 1 ? '' : 'es'} sin datos, marcado${faltan === 1 ? '' : 's'} con \u2014` : ''}</div>
+    ${d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : ''}
+    <div class="f-pie">Datos de Finnhub (balances presentados a la SEC${d.aniosDatos ? `, ${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta}`: ''}) \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}${faltan ? ` \u00b7 ${faltan} valor${faltan === 1 ? '' : 'es'} sin datos, marcado${faltan === 1 ? '' : 's'} con \u2014` : ''} \u00b7 <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>
   </div>`;
 }
 /** refresca los fundamentales del ticker y repinta solo ese bloque */
@@ -603,6 +606,7 @@ const cmpNum = n => v => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('
 const CMP_FILAS = [
   { sec: 'Calidad del negocio' },
   { k: 'ROIC', v: d => d.roicAct, f: cmpPct, mejor: 1 },
+  { k: 'ROIC promedio 5 a\u00f1os', v: d => d.roicProm5, f: cmpPct, mejor: 1 },
   // con recompras fuertes el patrimonio se achica y el ROE se dispara sin que el negocio mejore:
   // arriba de 100 % o con patrimonio negativo se muestra, pero no compite
   { k: 'ROE', v: d => d.roe, f: cmpPct, mejor: 1, valido: (v, d) => v <= 1 && !(d.deudaPat < 0), ns: true },
@@ -612,7 +616,7 @@ const CMP_FILAS = [
   { sec: 'Crecimiento, CAGR 5 a\u00f1os' },
   { k: 'Ventas', v: d => d.cagrVentas5 ?? d.crecVentas5, f: cmpPct, mejor: 1 },
   { k: 'Ganancia neta', v: d => d.cagrNeto5, f: cmpPct, mejor: 1 },
-  { k: 'EPS', v: d => d.cagrEps5 ?? d.crecEps5, f: cmpPct, mejor: 1 },
+  { k: 'EPS', v: d => d.cagrEps5, f: cmpPct, mejor: 1 },
   { sec: 'Valuaci\u00f3n' },
   { k: 'P/E', v: d => d.pe, f: cmpNum(1), mejor: -1, valido: v => v > 0 },
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
@@ -745,7 +749,13 @@ ${tesis || '\u2014'}
 
 ${c.tablaF}
 
-## Posiciones cerradas
+${(() => { const pt = E.patrimonio(k); if (!pt.activos.length) return ''; return `## Toda mi plata (patrimonio)
+Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al MEP $ ${fmtARS.format(pt.mep || 0)}.
+| Activo | Tipo | Valor USD | Detalle |
+|---|---|---|---|
+${pt.activos.map(a => `| ${a.nombre} | ${E.TIPOS_ACTIVO[a.tipo] || a.tipo} | ${a.valorUSD != null ? n(a.valorUSD) : '\u2014'} | ${a.detalle.replace(/\|/g, '/')} |`).join('\n')}
+
+`; })()}## Posiciones cerradas
 | Ticker | Realizado USD | Dividendos | Alfa vs SPY |
 |---|---|---|---|
 ${cerrRows || '| \u2014 | | | |'}
@@ -889,7 +899,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${pc(d.roicAct)} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5 ?? d.crecEps5)} | ${n2(d.deudaPat)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${d.yieldDiv ? pc(d.yieldDiv) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (anual)' : ' (ROI Finnhub)'}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${n2(d.deudaPat)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${d.yieldDiv ? pc(d.yieldDiv) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -903,7 +913,7 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
+| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (\u00faltimos 12 m; prom 5 a\u00f1os) | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${pendientes.length ? `\n\nSin fundamentales en esta foto (Finnhub da 60 consultas por minuto; se est\u00e1n completando): ${pendientes.join(', ')}. Si necesit\u00e1s alguno, ped\u00edmelo.` : ''}`,
   };
@@ -951,6 +961,75 @@ window.addEventListener('fund-listo', () => {
   const t = $('#export-md'); if (!t) return;
   const c = ctxResumenFund(); t.value = Intercambio.exportar(c.faltan);
 });
+
+/* Calendario de balances: proximos earnings de todo lo que se sigue (cartera + watchlist), por fecha.
+ * Las fechas vienen del calendario de resultados de Finnhub, que se trae con la ficha de cada empresa. */
+function formBalances() {
+  const k = E.cartera(); const hoy = D.today();
+  const todos = [...k.posiciones.map(p => ({ t: p.ticker, tengo: true, peso: p.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(w => ({ t: w.ticker, tengo: false }))];
+  const con = [], sin = [], pasados = [];
+  for (const x of todos) {
+    const d = Fund.de(x.t); if (!d) { sin.push({ ...x, motivo: 'ficha todav\u00eda no cargada' }); continue; }
+    if (!d.balance) { sin.push({ ...x, motivo: 'Finnhub no tiene fecha' }); continue; }
+    const dias = D.daysBetween(hoy, d.balance.fecha);
+    if (dias < 0) { pasados.push({ ...x, b: d.balance, dias }); continue; }
+    con.push({ ...x, b: d.balance, dias });
+  }
+  con.sort((a, b) => a.b.fecha.localeCompare(b.b.fecha));
+  const hora = h => h === 'bmo' ? 'antes de abrir' : h === 'amc' ? 'despu\u00e9s del cierre' : h === 'dmh' ? 'durante la rueda' : '';
+  const fila = x => `<div class="bal-r" data-act="pos" data-id="${esc(x.t)}"><div class="bal-d"><b>${D.fmt(x.b.fecha)}</b><span>${x.dias === 0 ? 'hoy' : x.dias === 1 ? 'ma\u00f1ana' : `en ${x.dias} d\u00edas`}</span></div><div class="bal-t"><b>${esc(x.t)}</b>${x.tengo ? `<span class="sub">${M.pct(x.peso, 1)} de la cartera</span>` : '<span class="tag">watchlist</span>'}</div><div class="bal-x">${hora(x.b.hora) ? `<span>${hora(x.b.hora)}</span>` : ''}${x.b.epsEst != null ? `<span>EPS esperado ${fmtU(x.b.epsEst)}</span>` : ''}</div></div>`;
+  const grupo = (titulo, arr) => arr.length ? `<div class="f-sec"><div class="t">${titulo}</div>${arr.map(fila).join('')}</div>` : '';
+  const semana = con.filter(x => x.dias <= 7), quincena = con.filter(x => x.dias > 7 && x.dias <= 30), luego = con.filter(x => x.dias > 30);
+  const body = `<div class="hoja">
+    ${con.length ? '' : `<p class="ob-nota">Todav\u00eda no hay fechas: se cargan con la ficha de cada empresa (abrila o esper\u00e1 a que se completen solas).</p>`}
+    ${grupo('Esta semana', semana)}${grupo('Pr\u00f3ximos 30 d\u00edas', quincena)}${grupo('M\u00e1s adelante', luego)}
+    ${sin.length ? `<div class="f-sec"><div class="t">Sin fecha</div><p class="small muted" style="margin:0">${sin.map(x => `${esc(x.t)} (${x.motivo})`).join(' \u00b7 ')}</p></div>` : ''}
+    ${pasados.length ? `<div class="f-sec"><div class="t">Ya presentaron (ficha vieja)</div><p class="small muted" style="margin:0">${pasados.map(x => `${esc(x.t)} el ${D.fmt(x.b.fecha)}`).join(' \u00b7 ')}. Se actualiza al abrir la ficha.</p></div>` : ''}
+    <p class="ob-nota">Fechas del calendario de resultados de Finnhub, que las toma de los anuncios de cada empresa y las estima cuando todav\u00eda no hay anuncio. Se traen junto con la ficha (hasta 200 d\u00edas adelante) y se refrescan cada vez que la ficha se actualiza. Toc\u00e1 una fila para abrir la ficha.</p>
+  </div>`;
+  Modal.open({ title: 'Balances que vienen', submit: '', body });
+}
+
+/* ---------- Otros activos: efectivo, fondo, letra, bono, bitcoin, otro ---------- */
+function formActivo(id) {
+  const a = id ? (state.cartera.activos || []).find(x => x.id === id) : null; const isNew = !a;
+  const v = a || { tipo: 'efectivo', moneda: 'ARS', fecha: D.today() };
+  const tipos = Object.entries(E.TIPOS_ACTIVO);
+  const body = `
+    ${F.field('Tipo', F.select('ac-tipo', tipos, v.tipo))}
+    ${F.field('Nombre', F.input('ac-nombre', v.nombre || '', 'placeholder="Fondo Lecaps Balanz, S31O6, YMCXO\u2026"'))}
+    <div class="grid2">
+      ${F.field('Moneda', F.select('ac-moneda', [['ARS', 'Pesos'], ['USD', 'D\u00f3lares']], v.moneda || 'ARS'), '', 'ac-f ac-moneda')}
+      ${F.field('Monto', F.input('ac-monto', v.monto || '', 'inputmode="decimal" placeholder="0"'), '', 'ac-f ac-efectivo ac-otro')}
+      ${F.field('Capital invertido', F.input('ac-capital', v.capital || '', 'inputmode="decimal" placeholder="0"'), 'lo que pusiste', 'ac-f ac-tasa')}
+      ${F.field('TNA %', F.input('ac-tna', v.tna || '', 'inputmode="decimal" placeholder="ej. 32"'), 'inter\u00e9s simple sobre el capital', 'ac-f ac-tasa')}
+      ${F.field('Desde', F.input('ac-desde', v.desde || D.today(), 'type="date"'), '', 'ac-f ac-tasa')}
+      ${F.field('Vence', F.input('ac-vence', v.vence || '', 'type="date"'), 'opcional', 'ac-f ac-tasa')}
+      ${F.field('Valor hoy (correcci\u00f3n)', F.input('ac-vmanual', v.valorManual ? v.valorManual.v : '', 'inputmode="decimal" placeholder="lo que muestra Balanz"'), 'opcional: si lo carg\u00e1s, de ac\u00e1 en m\u00e1s devenga desde este valor', 'ac-f ac-tasa')}
+      ${F.field('Fecha del valor', F.input('ac-vfecha', v.valorManual ? v.valorManual.fecha : D.today(), 'type="date"'), '', 'ac-f ac-tasa')}
+      ${F.field('Cantidad de BTC', F.input('ac-cantidad', v.cantidad || '', 'inputmode="decimal" placeholder="0,0125"'), 'precio autom\u00e1tico (CoinGecko)', 'ac-f ac-btc')}
+      ${F.field('Precio a mano (US$)', F.input('ac-pxmanual', v.precioManual || '', 'inputmode="decimal" placeholder="solo si no llega el precio"'), '', 'ac-f ac-btc')}
+      ${F.field('Fecha', F.input('ac-fecha', v.fecha || D.today(), 'type="date"'), '', 'ac-f ac-efectivo ac-otro')}
+    </div>
+    ${F.field('Nota', F.input('ac-nota', v.nota || '', 'placeholder="opcional"'))}`;
+  Modal.open({ title: isNew ? 'Nuevo activo' : 'Editar activo', body,
+    extra: isNew ? '' : `<button class="btn danger" data-act="del-activo" data-id="${a.id}">Borrar</button>`,
+    onSubmit: () => {
+      const tipo = Modal.val('ac-tipo'); const nombre = Modal.val('ac-nombre').trim() || E.TIPOS_ACTIVO[tipo];
+      const n = k => M.parse(Modal.val(k)) || null;
+      const nuevo = { id: a ? a.id : uid(), tipo, nombre, moneda: tipo === 'btc' ? 'USD' : Modal.val('ac-moneda'), nota: Modal.val('ac-nota').trim() || undefined };
+      if (tipo === 'efectivo' || tipo === 'otro') { nuevo.monto = n('ac-monto'); nuevo.fecha = Modal.val('ac-fecha') || D.today(); if (!nuevo.monto) { toast('Falta el monto'); return false; } }
+      else if (tipo === 'btc') { nuevo.cantidad = n('ac-cantidad'); nuevo.precioManual = n('ac-pxmanual'); if (!nuevo.cantidad) { toast('Falta la cantidad'); return false; } }
+      else { nuevo.capital = n('ac-capital'); nuevo.tna = n('ac-tna') || 0; nuevo.desde = Modal.val('ac-desde') || D.today(); nuevo.vence = Modal.val('ac-vence') || undefined; const vm = n('ac-vmanual'); if (vm) nuevo.valorManual = { v: vm, fecha: Modal.val('ac-vfecha') || D.today() }; if (!nuevo.capital && !vm) { toast('Falta el capital o el valor de hoy'); return false; } }
+      const arr = state.cartera.activos = state.cartera.activos || [];
+      const i = arr.findIndex(x => x.id === nuevo.id); if (i >= 0) arr[i] = nuevo; else arr.push(nuevo);
+      Persist.save(); render();
+      if (tipo === 'btc' && !Btc.precio()) Btc.actualizar().then(ok => { if (ok) render(); });
+    } });
+  // mostrar solo los campos del tipo elegido
+  const ajustar = () => { const t = $('#ac-tipo').value; const grupo = t === 'efectivo' ? 'ac-efectivo' : t === 'otro' ? 'ac-otro' : t === 'btc' ? 'ac-btc' : 'ac-tasa'; $$('#modal .ac-f').forEach(el => { el.style.display = el.classList.contains(grupo) || (el.classList.contains('ac-moneda') && t !== 'btc') ? '' : 'none'; }); };
+  ajustar(); $('#ac-tipo').addEventListener('change', ajustar);
+}
 
 function formImportar() {
   Intercambio._pendiente = null;  // ventana nueva: siempre se analiza de cero (si no, un texto igual al de la última vez se aplicaba sin vista previa)
