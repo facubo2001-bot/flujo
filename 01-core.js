@@ -62,6 +62,8 @@ const FERIADOS_NYSE = new Set([
 const MENOS = t => String(t).replace(/-/g, '\u2212');
 const NF = o => { const f = new Intl.NumberFormat('es-AR', o); return { format: v => MENOS(f.format(v)) }; };
 const fmtARS = NF({ maximumFractionDigits: 0 });
+/** pesos abreviados para tarjetas: 9,9 M · 360 k */
+const abrevARS = v => Math.abs(v) >= 1e6 ? `${(v / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 })} M` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3).toLocaleString('es-AR')} k` : fmtARS.format(Math.round(v));
 const fmtUSD = NF({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmtUSD2 = NF({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const M = {

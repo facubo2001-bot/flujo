@@ -137,6 +137,7 @@ const Actions = {
   'export-claude'() { formExportar(); },
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
+  'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   'new-activo'() { formActivo(null); },
   'activo'(id) { formActivo(id); },
   'del-activo'(id) { state.cartera.activos = (state.cartera.activos || []).filter(a => a.id !== id); Persist.save(); Modal.close(); render(); },
