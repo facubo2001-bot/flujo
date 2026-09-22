@@ -243,56 +243,39 @@ function viewCartera() {
   let html = '';
   // precios: una sola linea, sin tarjeta. La hora manda; CCL y SPY al lado; actualizar es un icono
   html += `<div class="px-strip"><span class="px-txt">${hayKey ? `${k.conPrecio ? `<b>Precios ${fechaTxt}</b>` : '<b>Sin precios todav\u00eda</b>'}${k.conPrecio && k.conPrecio < k.posiciones.length ? ` \u00b7 <span class="warn-text">${k.posiciones.length - k.conPrecio} sin precio</span>` : ''}${s.ccl ? ' \u00b7 CCL ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' \u00b7 SPY ' + MENOS(k.spyHoy.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}` : '<b>Falta tu clave de Finnhub</b>'}</span>${hayKey ? `<button class="icon-btn" data-act="precios-update" aria-label="Actualizar precios" title="Actualizar precios">${ICONS.repeat}</button>` : '<button class="btn sm" data-act="go-config">Configurar</button>'}</div>`;
-  if (enZona.length) html += `<div class="callout ${enZona.some(p => p.estado === 'urgente') ? 'crit' : 'amber'}" style="margin-bottom:14px"><b>${enZona.some(p => p.estado === 'urgente') ? 'Che, comprá urgente' : 'Che, mirala'}:</b> ${enZona.map(p => `<b>${esc(p.ticker)}</b> ${fmtU(p.precio)} (${G.le} ${fmtU(p.estado === 'urgente' ? p.alerta.urgente : p.alerta.mirala)})`).join(' · ')}</div>`;
   const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0); const valorTotTxt = k.valorTotal != null ? fmtU(k.valorTotal, 0) : valorTxt;
   const n0 = x => Math.abs(x).toLocaleString('es-AR', { maximumFractionDigits: 0 }); const sg = x => x >= 0 ? '+' : '−';
   const va = k.ventanas.anio, vi = k.ventanas.inicio; const vAlfa = va.disponible ? va : vi.disponible ? vi : null;
   const rendStat = (kLabel, v) => v && v.disponible && v.rend.realDiv != null ? { k: kLabel, v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { k: kLabel, v: '—' };
   const ultimoDiv = k.ops.filter(o => o.tipo === 'dividendo').sort((a, b) => b.fecha.localeCompare(a.fecha) || (Number(b.monto) || 0) - (Number(a.monto) || 0))[0];
   const cajaTotal = (k.valorTotal != null ? k.valorTotal : k.costo);
-  // --- las 4 tarjetas gerenciales: toda tu plata · CEDEARs · riesgo · para hoy
-  const pt = E.patrimonio(k);
-  const dpUSD = p => p.valor != null && p.dp != null ? p.valor - p.valor / (1 + p.dp / 100) : 0;
-  const btcQ = Btc.precio(); const hoyBtc = btcQ && btcQ.dp ? sum(pt.activos.filter(x => x.tipo === 'btc' && x.valorUSD).map(x => x.valorUSD - x.valorUSD / (1 + btcQ.dp / 100))) : 0;
-  const hoyUSD = k.conPrecio ? sum(k.posiciones.map(dpUSD)) + hoyBtc : null;
-  const faltaReserva = pt.total ? Math.max(0, pt.reservaObjetivo * pt.total - pt.reserva) : null;
-  const hayActivos = pt.activos.length > 0;
-  const top = k.posiciones.slice().sort((x, y) => (y.peso || 0) - (x.peso || 0));
-  const top3 = sum(top.slice(0, 3).map(x => x.peso || 0)); const mayor = top[0];
-  const maxPos = Number(s.maxPosiciones) || 16;
-  const TECH = /Technology|Semiconductor|Software|Internet|Media|Interactive|Communication|Electronic/i;
-  const conSector = k.posiciones.filter(x => Fund.de(x.ticker) && Fund.de(x.ticker).sector);
-  const techPct = conSector.length ? sum(conSector.filter(x => TECH.test(Fund.de(x.ticker).sector)).map(x => x.peso || 0)) : null;
-  const urg = enZona.filter(x => x.estado === 'urgente').map(x => x.ticker), mir = enZona.filter(x => x.estado === 'mirala').map(x => x.ticker);
-  const proxBal = [...k.posiciones, ...k.watch].map(x => ({ t: x.ticker, b: Fund.balance(x.ticker) })).filter(x => x.b).sort((x, y) => x.b.dias - y.b.dias)[0];
+  // --- tarjetas gerenciales: Portfolio · CEDEARs · Novedades (balances de la semana + lo que esta en zona)
+  const pt = E.patrimonio(k); const hayActivos = pt.activos.length > 0;
   const rendStr = v => v && v.disponible && v.rend.realDiv != null ? { v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { v: '—', cls: '' };
-  const riesgoCls = top3 >= 0.45 ? 'neg' : top3 >= 0.35 ? 'mid' : 'pos';
+  const reparto = pt.grupos.filter(g => g.valor > 0).map(g => `${g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'fondo' : g.nombre.toLowerCase()} ${M.pct(g.valor / pt.total, 0)}`).join(' · ');
+  // balances de la semana (hasta 7 dias): primero los mas proximos, entre iguales lo que esta en cartera
+  const balSemana = [...k.posiciones.map(x => ({ t: x.ticker, tengo: true, peso: x.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(x => ({ t: x.ticker, tengo: false, peso: 0 }))]
+    .map(x => ({ ...x, b: Fund.balance(x.t) })).filter(x => x.b && x.b.dias <= 7).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
+  // chips: "MELI 25/09 pm" (pm = tras el cierre, am = antes de abrir)
+  const ddmm = f => `${f.slice(8, 10)}/${f.slice(5, 7)}`;
+  const balLineas = balSemana.length ? `<div class="nov-l nov-z"><span class="nov-chips">${balSemana.map(x => `<span class="nov-chip bal" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)} ${ddmm(x.b.fecha)}${x.b.hora === 'bmo' ? '<i>am</i>' : x.b.hora === 'amc' ? '<i>pm</i>' : ''}</span>`).join('')}</span></div>` : '';
+  const zona = [...k.posiciones, ...k.watch].filter(x => x.estado).sort((x, y) => (x.estado === 'urgente' ? 0 : 1) - (y.estado === 'urgente' ? 0 : 1) || ((k.posiciones.some(p => p.ticker === y.ticker) ? 1 : 0) - (k.posiciones.some(p => p.ticker === x.ticker) ? 1 : 0)));
+  const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
+  const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
-    ${kpi({ label: 'Toda tu plata', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero',
-      stats: [
-        { k: 'Hoy', v: hoyUSD != null ? `${sg(hoyUSD)}${fmtU(Math.abs(hoyUSD), 0)}` : '—', cls: hoyUSD == null ? '' : hoyUSD >= 0 ? 'pos' : 'neg' },
-        hayActivos ? { k: 'Reserva', v: `${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '—'} <span class="soft">/ ${Math.round(pt.reservaObjetivo * 100)}</span>`, cls: pt.reservaPct == null ? '' : pt.reservaPct >= pt.reservaObjetivo ? 'pos' : 'neg' } : { k: 'Cedears', v: valorTxt },
-        hayActivos ? { k: faltaReserva > 0 ? 'Faltan' : 'Reserva ok', v: faltaReserva > 0 ? fmtU(faltaReserva, 0) : '✓' } : { k: 'Otros', v: 'cargalos abajo' },
-      ],
-      foot: pt.mep ? `$ ${abrevARS(pt.total * pt.mep)} al MEP ${fmtARS.format(pt.mep)}` : 'MEP no cargado' })}
+    ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero',
+      stats: hayActivos ? pt.grupos.slice(0, 4).map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'Reserva' : g.id === 'renta' ? 'Bonos' : g.nombre, v: fmtU(g.valor, 0), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
+        : [{ k: 'CEDEARs', v: valorTxt }, { k: 'Otros', v: '<span class="soft">abajo</span>' }],
+      foot: pt.mep ? `$ ${abrevARS((hayActivos ? pt.total : (k.valorTotal != null ? k.valorTotal : k.costo)) * pt.mep)} al MEP ${fmtARS.format(pt.mep)}` : 'MEP no cargado' })}
     ${kpi({ label: 'CEDEARs', value: valorTxt,
       stats: [
-        { k: 'Ganado', v: k.gpTotal != null ? `${sg(k.gpTotal)}${fmtU(Math.abs(k.gpTotal), 0)}` : '—', cls: k.gpTotal == null ? '' : k.gpTotal >= 0 ? 'pos' : 'neg' },
-        { k: 'Divid.', v: k.dividendos ? `+${fmtU(k.dividendos, 0)}` : '—', cls: k.dividendos ? 'pos' : '' },
         { k: 'YTD', ...rendStr(va) }, { k: 'Inicio', ...rendStr(vi) },
+        { k: 'Posiciones', v: String(k.posiciones.length) },
+        { k: 'Divid.', v: k.dividendos ? `+${fmtU(k.dividendos, 0)}` : '—', cls: k.dividendos ? 'pos' : '' },
       ] })}
-    ${kpi({ label: 'Riesgo', value: k.posiciones.length ? `<span class="${riesgoCls}">Top 3 = ${M.pct(top3, 0)}</span>` : '—',
-      stats: [
-        { k: 'Mayor', v: mayor ? `${esc(mayor.ticker)} ${M.pct(mayor.peso, 0)}` : '—', cls: mayor && mayor.peso >= 0.15 ? 'neg' : '' },
-        { k: 'Posic.', v: `${k.posiciones.length} <span class="soft">/ ${maxPos}</span>`, cls: k.posiciones.length >= maxPos ? 'neg' : '' },
-        { k: 'Tech', v: techPct != null ? M.pct(techPct, 0) : '—', cls: techPct != null && techPct >= 0.6 ? 'neg' : '' },
-      ],
-      foot: k.posiciones.length >= maxPos ? 'cupo lleno: una entra si sale otra' : techPct == null ? 'tech: se calcula con las fichas' : `${k.posiciones.length} nombres, cupo ${maxPos}` })}
-    <div class="card kpi tap" data-act="ir-alertas"><div class="label">Para hoy</div><div class="value">${enZona.length ? `<span class="${urg.length ? 'neg' : 'mid'}">${enZona.length} en zona</span>` : '<span class="pos">Nada en zona</span>'}</div><div class="mini">
-      <div><span class="k">Zona</span><b class="${urg.length ? 'neg' : mir.length ? 'mid' : ''}">${(() => { const l = urg.length ? urg : mir; return l.length ? l.slice(0, 2).map(esc).join(', ') + (l.length > 2 ? ` +${l.length - 2}` : '') : '—'; })()}</b></div>
-      <div><span class="k">Balance</span><b>${proxBal ? `${esc(proxBal.t)} · ${proxBal.b.dias === 0 ? 'hoy' : proxBal.b.dias + ' d'}` : '—'}</b></div>
-      <div><span class="k">Precios</span><b>${k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</b></div>
-    </div><div class="foot">${enZona.length ? 'tocá para ir a las alertas' : 'nada para hacer hoy'}</div></div>
+    <div class="card kpi nov ${balLineas || zonaLinea ? 'tap' : ''}" ${balLineas || zonaLinea ? 'data-act="ir-alertas"' : ''}><div class="label">Novedades</div>
+      ${balLineas || zonaLinea ? balLineas + zonaLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
+    </div>
   </div>`;
   const conc = state.cartera.conciliacion || null;
   // composición ↔ evolución
@@ -304,13 +287,13 @@ function viewCartera() {
   } else chartCard = renderEvolucion(k, seg);
   html += `<div class="grid g-12 section">
     ${chartCard}
-    <div class="card"><div class="card-head" style="align-items:flex-start;flex-wrap:nowrap"><div><h2>Posiciones</h2><span class="hint">${k.posiciones.length} posiciones · ${valorTxt}${hoyUSD != null && k.valor ? ` · hoy <b class="${hoyUSD >= 0 ? 'up' : 'down'}">${pctS(hoyUSD / (k.valor - hoyUSD))}</b>` : ''}</span></div><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
+    <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
       <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio · hoy</span><span>Valor · rdo.</span></div>
       ${k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balance(p.ticker); if (bal && bal.dias <= 7) avisos.push(`balance ${bal.dias === 0 ? 'hoy' : bal.dias === 1 ? 'mañana' : 'en ' + bal.dias + ' d'}`);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
-        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div><span class="pz-s">${p.cedear ? `${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs · ` : ''}${fmtAcc(p.acciones)} acc</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
+        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div><span class="pz-s">${p.cedear ? `${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs · ` : ''}${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
         <div class="pz-m">${p.precio != null ? `<span class="pz-px">${fmtU(p.precio)}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '—'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div>
-        <div class="pz-r"><b>${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}${p.dividendos ? '<i title="incluye dividendos">·d</i>' : ''}</span>` : ''}<span class="pz-w">${M.pct(p.peso, 1)}</span></div>
+        <div class="pz-r"><b>${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}<span class="pz-w">${M.pct(p.peso, 1)}</span></div>
       </div>`; }).join('')}
       </div>
     </div>

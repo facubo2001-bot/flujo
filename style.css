@@ -754,7 +754,7 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 .pz-cols>span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:6px 0 5px;border-bottom:1px solid var(--line);white-space:nowrap}
 .pz-cols>span:nth-child(2),.pz-cols>span:nth-child(3){text-align:right}
 .pz{display:contents;cursor:pointer}
-.pz>div{padding:12px 0;border-bottom:1px solid var(--line);min-width:0}
+.pz>div{padding:9px 0;min-width:0}
 .pz:last-child>div{border-bottom:0}
 .pz-t{display:flex;align-items:center;gap:8px;min-width:0}
 .pz-t b{font-family:var(--font-display);font-size:17px;font-weight:900;letter-spacing:-.03em}
@@ -777,4 +777,19 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 .kpi .value .mid{color:var(--warn-text)} .kpi .mini b.mid{color:var(--warn-text)}
 .kpi.tap{cursor:pointer}
 .g-kpi .kpi .mini b{font-size:14px}
-.g-kpi .kpi .mini .k{flex:1 1 auto;max-width:52%}
+.g-kpi .kpi .mini .k{flex:1 1 auto;max-width:none;letter-spacing:.05em}
+
+/* novedades: tarjeta ancha, del alto de las dos de arriba */
+.kpi.nov{grid-column:1/-1;gap:7px}
+.nov-l{display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.35;min-width:0}
+.nov-l>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nov-l b{font-weight:800}
+.nov-l i{flex:none;width:8px;height:8px;border-radius:50%}
+.nov-l i.bal{background:var(--accent)}
+.nov-z{margin-top:2px}
+.nov-chips{display:flex;flex-wrap:wrap;gap:6px;white-space:normal!important;overflow:visible!important}
+.nov-chip{font-size:12px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:99px;cursor:pointer}
+.nov-chip.urgente{background:var(--crit-soft);color:var(--crit-text)}
+.nov-chip.mirala{background:var(--warn-soft);color:var(--warn-text)}
+.nov-chip.bal{background:rgba(45,226,240,.14);color:var(--accent)}
+.nov-chip i{font-style:normal;font-weight:600;font-size:10px;opacity:.75;margin-left:3px}
