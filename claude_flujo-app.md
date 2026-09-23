@@ -175,7 +175,7 @@ Meta de Facu: hacer el análisis fundamental **dentro de la app** (ficha y compa
 
 Estado actual: build **202609232147**. Ocho vistas probadas a 390×844 con Playwright (ninguna muestra "Algo falló", cero errores de página) y smoke test a 1440×900. `sw.js` solo cambió su constante `VERSION`. Motor, ciclos de tarjeta y cálculo de cuotas quedaron intactos.
 
-**Para retomar en un chat nuevo: todo vive en el repo `facubo2001-bot/flujo` (público), no en el proyecto.** El sandbox lee `codeload.github.com` y `raw.githubusercontent.com` (la API de GitHub da 403 por rate limit, no hace falta). Facu sube los zips arrastrando el contenido y el repo queda **plano** (todo en la raíz; puede haber basura tipo `cedears (1).json`). Restaurar en una carpeta vacía:
+**Para retomar en un chat nuevo: todo vive en el repo `facubo2001-bot/flujo` (público), no en el proyecto.** El sandbox lee `codeload.github.com` y `raw.githubusercontent.com` (la API de GitHub da 403 por rate limit, no hace falta). Facu sube los zips arrastrando el contenido y el repo queda **plano** (por eso el zip **no puede tener dos archivos con el mismo nombre**: `data/cedears.json` va excluido del zip porque ya viaja `pwa/cedears.json`; si no, GitHub crea `cedears (1).json`) (todo en la raíz; puede haber basura tipo `cedears (1).json`). Restaurar en una carpeta vacía:
 ```
 curl -sL https://codeload.github.com/facubo2001-bot/flujo/tar.gz/refs/heads/main | tar -xz --strip-components=1
 mkdir -p src data pwa && mv 0*.js fonts.css style.css shell.html preset.json src/ && mv spy-*.json byma-*.txt cedears.json data/ && mv sw.js manifest.webmanifest *.png icon.svg pwa/
