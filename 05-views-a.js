@@ -58,10 +58,30 @@ function viewResumen() {
 
   let html = renderRespaldoBanner() + renderCobroBanner() + renderFijosBanner() + renderCierreBanner();
   html += `<div class="grid g-kpi">`;
-  html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), sub: `${avgToDate ? deltaPill(c.total, avgToDate) : ''} <span>${avgToDate ? `vs promedio${isCur ? ' al mismo día' : ''} (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})` : ''} · compras ${M.c(c.compras)}</span>`, spark: Charts.spark(last6), cls: 'hero' });
-  html += kpi({ label: isCur ? 'Proyección de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerró el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg' : ''}">${M.f(proj.total)}</span>`, sub: pres ? `<span class="pill ${projPct > 1 ? 'crit' : projPct > 0.85 ? 'warn' : 'good'}">${M.pct(projPct)} del presupuesto</span>${isCur ? `<span>${M.f(proj.pace || 0)}/día · ${proj.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>' });
-  html += kpi({ label: `Fijos + cuotas de ${mesN}`, value: M.f(comp), sub: `<span>Fijos ${M.c(margen.fijos)} · ${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'} ${M.c(c.cuotas)}</span>${pres ? `<span class="pill ${pctPresu(comp / pres)}">${M.pct(comp / pres)} del presupuesto</span>` : ''}`, cls: 'amber' });
-  html += kpi({ label: isCur ? 'Te queda para gastar' : ym < D.thisMonth() ? 'Te quedó sin gastar' : 'Quedará para gastar', value: M.f(margen.queda), sub: pres ? `<span class="pill ${margen.queda < 0 ? 'crit' : margen.queda < pres * 0.1 ? 'warn' : 'good'}">${margen.queda < 0 ? 'te pasaste del presupuesto' : 'presupuesto ' + M.c(pres)}</span>${isCur && margen.restantes ? `<span>${M.f(Math.max(0, margen.queda) / margen.restantes)}/día por ${margen.restantes} días</span>` : ''}` : '<span>Cargá tu presupuesto en Configuración</span>', cls: 'accent' });
+  // --- 4 tarjetas: numero grande + 3 filas parejas, sin parrafos (mismo criterio que Cartera)
+  const kARS = v => `$ ${abrevARS(v)}`;
+  const semPres = x => x > 1 ? 'neg' : x > 0.85 ? 'mid' : 'pos';
+  const deltaProm = avgToDate ? (c.total - avgToDate) / avgToDate : null;
+  html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), cls: 'hero', stats: [
+    { k: 'Promedio', v: deltaProm != null ? `${deltaProm >= 0 ? '+' : '\u2212'}${Math.round(Math.abs(deltaProm) * 100)} %` : '\u2014', cls: deltaProm == null ? '' : deltaProm > 0.05 ? 'neg' : deltaProm < -0.05 ? 'pos' : '' },
+    { k: 'Compras', v: kARS(c.compras) },
+    { k: 'Fijos', v: kARS(comp) },
+  ] });
+  html += kpi({ label: isCur ? 'Proyecci\u00f3n de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerr\u00f3 el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg' : ''}">${M.f(proj.total)}</span>`, stats: [
+    { k: 'Presup.', v: pres ? M.pct(projPct, 0) : '\u2014', cls: pres ? semPres(projPct) : '' },
+    { k: 'Ritmo', v: isCur ? `${kARS(proj.pace || 0)}/d\u00eda` : kARS(c.total / D.daysIn(ym)) + '/d\u00eda' },
+    { k: 'Faltan', v: isCur ? `${proj.restantes} d\u00edas` : '\u2014' },
+  ] });
+  html += kpi({ label: isCur ? 'Te queda' : ym < D.thisMonth() ? 'Te qued\u00f3' : 'Quedar\u00e1', value: `<span class="${margen.queda < 0 ? 'neg' : ''}">${M.f(margen.queda)}</span>`, stats: [
+    { k: 'Presup.', v: pres ? kARS(pres) : '\u2014' },
+    { k: 'Gastado', v: pres ? M.pct(c.total / pres, 0) : '\u2014', cls: pres ? semPres(c.total / pres) : '' },
+    { k: 'Por d\u00eda', v: isCur && margen.restantes ? kARS(Math.max(0, margen.queda) / margen.restantes) : '\u2014' },
+  ] });
+  html += kpi({ label: 'Fijos + cuotas', value: M.f(comp), stats: [
+    { k: 'Fijos', v: kARS(margen.fijos) },
+    { k: `${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'}`, v: kARS(c.cuotas) },
+    { k: 'Del presup.', v: pres ? M.pct(comp / pres, 0) : '\u2014', cls: pres ? (comp / pres > 0.6 ? 'neg' : comp / pres > 0.4 ? 'mid' : '') : '' },
+  ] });
   html += `</div>`;
 
   // ritmo + margen

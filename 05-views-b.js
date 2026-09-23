@@ -265,9 +265,10 @@ function viewCartera() {
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
     ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero',
-      stats: hayActivos ? pt.grupos.slice(0, 4).map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'Reserva' : g.id === 'renta' ? 'Bonos' : g.nombre, v: fmtU(g.valor, 0), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
-        : [{ k: 'CEDEARs', v: valorTxt }, { k: 'Otros', v: '<span class="soft">abajo</span>' }],
-      foot: pt.mep ? `$ ${abrevARS((hayActivos ? pt.total : (k.valorTotal != null ? k.valorTotal : k.costo)) * pt.mep)} al MEP ${fmtARS.format(pt.mep)}` : 'MEP no cargado' })}
+      stats: (hayActivos
+        ? pt.grupos.slice(0, 3).map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'Reserva' : g.id === 'renta' ? 'Bonos' : g.nombre, v: fmtARS.format(Math.round(g.valor)), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
+        : [{ k: 'CEDEARs', v: fmtARS.format(Math.round(k.valor != null ? k.valor : k.costo)) }, { k: 'Otros', v: '<span class="soft">abajo</span>' }]
+      ).concat([{ k: 'En pesos', v: pt.mep ? `$ ${abrevARS((hayActivos ? pt.total : (k.valorTotal != null ? k.valorTotal : k.costo)) * pt.mep)}` : '—' }]) })}
     ${kpi({ label: 'CEDEARs', value: valorTxt,
       stats: [
         { k: 'YTD', ...rendStr(va) }, { k: 'Inicio', ...rendStr(vi) },
@@ -289,13 +290,16 @@ function viewCartera() {
   html += `<div class="grid g-12 section">
     ${chartCard}
     <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
-      <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio · hoy</span><span>Valor · rdo.</span></div>
-      ${k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balance(p.ticker); if (bal && bal.dias <= 7) avisos.push(`balance ${bal.dias === 0 ? 'hoy' : bal.dias === 1 ? 'mañana' : 'en ' + bal.dias + ' d'}`);
+      <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio · hoy</span><span>Tenés</span></div>
+      ${(() => {
+      const valTxt = p => fmtU(p.valor != null ? p.valor : p.costo, 0), pxTxt = p => p.precio != null ? fmtU(p.precio) : '';
+      return k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balance(p.ticker);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
-        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<span class="pz-zone ${p.estado}">${p.estado}</span>` : ''}</div>${p.cedear ? `<span class="pz-s">${fmtAcc(Math.round(Cedears.aCedears(p.acciones, p.cedear) * 100) / 100)} CEDEARs</span>` : ''}<span class="pz-s">${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span>${avisos.length ? `<span class="pz-s warn-text">${avisos.join(' · ')}</span>` : ''}</div>
-        <div class="pz-m">${p.precio != null ? `<span class="pz-px">${fmtU(p.precio)}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '—'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div>
-        <div class="pz-r"><b>${fmtU(p.valor != null ? p.valor : p.costo, 0)}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}<span class="pz-w">${M.pct(p.peso, 1)}</span></div>
-      </div>`; }).join('')}
+        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<i class="pz-dot ${p.estado}" title="${p.estado}"></i>` : ''}${bal && bal.dias <= 14 ? `<i class="pz-dot bal" title="balance en ${bal.dias} d"></i>` : ''}</div><span class="pz-s">${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span></div>
+        <div class="pz-m"><div class="stk">${p.precio != null ? `<span class="pz-px">${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '—'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div></div>
+        <div class="pz-r"><div class="stk"><b>${esc(valTxt(p))}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}</div></div>
+        ${avisos.length ? `<div class="pz-f warn-text">${avisos.join(' · ')}</div>` : ''}
+      </div>`; }).join(''); })()}
       </div>
     </div>
   </div>`;
@@ -351,7 +355,7 @@ function viewCartera() {
  *  otras: { n, peso } o null. */
 function mapaBloques(items, otras = null, todas = false) {
   const top = todas ? items.slice() : items.slice(0, 9); if (!top.length) return '';
-  const TK = [14, 12, 11], NM = [10.5, 9.5, 9], PD = [9, 8, 7];
+  const TK = [17, 15, 13], NM = [12, 11, 10], PD = [10, 9, 8];
   // flex-grow reparte el espacio libre solo hasta donde suman los factores: con pesos de 0 a 1
   // la suma queda por debajo de 1 y los bloques no llegan a llenar la fila. Se escalan.
   const G = 1000, grow = x => Math.max(x * G, 0.01);
