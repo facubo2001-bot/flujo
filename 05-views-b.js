@@ -275,6 +275,7 @@ function viewCartera() {
         { k: 'Posiciones', v: String(k.posiciones.length) },
         { k: 'Divid.', v: k.dividendos ? `+${fmtU(k.dividendos, 0)}` : '—', cls: k.dividendos ? 'pos' : '' },
       ] })}
+    ${renderReservaCard(pt)}
     <div class="card kpi nov ${balLineas || zonaLinea ? 'tap' : ''}" ${balLineas || zonaLinea ? 'data-act="ir-alertas"' : ''}><div class="label">Novedades</div>
       ${balLineas || zonaLinea ? balLineas + zonaLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
     </div>
@@ -482,4 +483,26 @@ function renderRespaldoBanner() {
   if (!Gist.cfg()) return `<div class="callout crit" style="margin-bottom:14px"><b>Tus datos viven solo en este dispositivo.</b> Si lo perdés o borrás el navegador, se pierden. Conectá tu GitHub en <a data-go="config" style="color:var(--accent);text-decoration:underline;cursor:pointer">Ajustes</a>: tarda 2 minutos y de ahí en más se guarda solo.</div>`;
   const t = Gist.ultimoPush(); if (t && Date.now() - t > 7 * 86400000) return `<div class="callout amber" style="margin-bottom:14px"><b>Hace ${Math.round((Date.now() - t) / 86400000)} días que no sube a GitHub.</b> Abrí Ajustes y tocá "Traer ahora" para ver si hay un problema con el token.</div>`;
   return '';
+}
+
+
+/* ---------- Reserva en pesos: el fondo con valor cuota real y que tendrias en MP / dolar / inflacion ---------- */
+function renderReservaCard(pt) {
+  const fondos = pt.activos.filter(a => a.tipo === 'fci' && a.reserva);
+  if (!fondos.length) return '';
+  const a = fondos[0]; const r = a.reserva; const act = (state.cartera.activos || []).find(x => x.id === a.id);
+  const pc2 = v => `${v >= 0 ? '+' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
+  const sem = b => b.dif == null ? { cls: 'off', txt: '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
+  const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
+  const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
+  const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
+  const pesoPct = pt.total ? a.valorUSD / pt.total : null;
+  return `<div class="card kpi rsv tap" data-act="activo" data-id="${a.id}">
+    <div class="label">Reserva en pesos <span class="soft">\u00b7 ${esc(a.nombre)}</span></div>
+    <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de ${M.pct(pt.reservaObjetivo, 0)}</span>` : ''}</div></div>
+    <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
+    <div class="rsv-sem">${chips}</div>
+    ${alerta}
+    ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
+  </div>`;
 }

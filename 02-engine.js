@@ -377,10 +377,15 @@ const E = {
       else { out.sinPrecio = true; out.detalle = `${q} BTC \u00b7 sin precio todav\u00eda`; }
     } else if (a.tipo === 'efectivo' || a.tipo === 'otro') {
       out.valorMoneda = Number(a.monto) || 0; out.detalle = a.tipo === 'otro' && a.nota ? a.nota : (a.fecha ? `al ${D.fmt(a.fecha)}` : '');
+    } else if (a.tipo === 'fci' && a.slug && AD.vcUltimo(a.slug) && (a.lotes || []).length) {
+      // fondo con valor cuota real (CNV via ArgentinaDatos): cuotapartes = Σ monto / valor cuota del dia
+      const r = E.reserva(a); out.valorMoneda = r.valor; out.ganado = r.ganado; out.reserva = r;
+      out.detalle = `${r.cuotapartes.toLocaleString('es-AR', { maximumFractionDigits: 2 })} cuotapartes \u00b7 valor cuota ${r.vcHoy.v.toLocaleString('es-AR', { maximumFractionDigits: 4 })} al ${D.fmt(r.vcHoy.fecha)}${r.tem != null ? ` \u00b7 TEM ${(r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 })} %` : ''}`;
     } else {
-      // fci / letra / bono: devengamiento por tasa
-      const cap = Number(a.capital) || 0, tna = Number(a.tna) || 0;
-      const base = a.valorManual && a.valorManual.v && a.valorManual.fecha ? { v: Number(a.valorManual.v), desde: a.valorManual.fecha, manual: true } : { v: cap, desde: a.desde || hoy, manual: false };
+      // fci sin datos de la CNV / letra / bono: devengamiento por tasa
+      const cap = Number(a.capital) || sum((a.lotes || []).map(l => (l.tipo === 'rescate' ? -1 : 1) * (Number(l.monto) || 0))) || 0, tna = Number(a.tna) || 0;
+      const desdeLotes = (a.lotes || []).filter(l => l.fecha).map(l => l.fecha).sort()[0];
+      const base = a.valorManual && a.valorManual.v && a.valorManual.fecha ? { v: Number(a.valorManual.v), desde: a.valorManual.fecha, manual: true } : { v: cap, desde: a.desde || desdeLotes || hoy, manual: false };
       const dias = Math.max(0, D.daysBetween(base.desde, hoy));
       out.valorMoneda = base.v * (1 + tna / 100 * dias / 365);
       const partes = [];
@@ -392,6 +397,46 @@ const E = {
     }
     out.valorUSD = out.valorMoneda != null ? enUSD(out.valorMoneda, out.moneda) : null;
     return out;
+  },
+  /** Reserva en un fondo con lotes: valor hoy, cuotapartes, rendimiento realizado y que tendrias con la misma plata
+   *  en Mercado Pago (Mercado Fondo, valor cuota real), en dolar CCL, o siguiendo la inflacion. Todo desde cada lote. */
+  reserva(a) {
+    const hoy = D.today(); const vcHoy = AD.vcUltimo(a.slug);
+    const lotes = (a.lotes || []).filter(l => l.fecha && Number(l.monto) > 0).sort((x, y) => x.fecha.localeCompare(y.fecha));
+    const ipc = AD.box().ipc; const mesesIpc = Object.keys(ipc).sort(); const ultIpc = mesesIpc.length ? ipc[mesesIpc[mesesIpc.length - 1]] : null;
+    // factor inflacion desde una fecha hasta hoy: meses completos con dato + proxy (ultimo dato) para los meses sin dato, prorrateado por dias
+    const factorIpc = desde => {
+      if (ultIpc == null) return null;
+      let f = 1; let d = D.parse(desde); const h = D.parse(hoy);
+      while (d < h) {
+        const ym = D.iso(d).slice(0, 7); const tasa = ipc[ym] != null ? ipc[ym] : ultIpc;
+        const finMes = new Date(d.getFullYear(), d.getMonth() + 1, 0); const hastaEl = finMes < h ? finMes : h;
+        const diasMes = finMes.getDate(); const dias = Math.round((hastaEl - d) / 86400000) + (finMes < h ? 1 : 0);
+        f *= Math.pow(1 + tasa / 100, Math.min(1, dias / diasMes)); d = new Date(finMes.getTime() + 86400000);
+      }
+      return f;
+    };
+    const mpHoy = AD.vcUltimo(AD.MP_SLUG); const cclHoy = Number(state.settings.ccl) || null;
+    let cuotapartes = 0, invertido = 0, diasPond = 0, mpCuotas = 0, usd = 0, ipcVal = 0, faltan = [];
+    for (const l of lotes) {
+      const signo = l.tipo === 'rescate' ? -1 : 1; const monto = Number(l.monto);
+      const vc = l.vc ? { v: Number(l.vc), fecha: l.fecha } : AD.vcEn(a.slug, l.fecha); if (!vc) { faltan.push(l.fecha); continue; }
+      const q = monto / vc.v; cuotapartes += signo * q; invertido += signo * monto; diasPond += signo * monto * D.daysBetween(l.fecha, hoy);
+      const mp = AD.vcEn(AD.MP_SLUG, l.fecha); if (mp) mpCuotas += signo * monto / mp.v; else mpCuotas = NaN;
+      const ccl = AD.cclEn(l.fecha); if (ccl) usd += signo * monto / ccl; else usd = NaN;
+      const fi = factorIpc(l.fecha); if (fi != null) ipcVal += signo * monto * fi; else ipcVal = NaN;
+    }
+    const valor = cuotapartes * vcHoy.v; const dias = invertido > 0 ? diasPond / invertido : 0;
+    const temDe = v => invertido > 0 && v > 0 && dias >= 1 ? Math.pow(v / invertido, 30 / dias) - 1 : null;
+    const tem = temDe(valor);
+    const mpValor = Number.isFinite(mpCuotas) && mpHoy ? mpCuotas * mpHoy.v : null;
+    const cclValor = Number.isFinite(usd) && cclHoy ? usd * cclHoy : null;
+    const ipcValor = Number.isFinite(ipcVal) && ipcVal > 0 ? ipcVal : null;
+    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
+    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem, tna: tem != null ? tem * 12 : null, vcHoy, faltan,
+      usdHoy: cclHoy ? valor / cclHoy : null, usdCompra: Number.isFinite(usd) ? usd : null,
+      mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
+      fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
   },
   /** Todo el patrimonio: CEDEARs + otros activos. La caja contable de la app (dividendos + ventas) no entra: esa plata ya está en alguno de estos activos. */
   patrimonio(k) {

@@ -257,6 +257,8 @@ const Persist = {
     for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
     for (const k of ['alertas', 'precios', 'historial', 'spy', 'fund']) if (!s.cartera[k] || typeof s.cartera[k] !== 'object') s.cartera[k] = {};
     if (!Array.isArray(s.cartera.activos)) s.cartera.activos = [];  // otros activos: efectivo, fondos, letras, bonos, bitcoin
+    // reserva v2: los fondos llevan lotes (suscripcion / rescate) y valor cuota real; un fci viejo (capital + tna) pasa a un lote
+    for (const a of s.cartera.activos) if (a && a.tipo === 'fci' && !Array.isArray(a.lotes)) { a.lotes = a.capital ? [{ id: uid(), tipo: 'suscripcion', fecha: a.desde || D.today(), monto: Number(a.capital) || 0 }] : []; }
     for (const o of s.cartera.operaciones) if (o && o.fecha) { const h = D.habil(o.fecha); if (h !== o.fecha) o.fecha = h; }
     for (const o of s.cartera.operaciones) if (o && o.deDividendos > 0 && o.deCaja == null) { o.deCaja = o.deDividendos; delete o.deDividendos; }
     // alertas v2: `desc` (qué hace) separado de `nota` (tier + tesis). Nota vieja "qué hace | tesis" se parte una sola vez.
@@ -417,6 +419,68 @@ const TC = {
   },
 };
 
+/* ---------- ArgentinaDatos (misma gente que dolarapi; gratis, sin clave): valor cuota de FCI (fuente CNV),
+ * inflacion mensual (INDEC) y CCL historico. Todo cacheado en state.cartera.ad, se refresca una vez por dia. ---------- */
+const AD = {
+  BASE: 'https://api.argentinadatos.com/v1',
+  MP_SLUG: 'mercado-fondo-clase-a',   // el fondo de Mercado Pago, para comparar contra "dejarlo en MP"
+  box() { const c = state.cartera; if (!c.ad || typeof c.ad !== 'object') c.ad = { fondos: {}, ipc: {}, ccl: {}, at: {} }; for (const k of ['fondos', 'ipc', 'ccl', 'at']) if (!c.ad[k] || typeof c.ad[k] !== 'object') c.ad[k] = {}; return c.ad; },
+  async get(path) { const r = await fetch(`${AD.BASE}${path}`, { cache: 'no-store' }); if (!r.ok) throw new Error(`${r.status} ${path}`); return r.json(); },
+  fresco(k, horas = 20) { const t = AD.box().at[k]; return t && Date.now() - t < horas * 3600000; },
+  /** lista de fondos (para buscar el propio por nombre); cache en memoria una sesion */
+  async fondos() {
+    if (AD._fondos) return AD._fondos;
+    const j = await AD.get('/finanzas/fci/fondos');
+    const arr = Array.isArray(j) ? j : (j && (j.fondos || j.data)) || [];
+    AD._fondos = arr.map(f => ({ slug: f.slug || AD.slug(f.nombre || ''), nombre: f.nombre || f.slug || '', categoria: f.categoria || '', horizonte: f.horizonte || '' })).filter(f => f.slug);
+    return AD._fondos;
+  },
+  slug(n) { return String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); },
+  buscar(lista, q) { const t = AD.slug(q).split('-').filter(Boolean); return lista.filter(f => { const n = AD.slug(f.nombre); return t.every(x => n.includes(x)); }).slice(0, 25); },
+  /** historico de valor cuota de un fondo → { fecha: valorCuotaparte }, ultimos ~420 dias */
+  async fondo(slug, forzar = false) {
+    const box = AD.box(); const k = 'fondo:' + slug;
+    if (!forzar && AD.fresco(k) && box.fondos[slug]) return box.fondos[slug];
+    const j = await AD.get(`/finanzas/fci/fondos/${encodeURIComponent(slug)}/historico`);
+    const hist = Array.isArray(j) ? j : (j && j.historico) || [];
+    const desde = D.addDays(D.today(), -420); const vc = {};
+    for (const h of hist) { const f = String(h.fecha || '').slice(0, 10); const v = Number(h.valorCuotaparte ?? h.vcp ?? h.valor); if (f >= desde && v > 0) vc[f] = v; }
+    if (!Object.keys(vc).length) throw new Error('sin valor cuota');
+    box.fondos[slug] = { nombre: (j && j.nombre) || (hist[0] && hist[0].nombre) || slug, vc, hasta: Object.keys(vc).sort().pop() };
+    box.at[k] = Date.now(); Persist.save(); return box.fondos[slug];
+  },
+  /** valor cuota en una fecha (o el ultimo anterior disponible) */
+  vcEn(slug, fecha) { const f = AD.box().fondos[slug]; if (!f) return null; if (f.vc[fecha]) return { v: f.vc[fecha], fecha }; const ks = Object.keys(f.vc).filter(x => x <= fecha).sort(); const k = ks[ks.length - 1]; return k ? { v: f.vc[k], fecha: k } : null; },
+  vcUltimo(slug) { const f = AD.box().fondos[slug]; return f ? { v: f.vc[f.hasta], fecha: f.hasta } : null; },
+  /** inflacion mensual INDEC → { 'AAAA-MM': % } */
+  async inflacion(forzar = false) {
+    const box = AD.box(); if (!forzar && AD.fresco('ipc', 48) && Object.keys(box.ipc).length) return box.ipc;
+    const j = await AD.get('/finanzas/indices/inflacion'); const arr = Array.isArray(j) ? j : [];
+    const ipc = {}; for (const r of arr) { const f = String(r.fecha || '').slice(0, 7); const v = Number(r.valor); if (f && Number.isFinite(v)) ipc[f] = v; }
+    if (Object.keys(ipc).length) { box.ipc = ipc; box.at.ipc = Date.now(); Persist.save(); }
+    return box.ipc;
+  },
+  /** CCL historico (venta) → { fecha: valor }, ultimos ~420 dias */
+  async cclHist(forzar = false) {
+    const box = AD.box(); if (!forzar && AD.fresco('ccl') && Object.keys(box.ccl).length) return box.ccl;
+    const j = await AD.get('/cotizaciones/dolares/contadoconliqui'); const arr = Array.isArray(j) ? j : [];
+    const desde = D.addDays(D.today(), -420); const ccl = {};
+    for (const r of arr) { const f = String(r.fecha || '').slice(0, 10); const v = Number(r.venta) || Number(r.compra); if (f >= desde && v > 0) ccl[f] = v; }
+    if (Object.keys(ccl).length) { box.ccl = ccl; box.at.ccl = Date.now(); Persist.save(); }
+    return box.ccl;
+  },
+  cclEn(fecha) { const c = AD.box().ccl; if (c[fecha]) return c[fecha]; const ks = Object.keys(c).filter(x => x <= fecha).sort(); const k = ks[ks.length - 1]; return k ? c[k] : null; },
+  /** refresco diario de todo lo que usa la reserva; silencioso, cada fuente por su lado */
+  async actualizar() {
+    const slugs = new Set((state.cartera.activos || []).filter(a => a.tipo === 'fci' && a.slug).map(a => a.slug));
+    if (!slugs.size) return;
+    slugs.add(AD.MP_SLUG);
+    const tareas = [...slugs].map(sl => AD.fondo(sl).catch(e => { AD.box().at['err:' + sl] = String(e.message || e); }));
+    tareas.push(AD.inflacion().catch(() => {}), AD.cclHist().catch(() => {}));
+    await Promise.all(tareas);
+  },
+};
+
 /* ---------- Bitcoin (CoinGecko, gratis y sin clave) ---------- */
 const Btc = {
   async actualizar() {
@@ -492,6 +556,7 @@ const Precios = {
   async _actualizar(silencioso = false) {
     try { await TC.actualizar(true); } catch (e) {}
     if ((state.cartera.activos || []).some(a => a.tipo === 'btc')) { try { await Btc.actualizar(); } catch (e) {} }
+    try { await AD.actualizar(); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }
     const tickers = Precios.tickers(); if (!tickers.length) return false;
