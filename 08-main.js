@@ -139,6 +139,7 @@ const Actions = {
   'export-claude'() { formExportar(); },
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
+  'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'tj-sel'(id) { ui.resCard = id; ui.resMes = null; render(); },
   'cq-mes'(i) { ui.cqMes = Number(i); render(); },
   'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },

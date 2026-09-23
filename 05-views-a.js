@@ -19,6 +19,8 @@ const catChip = (catId) => { const c = L.cat(catId); return `<span class="cat-ch
 const necBadge = (n) => `<span class="nec nec-${n || 1}" title="${NECESIDAD[n || 1]}">${n || 1}</span>`;
 const medioLabel = (m) => m.medio === 'tarjeta' ? (L.tarjeta(m.tarjetaId) ? L.tarjeta(m.tarjetaId).nombre : 'Tarjeta') : (MEDIOS[m.medio] || m.medio || '—').split(' /')[0];
 const deltaPill = (cur, prev, invert = false) => { if (!prev) return ''; const d = (cur - prev) / prev; const up = d > 0; const good = invert ? up : !up; return `<b class="${Math.abs(d) < 0.02 ? 'neutral' : good ? 'down' : 'up'}">${up ? '+' : ''}${M.pct(d)}</b>`; };
+/** aclaraciones: una "i" chica que al tocarla muestra el texto (Facu: ahorrar espacio, hay cosas que ya sabe) */
+const infoBtn = t => `<button type="button" class="i-btn" data-act="info" data-id="${esc(encodeURIComponent(t))}" aria-label="Qu\u00e9 es esto">i</button>`;
 const kpi = ({ label, value, sub = '', cls = '', spark = '', stats = null, foot = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div>${stats ? `<div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>` : ''}${sub ? `<div class="delta">${sub}</div>` : ''}${foot ? `<div class="foot">${foot}</div>` : ''}${spark}</div>`;
 
 /* ---------- RESUMEN ---------- */
@@ -62,25 +64,18 @@ function viewResumen() {
   const kARS = v => `$ ${abrevARS(v)}`;
   const semPres = x => x > 1 ? 'neg' : x > 0.85 ? 'mid' : 'pos';
   const deltaProm = avgToDate ? (c.total - avgToDate) / avgToDate : null;
+  // --- dos tarjetas (Facu: cuatro + el grafico eran redundantes)
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), cls: 'hero', stats: [
     { k: 'Promedio', v: deltaProm != null ? `${deltaProm >= 0 ? '+' : '\u2212'}${Math.round(Math.abs(deltaProm) * 100)} %` : '\u2014', cls: deltaProm == null ? '' : deltaProm > 0.05 ? 'neg' : deltaProm < -0.05 ? 'pos' : '' },
     { k: 'Compras', v: kARS(c.compras) },
-    { k: 'Fijos', v: kARS(comp) },
-  ] });
-  html += kpi({ label: isCur ? 'Proyecci\u00f3n de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerr\u00f3 el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg' : ''}">${M.f(proj.total)}</span>`, stats: [
-    { k: 'Presup.', v: pres ? M.pct(projPct, 0) : '\u2014', cls: pres ? semPres(projPct) : '' },
-    { k: 'Ritmo', v: isCur ? `${kARS(proj.pace || 0)}/d\u00eda` : kARS(c.total / D.daysIn(ym)) + '/d\u00eda' },
-    { k: 'Faltan', v: isCur ? `${proj.restantes} d\u00edas` : '\u2014' },
+    { k: 'Cuotas', v: kARS(c.cuotas) },
+    { k: 'Fijos', v: kARS(margen.fijos) },
   ] });
   html += kpi({ label: isCur ? 'Te queda' : ym < D.thisMonth() ? 'Te qued\u00f3' : 'Quedar\u00e1', value: `<span class="${margen.queda < 0 ? 'neg' : ''}">${M.f(margen.queda)}</span>`, stats: [
     { k: 'Presup.', v: pres ? kARS(pres) : '\u2014' },
-    { k: 'Gastado', v: pres ? M.pct(c.total / pres, 0) : '\u2014', cls: pres ? semPres(c.total / pres) : '' },
+    { k: isCur ? 'Cierre' : 'Gastado', v: isCur ? kARS(proj.total) : kARS(c.total), cls: pres ? semPres((isCur ? proj.total : c.total) / pres) : '' },
+    { k: 'Del presup.', v: pres ? M.pct((isCur ? proj.total : c.total) / pres, 0) : '\u2014', cls: pres ? semPres((isCur ? proj.total : c.total) / pres) : '' },
     { k: 'Por d\u00eda', v: isCur && margen.restantes ? kARS(Math.max(0, margen.queda) / margen.restantes) : '\u2014' },
-  ] });
-  html += kpi({ label: 'Fijos + cuotas', value: M.f(comp), stats: [
-    { k: 'Fijos', v: kARS(margen.fijos) },
-    { k: `${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'}`, v: kARS(c.cuotas) },
-    { k: 'Del presup.', v: pres ? M.pct(comp / pres, 0) : '\u2014', cls: pres ? (comp / pres > 0.6 ? 'neg' : comp / pres > 0.4 ? 'mid' : '') : '' },
   ] });
   html += `</div>`;
 
@@ -98,7 +93,7 @@ function viewResumen() {
   if (pres) { const iReal = curVals.findIndex(v => v != null && v >= pres); const iProj = iReal < 0 ? projVals.findIndex(v => v != null && v >= pres) : -1;
     if (iReal >= 0) cruce = { i: iReal, label: String(iReal + 1), color: 'var(--crit)', pasado: true }; else if (iProj >= 0) cruce = { i: iProj, label: String(iProj + 1), color: 'var(--warn)', pasado: false }; }
   html += `<div class="grid g-21 section">
-    <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : 'Cuotas desde el 1 · compras por día'}</span></div>
+    <div class="card"><div class="card-head"><h2>Ritmo del mes ${infoBtn('Acumulado del mes: las cuotas de compras anteriores cuentan desde el d\u00eda 1 y las compras en el d\u00eda que las hiciste. La l\u00ednea gris es tu promedio de los meses anteriores y la punteada, la proyecci\u00f3n al ritmo actual.')}</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : ''}</span></div>
       ${ChartQ.reg(w => Charts.line({ w, labels, h: 230, cruce, tipTitle: i => `Día ${labels[i]}`, refY: margen.presupuesto || null, refLabel: margen.presupuesto ? 'Presupuesto' : '', series: [
         ...(avg.vals ? [{ name: `Promedio ${avg.n} ${avg.n === 1 ? 'mes' : 'meses'}`, color: 'var(--line-2)', values: avgVals }] : []),
         { name: D.monthName(ym).split(' ')[0], color: 'var(--accent)', values: curVals, area: true, strong: true },
@@ -106,7 +101,6 @@ function viewResumen() {
       ] }), 230)}
       ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, ...(avg.vals ? [{ name: `Promedio (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})`, color: 'var(--line-2)', kind: 'line' }] : []), ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
     </div>
-    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><button class="btn ghost sm" data-go="plan">Plan e inversión ${G.to}</button></div>${renderMargen(margen, proj)}</div>
   </div>`;
 
   // insights + donut
@@ -339,7 +333,7 @@ function viewMovimientos() {
   const cuotas = sum(movs.filter(m => m.cuotaRow || (m.cuotas || 1) > 1).map(E.rowAmount));
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
-  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} \u00b7 innecesario <b>${M.f(innec)}</b></div></div>
+  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} \u00b7 innecesario <b>${M.f(innec)}</b> ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
     <div class="gh-stats"><div><span>Compras</span><b>${kARS(compras)}</b></div><div><span>Cuotas</span><b>${kARS(cuotas)}</b></div><div><span>Fijos</span><b>${kARS(fijos)}</b></div></div>
     <div class="gh-list">
     ${(() => {
@@ -354,7 +348,6 @@ function viewMovimientos() {
       </div>`;
     })()}
     ${renderMovTable(movs)}
-    <p class="small muted" style="margin-top:10px">Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en él (monto de la cuota, no el total). Las filas con borde ámbar son fijos estimados: tocá <b>Confirmar</b> para cargar el monto real. <kbd>N</kbd> abre un gasto nuevo.</p>
   </div>`;
 }
 

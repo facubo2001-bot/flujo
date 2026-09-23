@@ -404,7 +404,7 @@ function renderEvolucion(k, seg) {
       { name: 'Tu cartera', color: 'var(--accent)', values: serie.real, strong: true },
       { name: 'Tu cartera', color: 'var(--accent)', values: serie.sueltos, dots: true },
     ] }), 220) + Charts.legend([{ name: 'Tu cartera', color: 'var(--accent)', kind: 'line' }, { name: 'Sombra S&P 500', color: 'var(--c4)', kind: 'line' }, { name: 'Invertido neto', color: 'var(--ink-3)', kind: 'dash' }])
-      + (serie.haySueltos ? `<p class="small muted" style="margin:8px 0 0">${serie.desdeDiario ? `Tu cartera se registra d\u00eda a d\u00eda desde el ${D.fmt(serie.desdeDiario)}` : 'Tu cartera se empieza a registrar d\u00eda a d\u00eda desde hoy'}; antes solo hay puntos sueltos (el arranque y las fotos guardadas). Los n\u00fameros de arriba s\u00ed cuentan todo el per\u00edodo: salen de tus operaciones.</p>` : '');
+      + (serie.haySueltos ? `<div class="i-row">${infoBtn(`${serie.desdeDiario ? `Tu cartera se registra d\u00eda a d\u00eda desde el ${D.fmt(serie.desdeDiario)}` : 'Tu cartera se empieza a registrar d\u00eda a d\u00eda desde hoy'}; antes solo hay puntos sueltos (el arranque y las fotos guardadas). Los n\u00fameros de arriba s\u00ed cuentan todo el per\u00edodo: salen de tus operaciones.`)}</div>` : '');
   }
   // alfa por posición (mismas compras hechas en SPY): quién suma y quién resta
   const conAlfa = [...k.posiciones, ...k.cerradas].filter(p => p.alfaUSD != null).sort((a, b) => b.alfaUSD - a.alfaUSD);
@@ -448,14 +448,13 @@ function renderPatrimonio(k) {
   const fila = a => `<div class="act-r" data-act="activo" data-id="${a.id}"><div class="act-l"><b>${esc(a.nombre)}</b><span class="sub">${esc(E.TIPOS_ACTIVO[a.tipo] || '')}${a.detalle ? ' \u00b7 ' + esc(a.detalle) : ''}</span></div><div class="act-v"><b>${a.valorUSD != null ? fmtU(a.valorUSD, 0) : '\u2014'}</b><span class="sub">${a.valorMoneda != null && a.moneda === 'ARS' ? fmtM(a.valorMoneda, 'ARS') : (pt.total && a.valorUSD != null ? M.pct(a.valorUSD / pt.total, 1) : '')}</span></div></div>`;
   const leyenda = pt.grupos.map(g => `<div class="pat-g"><i style="background:${g.color}"></i><span>${esc(g.nombre)}</span><b>${M.pct(g.valor / pt.total, 1)}</b><span class="sub">${fmtU(g.valor, 0)}</span></div>`).join('');
   const reservaCls = pt.reservaPct == null ? '' : pt.reservaPct >= pt.reservaObjetivo ? 'ok' : pt.reservaPct >= pt.reservaObjetivo * 0.6 ? 'mid' : 'bad';
-  return `<div class="card section"><div class="card-head"><h2>Toda tu plata</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
+  return `<div class="card section"><div class="card-head"><h2>Toda tu plata ${pt.mep ? infoBtn(`Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.`) : ''}</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
     ${hay ? `
     <div class="pat-top">
       <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
       <div class="pat-leg">${leyenda}</div>
     </div>
     <div class="pat-res"><span>Reserva (efectivo + fondos)</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
-    ${pt.mep ? `<p class="small muted" style="margin:0 0 6px">Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los CEDEARs valen lo de arriba; los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.</p>` : ''}
     ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
@@ -481,7 +480,7 @@ function renderReservaCard(pt) {
   if (!fondos.length) return '';
   const a = fondos[0]; const r = a.reserva; const act = (state.cartera.activos || []).find(x => x.id === a.id);
   const pc2 = v => `${v >= 0 ? '+' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
-  const sem = b => b.dif == null ? { cls: 'off', txt: r.dias < 7 ? `d\u00eda ${Math.max(1, Math.round(r.dias))}/7` : '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
+  const sem = b => b.dif == null ? { cls: 'off', txt: '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
   const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
   const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
   const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
@@ -491,7 +490,7 @@ function renderReservaCard(pt) {
     <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de ${M.pct(pt.reservaObjetivo, 0)}</span>` : ''}</div></div>
     <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
     <div class="rsv-sem">${chips}</div>
-    ${r.dias < 7 ? `<div class="small muted">Los semáforos se prenden a los 7 días: antes, un día de dólar multiplicado por 30 es ruido.</div>` : alerta}
+    ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : alerta}
     ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
   </div>`;
 }

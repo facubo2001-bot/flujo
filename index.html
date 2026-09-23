@@ -950,6 +950,14 @@ p.rs-hint{padding:8px 0 0}
 .gh-list .chips.filtros{margin:0 -14px 6px;padding-left:14px;padding-right:14px}
 .main{overflow-x:hidden}
 
+/* aclaraciones en una "i" */
+.i-btn{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--ink-3);font:700 11px/1 var(--font-ui);font-style:italic;cursor:pointer;vertical-align:2px;margin-left:4px;padding:0}
+h2 .i-btn{vertical-align:3px}
+.i-row{display:flex;justify-content:flex-end;margin-top:6px}
+.info-txt{font-size:15px;line-height:1.5;color:var(--ink-2);margin:0}
+.rsv-sucio{font-size:13px;color:var(--warn-text);line-height:1.35}
+.kpi.rsv .rsv-sem .rsv-c{transition:opacity .2s}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1156,7 +1164,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609232159';
+const BUILD = '202609232257';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2338,8 +2346,9 @@ const E = {
     const cclValor = Number.isFinite(usd) && cclCorte ? usd * cclCorte : null;
     const ipcValor = Number.isFinite(ipcVal) && ipcVal > 0 ? ipcVal : null;
     // con menos de 7 dias la diferencia mensualizada es ruido (un dia de CCL × 30): se muestra, pero no se juzga
-    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: dias >= 7 && v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
-    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem: dias >= 7 ? tem : null, tna: dias >= 7 && tem != null ? tem * 12 : null, vcHoy, faltan, corte: hoy,
+    // con menos de 7 dias los numeros tienen ruido: se muestran igual, con aviso en la tarjeta (Facu)
+    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
+    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem, tna: tem != null ? tem * 12 : null, sucio: dias < 7, vcHoy, faltan, corte: hoy,
       usdHoy: cclHoy ? valor / cclHoy : null, usdCompra: Number.isFinite(usd) ? usd : null,
       mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
       fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
@@ -2872,6 +2881,8 @@ const catChip = (catId) => { const c = L.cat(catId); return `<span class="cat-ch
 const necBadge = (n) => `<span class="nec nec-${n || 1}" title="${NECESIDAD[n || 1]}">${n || 1}</span>`;
 const medioLabel = (m) => m.medio === 'tarjeta' ? (L.tarjeta(m.tarjetaId) ? L.tarjeta(m.tarjetaId).nombre : 'Tarjeta') : (MEDIOS[m.medio] || m.medio || '—').split(' /')[0];
 const deltaPill = (cur, prev, invert = false) => { if (!prev) return ''; const d = (cur - prev) / prev; const up = d > 0; const good = invert ? up : !up; return `<b class="${Math.abs(d) < 0.02 ? 'neutral' : good ? 'down' : 'up'}">${up ? '+' : ''}${M.pct(d)}</b>`; };
+/** aclaraciones: una "i" chica que al tocarla muestra el texto (Facu: ahorrar espacio, hay cosas que ya sabe) */
+const infoBtn = t => `<button type="button" class="i-btn" data-act="info" data-id="${esc(encodeURIComponent(t))}" aria-label="Qu\u00e9 es esto">i</button>`;
 const kpi = ({ label, value, sub = '', cls = '', spark = '', stats = null, foot = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div>${stats ? `<div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>` : ''}${sub ? `<div class="delta">${sub}</div>` : ''}${foot ? `<div class="foot">${foot}</div>` : ''}${spark}</div>`;
 
 /* ---------- RESUMEN ---------- */
@@ -2915,25 +2926,18 @@ function viewResumen() {
   const kARS = v => `$ ${abrevARS(v)}`;
   const semPres = x => x > 1 ? 'neg' : x > 0.85 ? 'mid' : 'pos';
   const deltaProm = avgToDate ? (c.total - avgToDate) / avgToDate : null;
+  // --- dos tarjetas (Facu: cuatro + el grafico eran redundantes)
   html += kpi({ label: `Gastos de ${mesN}`, value: M.f(c.total), cls: 'hero', stats: [
     { k: 'Promedio', v: deltaProm != null ? `${deltaProm >= 0 ? '+' : '\u2212'}${Math.round(Math.abs(deltaProm) * 100)} %` : '\u2014', cls: deltaProm == null ? '' : deltaProm > 0.05 ? 'neg' : deltaProm < -0.05 ? 'pos' : '' },
     { k: 'Compras', v: kARS(c.compras) },
-    { k: 'Fijos', v: kARS(comp) },
-  ] });
-  html += kpi({ label: isCur ? 'Proyecci\u00f3n de cierre' : ym > D.thisMonth() ? 'Estimado (promedio 3 meses)' : 'Cerr\u00f3 el mes en', value: `<span class="${pres && projPct >= 1 ? 'neg' : ''}">${M.f(proj.total)}</span>`, stats: [
-    { k: 'Presup.', v: pres ? M.pct(projPct, 0) : '\u2014', cls: pres ? semPres(projPct) : '' },
-    { k: 'Ritmo', v: isCur ? `${kARS(proj.pace || 0)}/d\u00eda` : kARS(c.total / D.daysIn(ym)) + '/d\u00eda' },
-    { k: 'Faltan', v: isCur ? `${proj.restantes} d\u00edas` : '\u2014' },
+    { k: 'Cuotas', v: kARS(c.cuotas) },
+    { k: 'Fijos', v: kARS(margen.fijos) },
   ] });
   html += kpi({ label: isCur ? 'Te queda' : ym < D.thisMonth() ? 'Te qued\u00f3' : 'Quedar\u00e1', value: `<span class="${margen.queda < 0 ? 'neg' : ''}">${M.f(margen.queda)}</span>`, stats: [
     { k: 'Presup.', v: pres ? kARS(pres) : '\u2014' },
-    { k: 'Gastado', v: pres ? M.pct(c.total / pres, 0) : '\u2014', cls: pres ? semPres(c.total / pres) : '' },
+    { k: isCur ? 'Cierre' : 'Gastado', v: isCur ? kARS(proj.total) : kARS(c.total), cls: pres ? semPres((isCur ? proj.total : c.total) / pres) : '' },
+    { k: 'Del presup.', v: pres ? M.pct((isCur ? proj.total : c.total) / pres, 0) : '\u2014', cls: pres ? semPres((isCur ? proj.total : c.total) / pres) : '' },
     { k: 'Por d\u00eda', v: isCur && margen.restantes ? kARS(Math.max(0, margen.queda) / margen.restantes) : '\u2014' },
-  ] });
-  html += kpi({ label: 'Fijos + cuotas', value: M.f(comp), stats: [
-    { k: 'Fijos', v: kARS(margen.fijos) },
-    { k: `${c.nCuotas} cuota${c.nCuotas === 1 ? '' : 's'}`, v: kARS(c.cuotas) },
-    { k: 'Del presup.', v: pres ? M.pct(comp / pres, 0) : '\u2014', cls: pres ? (comp / pres > 0.6 ? 'neg' : comp / pres > 0.4 ? 'mid' : '') : '' },
   ] });
   html += `</div>`;
 
@@ -2951,7 +2955,7 @@ function viewResumen() {
   if (pres) { const iReal = curVals.findIndex(v => v != null && v >= pres); const iProj = iReal < 0 ? projVals.findIndex(v => v != null && v >= pres) : -1;
     if (iReal >= 0) cruce = { i: iReal, label: String(iReal + 1), color: 'var(--crit)', pasado: true }; else if (iProj >= 0) cruce = { i: iProj, label: String(iProj + 1), color: 'var(--warn)', pasado: false }; }
   html += `<div class="grid g-21 section">
-    <div class="card"><div class="card-head"><h2>Ritmo del mes</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : 'Cuotas desde el 1 · compras por día'}</span></div>
+    <div class="card"><div class="card-head"><h2>Ritmo del mes ${infoBtn('Acumulado del mes: las cuotas de compras anteriores cuentan desde el d\u00eda 1 y las compras en el d\u00eda que las hiciste. La l\u00ednea gris es tu promedio de los meses anteriores y la punteada, la proyecci\u00f3n al ritmo actual.')}</h2><span class="hint">${cruce ? `<span class="${cruce.pasado ? 'crit-text' : 'warn-text'}">${cruce.pasado ? `presupuesto cruzado el ${cruce.label}` : `a este ritmo lo cruzás el ${cruce.label}`}</span>` : ''}</span></div>
       ${ChartQ.reg(w => Charts.line({ w, labels, h: 230, cruce, tipTitle: i => `Día ${labels[i]}`, refY: margen.presupuesto || null, refLabel: margen.presupuesto ? 'Presupuesto' : '', series: [
         ...(avg.vals ? [{ name: `Promedio ${avg.n} ${avg.n === 1 ? 'mes' : 'meses'}`, color: 'var(--line-2)', values: avgVals }] : []),
         { name: D.monthName(ym).split(' ')[0], color: 'var(--accent)', values: curVals, area: true, strong: true },
@@ -2959,7 +2963,6 @@ function viewResumen() {
       ] }), 230)}
       ${Charts.legend([{ name: 'Este mes', color: 'var(--accent)', kind: 'line' }, ...(avg.vals ? [{ name: `Promedio (${avg.n} ${avg.n === 1 ? 'mes' : 'meses'})`, color: 'var(--line-2)', kind: 'line' }] : []), ...(isCur ? [{ name: 'Proyección', color: 'var(--accent)', kind: 'dash' }] : [])])}
     </div>
-    <div class="card"><div class="card-head"><h2>Cuánto me queda</h2><button class="btn ghost sm" data-go="plan">Plan e inversión ${G.to}</button></div>${renderMargen(margen, proj)}</div>
   </div>`;
 
   // insights + donut
@@ -3192,7 +3195,7 @@ function viewMovimientos() {
   const cuotas = sum(movs.filter(m => m.cuotaRow || (m.cuotas || 1) > 1).map(E.rowAmount));
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
-  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} \u00b7 innecesario <b>${M.f(innec)}</b></div></div>
+  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} \u00b7 innecesario <b>${M.f(innec)}</b> ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
     <div class="gh-stats"><div><span>Compras</span><b>${kARS(compras)}</b></div><div><span>Cuotas</span><b>${kARS(cuotas)}</b></div><div><span>Fijos</span><b>${kARS(fijos)}</b></div></div>
     <div class="gh-list">
     ${(() => {
@@ -3207,7 +3210,6 @@ function viewMovimientos() {
       </div>`;
     })()}
     ${renderMovTable(movs)}
-    <p class="small muted" style="margin-top:10px">Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en él (monto de la cuota, no el total). Las filas con borde ámbar son fijos estimados: tocá <b>Confirmar</b> para cargar el monto real. <kbd>N</kbd> abre un gasto nuevo.</p>
   </div>`;
 }
 
@@ -3683,7 +3685,7 @@ function renderEvolucion(k, seg) {
       { name: 'Tu cartera', color: 'var(--accent)', values: serie.real, strong: true },
       { name: 'Tu cartera', color: 'var(--accent)', values: serie.sueltos, dots: true },
     ] }), 220) + Charts.legend([{ name: 'Tu cartera', color: 'var(--accent)', kind: 'line' }, { name: 'Sombra S&P 500', color: 'var(--c4)', kind: 'line' }, { name: 'Invertido neto', color: 'var(--ink-3)', kind: 'dash' }])
-      + (serie.haySueltos ? `<p class="small muted" style="margin:8px 0 0">${serie.desdeDiario ? `Tu cartera se registra d\u00eda a d\u00eda desde el ${D.fmt(serie.desdeDiario)}` : 'Tu cartera se empieza a registrar d\u00eda a d\u00eda desde hoy'}; antes solo hay puntos sueltos (el arranque y las fotos guardadas). Los n\u00fameros de arriba s\u00ed cuentan todo el per\u00edodo: salen de tus operaciones.</p>` : '');
+      + (serie.haySueltos ? `<div class="i-row">${infoBtn(`${serie.desdeDiario ? `Tu cartera se registra d\u00eda a d\u00eda desde el ${D.fmt(serie.desdeDiario)}` : 'Tu cartera se empieza a registrar d\u00eda a d\u00eda desde hoy'}; antes solo hay puntos sueltos (el arranque y las fotos guardadas). Los n\u00fameros de arriba s\u00ed cuentan todo el per\u00edodo: salen de tus operaciones.`)}</div>` : '');
   }
   // alfa por posición (mismas compras hechas en SPY): quién suma y quién resta
   const conAlfa = [...k.posiciones, ...k.cerradas].filter(p => p.alfaUSD != null).sort((a, b) => b.alfaUSD - a.alfaUSD);
@@ -3727,14 +3729,13 @@ function renderPatrimonio(k) {
   const fila = a => `<div class="act-r" data-act="activo" data-id="${a.id}"><div class="act-l"><b>${esc(a.nombre)}</b><span class="sub">${esc(E.TIPOS_ACTIVO[a.tipo] || '')}${a.detalle ? ' \u00b7 ' + esc(a.detalle) : ''}</span></div><div class="act-v"><b>${a.valorUSD != null ? fmtU(a.valorUSD, 0) : '\u2014'}</b><span class="sub">${a.valorMoneda != null && a.moneda === 'ARS' ? fmtM(a.valorMoneda, 'ARS') : (pt.total && a.valorUSD != null ? M.pct(a.valorUSD / pt.total, 1) : '')}</span></div></div>`;
   const leyenda = pt.grupos.map(g => `<div class="pat-g"><i style="background:${g.color}"></i><span>${esc(g.nombre)}</span><b>${M.pct(g.valor / pt.total, 1)}</b><span class="sub">${fmtU(g.valor, 0)}</span></div>`).join('');
   const reservaCls = pt.reservaPct == null ? '' : pt.reservaPct >= pt.reservaObjetivo ? 'ok' : pt.reservaPct >= pt.reservaObjetivo * 0.6 ? 'mid' : 'bad';
-  return `<div class="card section"><div class="card-head"><h2>Toda tu plata</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
+  return `<div class="card section"><div class="card-head"><h2>Toda tu plata ${pt.mep ? infoBtn(`Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.`) : ''}</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
     ${hay ? `
     <div class="pat-top">
       <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
       <div class="pat-leg">${leyenda}</div>
     </div>
     <div class="pat-res"><span>Reserva (efectivo + fondos)</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
-    ${pt.mep ? `<p class="small muted" style="margin:0 0 6px">Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los CEDEARs valen lo de arriba; los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.</p>` : ''}
     ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
@@ -3760,7 +3761,7 @@ function renderReservaCard(pt) {
   if (!fondos.length) return '';
   const a = fondos[0]; const r = a.reserva; const act = (state.cartera.activos || []).find(x => x.id === a.id);
   const pc2 = v => `${v >= 0 ? '+' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
-  const sem = b => b.dif == null ? { cls: 'off', txt: r.dias < 7 ? `d\u00eda ${Math.max(1, Math.round(r.dias))}/7` : '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
+  const sem = b => b.dif == null ? { cls: 'off', txt: '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
   const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
   const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
   const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
@@ -3770,7 +3771,7 @@ function renderReservaCard(pt) {
     <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de ${M.pct(pt.reservaObjetivo, 0)}</span>` : ''}</div></div>
     <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
     <div class="rsv-sem">${chips}</div>
-    ${r.dias < 7 ? `<div class="small muted">Los semáforos se prenden a los 7 días: antes, un día de dólar multiplicado por 30 es ruido.</div>` : alerta}
+    ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : alerta}
     ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
   </div>`;
 }
@@ -5162,6 +5163,7 @@ const Actions = {
   'export-claude'() { formExportar(); },
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
+  'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'tj-sel'(id) { ui.resCard = id; ui.resMes = null; render(); },
   'cq-mes'(i) { ui.cqMes = Number(i); render(); },
   'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },

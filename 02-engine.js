@@ -437,8 +437,9 @@ const E = {
     const cclValor = Number.isFinite(usd) && cclCorte ? usd * cclCorte : null;
     const ipcValor = Number.isFinite(ipcVal) && ipcVal > 0 ? ipcVal : null;
     // con menos de 7 dias la diferencia mensualizada es ruido (un dia de CCL × 30): se muestra, pero no se juzga
-    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: dias >= 7 && v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
-    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem: dias >= 7 ? tem : null, tna: dias >= 7 && tem != null ? tem * 12 : null, vcHoy, faltan, corte: hoy,
+    // con menos de 7 dias los numeros tienen ruido: se muestran igual, con aviso en la tarjeta (Facu)
+    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
+    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem, tna: tem != null ? tem * 12 : null, sucio: dias < 7, vcHoy, faltan, corte: hoy,
       usdHoy: cclHoy ? valor / cclHoy : null, usdCompra: Number.isFinite(usd) ? usd : null,
       mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
       fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
