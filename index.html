@@ -946,6 +946,10 @@ p.rs-hint{padding:8px 0 0}
 .g-kpi .kpi.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .kpi .label .bankdot{display:inline-block;width:8px;height:8px;border-radius:50%}
 
+/* la fila de filtros scrollea sola: antes estaba dentro de una .card que la contenia; sin la card empujaba la pagina 6 px y dejaba mover la pantalla de costado */
+.gh-list .chips.filtros{margin:0 -14px 6px;padding-left:14px;padding-right:14px}
+.main{overflow-x:hidden}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1152,7 +1156,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609232147';
+const BUILD = '202609232159';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 

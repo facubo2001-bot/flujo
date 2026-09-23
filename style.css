@@ -921,3 +921,7 @@ p.rs-hint{padding:8px 0 0}
 .tp-sum{font-size:13px;color:var(--ink-3);margin-bottom:4px}
 .g-kpi .kpi.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .kpi .label .bankdot{display:inline-block;width:8px;height:8px;border-radius:50%}
+
+/* la fila de filtros scrollea sola: antes estaba dentro de una .card que la contenia; sin la card empujaba la pagina 6 px y dejaba mover la pantalla de costado */
+.gh-list .chips.filtros{margin:0 -14px 6px;padding-left:14px;padding-right:14px}
+.main{overflow-x:hidden}
