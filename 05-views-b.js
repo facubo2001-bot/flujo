@@ -466,7 +466,7 @@ function renderPatrimonio(k) {
       <div class="pat-leg">${leyenda}</div>
     </div>
     <div class="pat-res"><span>Reserva (efectivo + fondos)</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
-    ${pt.mep ? `<p class="small muted" style="margin:0 0 6px">Total en pesos al MEP ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los CEDEARs valen lo de arriba; los pesos se pasan a d\u00f3lares al MEP. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.</p>` : ''}
+    ${pt.mep ? `<p class="small muted" style="margin:0 0 6px">Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los CEDEARs valen lo de arriba; los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.</p>` : ''}
     ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
@@ -492,7 +492,7 @@ function renderReservaCard(pt) {
   if (!fondos.length) return '';
   const a = fondos[0]; const r = a.reserva; const act = (state.cartera.activos || []).find(x => x.id === a.id);
   const pc2 = v => `${v >= 0 ? '+' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
-  const sem = b => b.dif == null ? { cls: 'off', txt: '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
+  const sem = b => b.dif == null ? { cls: 'off', txt: r.dias < 7 ? `d\u00eda ${Math.max(1, Math.round(r.dias))}/7` : '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
   const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
   const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
   const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
@@ -500,9 +500,9 @@ function renderReservaCard(pt) {
   return `<div class="card kpi rsv tap" data-act="activo" data-id="${a.id}">
     <div class="label">Reserva en pesos <span class="soft">\u00b7 ${esc(a.nombre)}</span></div>
     <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de ${M.pct(pt.reservaObjetivo, 0)}</span>` : ''}</div></div>
-    <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
+    <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
     <div class="rsv-sem">${chips}</div>
-    ${alerta}
+    ${r.dias < 7 ? `<div class="small muted">Los semáforos se prenden a los 7 días: antes, un día de dólar multiplicado por 30 es ruido.</div>` : alerta}
     ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
   </div>`;
 }

@@ -367,8 +367,8 @@ const E = {
   TIPOS_ACTIVO: { efectivo: 'Efectivo', fci: 'Fondo (Lecaps / money market)', letra: 'Letra', bono: 'Bono / ON', btc: 'Bitcoin', otro: 'Otro' },
   /** Valua un activo hoy, en USD. Tasa: capital × (1 + TNA × días/365) desde la fecha de compra, o desde la última
    *  corrección manual si la hay (interés simple, como cotiza una Lecap). Pesos → dólares al MEP. */
-  valuarActivo(a, mep, btcPx) {
-    const hoy = D.today(); const enUSD = (v, moneda) => moneda === 'ARS' ? (mep ? v / mep : null) : v;
+  valuarActivo(a, tc, btcPx) {
+    const hoy = D.today(); const enUSD = (v, moneda) => moneda === 'ARS' ? (tc ? v / tc : null) : v;
     const out = { id: a.id, tipo: a.tipo, nombre: a.nombre || E.TIPOS_ACTIVO[a.tipo] || 'Activo', moneda: a.moneda || 'ARS', detalle: '', valorMoneda: null, valorUSD: null, sinPrecio: false };
     if (a.tipo === 'btc') {
       const q = Number(a.cantidad) || 0; out.moneda = 'USD';
@@ -401,7 +401,7 @@ const E = {
   /** Reserva en un fondo con lotes: valor hoy, cuotapartes, rendimiento realizado y que tendrias con la misma plata
    *  en Mercado Pago (Mercado Fondo, valor cuota real), en dolar CCL, o siguiendo la inflacion. Todo desde cada lote. */
   reserva(a) {
-    const hoy = D.today(); const vcHoy = AD.vcUltimo(a.slug);
+    const vcHoy = AD.vcUltimo(a.slug); const hoy = vcHoy.fecha;  // corte: todo se compara hasta la fecha del ultimo valor cuota (la CNV publica con 1 dia de atraso)
     const lotes = (a.lotes || []).filter(l => l.fecha && Number(l.monto) > 0).sort((x, y) => x.fecha.localeCompare(y.fecha));
     const ipc = AD.box().ipc; const mesesIpc = Object.keys(ipc).sort(); const ultIpc = mesesIpc.length ? ipc[mesesIpc[mesesIpc.length - 1]] : null;
     // factor inflacion desde una fecha hasta hoy: meses completos con dato + proxy (ultimo dato) para los meses sin dato, prorrateado por dias
@@ -416,11 +416,15 @@ const E = {
       }
       return f;
     };
-    const mpHoy = AD.vcUltimo(AD.MP_SLUG); const cclHoy = Number(state.settings.ccl) || null;
+    const mpHoy = AD.vcEn(AD.MP_SLUG, hoy); const cclCorte = AD.cclEn(hoy) || Number(state.settings.ccl) || null; const cclHoy = Number(state.settings.ccl) || cclCorte;
     let cuotapartes = 0, invertido = 0, diasPond = 0, mpCuotas = 0, usd = 0, ipcVal = 0, faltan = [];
     for (const l of lotes) {
       const signo = l.tipo === 'rescate' ? -1 : 1; const monto = Number(l.monto);
-      const vc = l.vc ? { v: Number(l.vc), fecha: l.fecha } : AD.vcEn(a.slug, l.fecha); if (!vc) { faltan.push(l.fecha); continue; }
+      // la CNV publica el valor cuota por cada 1.000 cuotapartes (2.140,15) y Balanz por cuotaparte (2,140265):
+      // un valor cargado a mano del comprobante se lleva a la escala de la CNV
+      const ref = AD.vcEn(a.slug, l.fecha); let vcM = l.vc ? Number(l.vc) : null;
+      if (vcM && ref) { const esc10 = Math.round(Math.log10(ref.v / vcM)); if (Math.abs(esc10) >= 2) vcM *= Math.pow(10, esc10); }
+      const vc = vcM ? { v: vcM, fecha: l.fecha } : ref; if (!vc) { faltan.push(l.fecha); continue; }
       const q = monto / vc.v; cuotapartes += signo * q; invertido += signo * monto; diasPond += signo * monto * D.daysBetween(l.fecha, hoy);
       const mp = AD.vcEn(AD.MP_SLUG, l.fecha); if (mp) mpCuotas += signo * monto / mp.v; else mpCuotas = NaN;
       const ccl = AD.cclEn(l.fecha); if (ccl) usd += signo * monto / ccl; else usd = NaN;
@@ -430,17 +434,19 @@ const E = {
     const temDe = v => invertido > 0 && v > 0 && dias >= 1 ? Math.pow(v / invertido, 30 / dias) - 1 : null;
     const tem = temDe(valor);
     const mpValor = Number.isFinite(mpCuotas) && mpHoy ? mpCuotas * mpHoy.v : null;
-    const cclValor = Number.isFinite(usd) && cclHoy ? usd * cclHoy : null;
+    const cclValor = Number.isFinite(usd) && cclCorte ? usd * cclCorte : null;
     const ipcValor = Number.isFinite(ipcVal) && ipcVal > 0 ? ipcVal : null;
-    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
-    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem, tna: tem != null ? tem * 12 : null, vcHoy, faltan,
+    // con menos de 7 dias la diferencia mensualizada es ruido (un dia de CCL × 30): se muestra, pero no se juzga
+    const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: dias >= 7 && v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
+    return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem: dias >= 7 ? tem : null, tna: dias >= 7 && tem != null ? tem * 12 : null, vcHoy, faltan, corte: hoy,
       usdHoy: cclHoy ? valor / cclHoy : null, usdCompra: Number.isFinite(usd) ? usd : null,
       mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
       fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
   },
   /** Todo el patrimonio: CEDEARs + otros activos. La caja contable de la app (dividendos + ventas) no entra: esa plata ya está en alguno de estos activos. */
   patrimonio(k) {
-    const mep = k.mep, btcPx = Btc.precio();
+    // pesos → dolares al CCL: es el dolar con el que se compran CEDEARs (antes MEP; la reserva y el patrimonio no coincidian)
+    const mep = k.ccl || k.mep, btcPx = Btc.precio();
     const activos = (state.cartera.activos || []).map(a => E.valuarActivo(a, mep, btcPx));
     const grupos = [
       { id: 'cedears', nombre: 'CEDEARs', color: 'var(--accent)', valor: k.valor || 0 },

@@ -750,7 +750,7 @@ ${tesis || '\u2014'}
 ${c.tablaF}
 
 ${(() => { const pt = E.patrimonio(k); if (!pt.activos.length) return ''; return `## Toda mi plata (patrimonio)
-Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al MEP $ ${fmtARS.format(pt.mep || 0)}.
+Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al CCL $ ${fmtARS.format(pt.mep || 0)}.
 | Activo | Tipo | Valor USD | Detalle |
 |---|---|---|---|
 ${pt.activos.map(a => `| ${a.nombre} | ${E.TIPOS_ACTIVO[a.tipo] || a.tipo} | ${a.valorUSD != null ? n(a.valorUSD) : '\u2014'} | ${a.detalle.replace(/\|/g, '/')} |`).join('\n')}
