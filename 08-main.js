@@ -139,6 +139,8 @@ const Actions = {
   'export-claude'() { formExportar(); },
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
+  'tj-sel'(id) { ui.resCard = id; ui.resMes = null; render(); },
+  'cq-mes'(i) { ui.cqMes = Number(i); render(); },
   'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   'new-activo'() { formActivo(null); },
   'rs-pick'(slug) { ReservaUI.pick(slug); },
@@ -237,7 +239,7 @@ document.addEventListener('change', e => {
   if (t.dataset.budget) { const c = state.categorias.find(c => c.id === t.dataset.budget); if (c) { c.presupuesto = M.parse(t.value); Persist.save(); render(); } return; }
   if (t.dataset.pago) { const [tarjetaId, mes] = t.dataset.pago.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.cuentaId = t.value; Persist.save(); render(); return; }
   if (t.dataset.pagado) { const [tarjetaId, mes] = t.dataset.pagado.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.pagado = t.checked; Persist.save(); render(); return; }
-  if (t.id === 'res-card' || t.id === 'res-mes') { ui.resCard = $('#res-card').value; ui.resMes = $('#res-mes').value; $('#res-detalle').innerHTML = renderResumenDetalle(ui.resCard, ui.resMes); return; }
+  if (t.id === 'res-mes') { ui.resMes = $('#res-mes').value; render(); return; }
   if (t.id === 'import-file') { const f = t.files[0]; if (!f) return; f.text().then(txt => { try { const j = JSON.parse(txt); if (!j || !j.v) throw new Error(); confirmar(`Importar ${j.movimientos?.length || 0} movimientos y reemplazar los datos actuales?`, () => { state = Persist.migrate(j); Persist.save(); toast('Datos importados'); go('resumen'); }, 'Importar'); } catch (e) { toast('El archivo no es un respaldo válido'); } }); return; }
   if (t.id === 'import-csv') { const f = t.files[0]; if (!f) return; f.text().then(importarCSV); return; }
 });

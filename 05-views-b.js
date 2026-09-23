@@ -10,55 +10,44 @@ const cardDot = c => CARD_DOT[String(c || '').toUpperCase()] || c || 'var(--ink-
 function viewTarjetas() {
   const hoy = D.today(); const ym = ui.mes;
   if (!state.tarjetas.length) return `<div class="card">${empty({ kind: 'setup', icon: 'card', head: 'Todavía no cargaste tarjetas', sub: 'Agregá la primera y Gastos calcula solo el cierre, las cuotas y cuánto pagás cada mes.', btn: 'Agregar tarjeta', action: 'new-card' })}</div>`;
-  let html = `<div class="grid g-3">`;
+  const kARS = v => `$ ${abrevARS(v)}`;
+  const sinCuotas = d => String(d || '').replace(/,\s*\d+\s*cuotas?\)/i, ')').replace(/\s*\(\s*\d+\s*cuotas?\s*\)\s*$/i, '');
+  // --- tarjetas: mismo formato que las de Cartera (numero grande + tres filas + pie)
+  let html = `<div class="grid g-kpi">`;
   state.tarjetas.forEach((t, i) => {
     const now = E.cardNow(t, hoy);
     const consumoPeriodo = sum(E.data().pieces.filter(p => p.m.medio === 'tarjeta' && p.m.tarjetaId === t.id && p.mesPago === now.mesPago && p.idx === 1 && !p.m.recId).map(p => p.montoARS));
     const prox = E.proximoPago(t, hoy);
     const cerrando = E.resumen(t.id, now.mesPago);
     const lim = Number(t.limite) || 0; const uso = lim ? (prox.ym === now.mesPago ? cerrando.total : prox.total + cerrando.total) / lim : 0;
-    const cierreDesde = D.addDays(E.fechaCierre(t.id, D.addMonths(now.mesPago, -1)), 1);
-    html += `<div class="tcard" data-act="edit-card" data-id="${t.id}" style="cursor:pointer">
-      <div class="tname"><span><i class="bankdot" style="background:${cardDot(t.color || CARD_COLORS[i % CARD_COLORS.length])}"></i>${esc(t.nombre)}<span style="font-weight:400;color:var(--ink-3);font-size:13px"> ${esc(t.banco || '')}</span></span><button class="mini-btn" data-act="edit-card" data-id="${t.id}">${ICONS.edit}</button></div>
-      <div><div style="font-size:12px;color:var(--ink-3)">Período ${D.fmt(cierreDesde)} – ${D.fmt(now.cierre)} · cierra en ${now.diasAlCierre} día${now.diasAlCierre === 1 ? '' : 's'}</div><div class="tbig">${M.f(cerrando.total)}</div></div>
-      <div class="tmeta"><span>Consumo nuevo<b>${M.f(consumoPeriodo)}</b></span><span>Cuotas y fijos<b>${M.f(cerrando.total - consumoPeriodo)}</b></span>${prox.ym !== now.mesPago ? `<span>A pagar el ${D.fmt(prox.fecha)}<b>${M.f(prox.total)}</b></span>` : ''}</div>
-      ${lim ? `<div style="margin-top:10px"><div class="row between" style="font-size:11px;color:var(--ink-3)"><span>Límite ${M.c(lim)}</span><span>${M.pct(uso)}</span></div><div class="meter lim ${uso >= 0.85 ? 'warn' : ''}" style="margin-top:6px"><i class="${uso >= 0.85 ? 'glow-fill warn' : ''}" style="width:${clamp(uso * 100, 0, 100)}%"></i></div></div>` : ''}
-    </div>`;
+    const stats = [{ k: 'Nuevo', v: kARS(consumoPeriodo) }, { k: 'Cuotas', v: kARS(cerrando.total - consumoPeriodo) }];
+    if (prox.ym !== now.mesPago) stats.push({ k: `Pag\u00e1s ${D.fmt(prox.fecha)}`, v: kARS(prox.total), cls: 'mid' });
+    if (lim) stats.push({ k: 'L\u00edmite', v: M.pct(uso, 0), cls: uso >= 0.85 ? 'neg' : uso >= 0.6 ? 'mid' : 'pos' });
+    const esSel = (ui.resCard || state.tarjetas[0].id) === t.id;
+    html += `<div class="card kpi tap ${esSel ? 'sel' : ''}" data-act="tj-sel" data-id="${t.id}"><div class="label"><i class="bankdot" style="background:${cardDot(t.color || CARD_COLORS[i % CARD_COLORS.length])}"></i>${esc(t.nombre)}</div><div class="value">${M.f(cerrando.total)}</div>
+      <div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>
+      <div class="foot">cierra en ${now.diasAlCierre} d\u00eda${now.diasAlCierre === 1 ? '' : 's'} \u00b7 vence ${D.fmt(cerrando.fecha)}</div></div>`;
   });
-  html += `<button class="card" data-act="new-card" style="display:flex;align-items:center;justify-content:center;gap:8px;color:var(--ink-3);font-weight:700;min-height:150px;border-style:dashed;cursor:pointer">${ICONS.plus} Agregar tarjeta</button></div>`;
+  html += `</div><button class="tj-add" data-act="new-card">${ICONS.plus} Agregar tarjeta</button>`;
 
-  // Plan de pago del mes
-  const meses = D.range(ym, 3);
-  html += `<div class="card section"><div class="card-head"><h2>Plan de pago</h2><span class="hint">Qué vence, cuándo y de dónde sale</span></div>
-    <div class="table-wrap"><table><thead><tr><th>Cierre</th><th>Tarjeta</th><th class="r">Monto</th><th>Sale de</th><th>Pagado</th></tr></thead><tbody>
-    ${meses.flatMap(m => state.tarjetas.map(t => { const r = E.resumen(t.id, m); if (!r.total && m !== ym) return ''; const p = state.pagos.find(p => p.tarjetaId === t.id && p.mes === m) || {};
-      return `<tr style="${p.pagado ? 'opacity:.55' : ''}"><td class="mono" style="white-space:nowrap">${D.fmt(E.fechaCierre(t.id, m), { year: true })}</td><td><b style="font-weight:500">${esc(t.nombre)}</b><span class="sub">${r.pieces.length} ítems · vence ${D.fmt(r.fecha)}</span></td><td class="amount r"><b>${M.f(r.total)}</b></td>
-      <td><select class="input sm" data-pago="${t.id}|${m}"><option value="">Elegir cuenta…</option>${state.cuentas.map(c => `<option value="${c.id}" ${p.cuentaId === c.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></td>
-      <td><label class="switch"><input type="checkbox" data-pagado="${t.id}|${m}" ${p.pagado ? 'checked' : ''}><span>${p.pagado ? 'Sí' : 'No'}</span></label></td></tr>`; })).join('')}
-    </tbody></table></div>
-    <p class="small muted" style="margin-top:8px">Tocá una tarjeta arriba para editar sus datos (cierre, vencimiento, límite). Los resúmenes futuros incluyen las cuotas que ya conocés.</p></div>`;
-
-  // Cuentas
-  const pend = state.pagos.filter(p => !p.pagado && p.cuentaId);
-  html += `<div class="grid g-2 section">
-    <div class="card"><div class="card-head"><h2>De dónde sale la plata</h2><button class="btn sm" data-act="new-cuenta">${ICONS.plus} Cuenta</button></div>
-      ${state.cuentas.length ? state.cuentas.map(c => { const saldo = M.toARS(Number(c.saldo) || 0, c.moneda); const asig = sum(pend.filter(p => p.cuentaId === c.id).map(p => E.resumen(p.tarjetaId, p.mes).total)); const desp = saldo - asig + (c.esSueldo ? (Number(state.settings.ingreso) || 0) : 0);
-        return `<div class="list-item"><div><b style="font-weight:500">${esc(c.nombre)}</b>${c.esSueldo ? ' <span class="tag">cobro el sueldo acá</span>' : ''}<span class="sub small muted">${esc(c.tipo || '')}${asig ? ` · ${M.f(asig)} asignados a resúmenes` : ''}</span></div><div class="row" style="gap:4px"><div style="text-align:right"><div class="mono">${M.f(saldo)}${c.moneda === 'USD' ? `<span class="sub">US$ ${fmtUSD.format(Number(c.saldo) || 0)}</span>` : ''}</div>${asig || c.esSueldo ? `<div class="small ${desp < 0 ? 'pill crit' : 'muted'}">tras pagar${c.esSueldo ? ' + sueldo' : ''}: ${M.f(desp)}</div>` : ''}</div><button class="mini-btn" data-act="edit-cuenta" data-id="${c.id}">${ICONS.edit}</button></div></div>`; }).join('') : empty({ kind: 'setup', icon: 'chart', head: 'Falta decir con qué pagás', sub: 'Cargá tus cuentas y Gastos te dice si llegás a cubrir cada resumen.', btn: 'Agregar cuenta', action: 'new-cuenta' })}
-    </div>
-    <div class="card"><div class="card-head"><h2>Detalle del resumen</h2><div class="row" style="gap:6px"><select class="input sm" id="res-card">${state.tarjetas.map(t => `<option value="${t.id}" ${ui.resCard === t.id ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select><select class="input sm" id="res-mes">${D.range(D.addMonths(ym, -2), 8).map(m => `<option value="${m}" ${(ui.resMes || E.cardNow(state.tarjetas[0], hoy).mesPago) === m ? 'selected' : ''}>cierre ${D.fmt(E.fechaCierre((ui.resCard || state.tarjetas[0].id), m), { year: true })}</option>`).join('')}</select></div></div>
-      <div id="res-detalle">${renderResumenDetalle(ui.resCard || state.tarjetas[0].id, ui.resMes || E.cardNow(state.tarjetas[0], hoy).mesPago)}</div>
-    </div>
+  // --- solo lo que va en cada tarjeta (Facu: plan de pago y cuentas no hacen falta). Tocar una tarjeta la elige.
+  const tSel = state.tarjetas.find(t => t.id === ui.resCard) || state.tarjetas[0];
+  const mSel = ui.resMes || E.cardNow(tSel, hoy).mesPago;
+  html += `<div class="card section"><div class="card-head"><h2>Qu\u00e9 va en ${esc(tSel.nombre)}</h2><button class="btn sm ghost" data-act="edit-card" data-id="${tSel.id}">${ICONS.edit} Editar</button></div>
+    <div class="tp-sels"><select class="tp-sel" id="res-mes">${D.range(D.addMonths(ym, -2), 8).map(m => `<option value="${m}" ${mSel === m ? 'selected' : ''}>cierre ${D.fmt(E.fechaCierre(tSel.id, m))}</option>`).join('')}</select></div>
+    <div id="res-detalle">${renderResumenDetalle(tSel.id, mSel)}</div>
   </div>`;
   return html;
 }
 
 function renderResumenDetalle(tarjetaId, ym) {
-  const r = E.resumen(tarjetaId, ym); const t = L.tarjeta(tarjetaId);
-  if (!r.pieces.length) return empty({ kind: 'periodo', icon: 'cal', head: 'Sin consumos en este resumen', sub: 'Los que hagas antes del cierre aparecen acá.' });
+  const r = E.resumen(tarjetaId, ym);
+  if (!r.pieces.length) return empty({ kind: 'periodo', icon: 'cal', head: 'Sin consumos en este resumen', sub: 'Los que hagas antes del cierre aparecen ac\u00e1.' });
   const rows = r.pieces.slice().sort((a, b) => a.m.fecha.localeCompare(b.m.fecha));
   const cuotas = sum(rows.filter(p => p.idx > 1).map(p => p.montoARS));
-  return `<div class="row between small muted" style="margin-bottom:8px"><span>Cierra ${D.fmt(E.fechaCierre(tarjetaId, ym), { year: true })} · vence ${D.fmt(r.fecha, { year: true })} · ${rows.length} ítems</span><span>Cuotas de compras anteriores: <b class="mono">${M.f(cuotas)}</b></span></div>
-  <div class="table-wrap"><table><thead><tr><th>Compra</th><th>Concepto</th><th class="r">Importe</th></tr></thead><tbody>${rows.map(p => `<tr><td class="mono muted" style="white-space:nowrap">${D.fmt(p.m.fecha)}</td><td>${esc(p.m.desc)}${p.n > 1 ? ` <span class="tag">${p.idx}/${p.n}</span>` : ''}${p.m.recId ? ' <span class="tag">fijo</span>' : ''}</td><td class="amount r">${M.f(p.montoARS)}</td></tr>`).join('')}<tr><td></td><td><b>Total</b></td><td class="amount r"><b>${M.f(r.total)}</b></td></tr></tbody></table></div>`;
+  const sinCuotas = d => String(d || '').replace(/,\s*\d+\s*cuotas?\)/i, ')').replace(/\s*\(\s*\d+\s*cuotas?\s*\)\s*$/i, '');
+  return `<div class="tp-sum">vence ${D.fmt(r.fecha)} \u00b7 ${rows.length} \u00edtems \u00b7 cuotas anteriores ${M.f(cuotas)}</div>
+    <div class="mlist">${rows.map(p => `<div class="mv"><div style="min-width:0"><div class="m1"><b>${esc(sinCuotas(p.m.desc))}</b></div><div class="m2">${['compra ' + D.fmt(p.m.fecha), p.n > 1 ? `cuota ${p.idx}/${p.n}` : '', p.m.recId ? 'fijo' : ''].filter(Boolean).join(' \u00b7 ')}</div></div><div class="mm">${M.f(p.montoARS)}</div></div>`).join('')}</div>`;
 }
 
 /* ---------- PLAN: presupuesto e inversión ---------- */

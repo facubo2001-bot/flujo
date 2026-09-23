@@ -49,7 +49,7 @@ const Charts = {
   },
 
   /** Stacked columns. series: [{name,color,values}] ; optional line overlay {name,values,color} on the SAME axis */
-  stacked({ w = 640, series, labels, h = 240, line = null, yFmt = axisFmt, tipTitle = i => labels[i], tipFmt = v => M.f(v), highlight = -1, thresholdPct = null }) {
+  stacked({ w = 640, series, labels, h = 240, line = null, yFmt = axisFmt, tipTitle = i => labels[i], tipFmt = v => M.f(v), highlight = -1, thresholdPct = null, act = null }) {
     const padL = 44, padR = 12, padT = 14, padB = 26;
     const iw = w - padL - padR, ih = h - padT - padB; const n = labels.length;
     const totals = labels.map((_, i) => sum(series.map(s => s.values[i] || 0)));
@@ -70,13 +70,15 @@ const Charts = {
         const top = acc + v >= totals[i] - 1e-9;
         const r = top ? 4 : 0;
         const xx = x(i) - bw / 2;
-        bars += r ? `<path d="M${xx} ${y0}V${y1 + r}q0 -${r} ${r} -${r}h${bw - 2 * r}q${r} 0 ${r} ${r}V${y0}Z" fill="${s.color}" />` : `<rect x="${xx}" y="${y1}" width="${bw}" height="${hh}" fill="${s.color}" />`;
+        // barra elegida (graficos tocables): las demas se apagan
+        const op = act && highlight >= 0 && i !== highlight ? ' opacity=".35"' : '';
+        bars += r ? `<path d="M${xx} ${y0}V${y1 + r}q0 -${r} ${r} -${r}h${bw - 2 * r}q${r} 0 ${r} ${r}V${y0}Z" fill="${s.color}"${op} />` : `<rect x="${xx}" y="${y1}" width="${bw}" height="${hh}" fill="${s.color}"${op} />`;
         acc += v;
       });
       const rows = series.filter(s => (s.values[i] || 0) > 0).map(s => tipRow(s.color, s.name, tipFmt(s.values[i]))).join('');
       const tot = totals[i] ? tipRow('', 'Total', tipFmt(totals[i])) : '';
       const ln = line && line.values[i] != null ? tipRow('', line.name, tipFmt(line.values[i])) : '';
-      hits += `<rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${ih}" data-tip="${esc(`<b>${esc(tipTitle(i))}</b>${rows}${tot}${ln}`)}"/>`;
+      hits += act ? `<rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${ih}" data-act="${act}" data-id="${i}" style="cursor:pointer"/>` : `<rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${ih}" data-tip="${esc(`<b>${esc(tipTitle(i))}</b>${rows}${tot}${ln}`)}"/>`;
     });
     let lp = '';
     if (line) { let d = ''; line.values.forEach((v, i) => { if (v == null) return; d += (d ? 'L' : 'M') + x(i) + ' ' + y(v); }); lp = `<path d="${d}" fill="none" stroke="${line.color || 'var(--ink)'}" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>`; }

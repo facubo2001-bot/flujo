@@ -25,7 +25,10 @@ const pwaHead = `<meta charset="utf-8">
 const swReg = `<script>
 if ('serviceWorker' in navigator) { let recargando = false; navigator.serviceWorker.addEventListener('controllerchange', () => { if (recargando) return; recargando = true; try { toast('Actualizando a la versión nueva…', 2000); } catch (e) {} setTimeout(() => location.reload(), 600); }); window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => { try { reg.update(); } catch (e) {} setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000); }).catch(() => {}); }); }
 </script>`;
-const pwaHtml = `<!doctype html>\n<html lang="es"><head>\n${pwaHead}\n</head><body>\n${html.replace('/*__PRESET__*/', () => preset)}\n${swReg}\n</body></html>`;
+// la PWA publicada (repo PUBLICO en GitHub Pages) va SIN datos personales: los datos viven en el telefono y en el gist privado.
+// flujo.html (local, para tests) sigue llevando el preset si existe. FLUJO_PRESET_PWA=1 lo fuerza tambien en la PWA.
+const htmlPwa = process.env.FLUJO_PRESET_PWA === '1' ? html : src('shell.html').replace('/*__CSS__*/', () => css).replace('/*__JS__*/', () => js).replace('/*__PRESET__*/', () => 'null').replace("'__BUILD__'", `'${version0}'`);
+const pwaHtml = `<!doctype html>\n<html lang="es"><head>\n${pwaHead}\n</head><body>\n${htmlPwa}\n${swReg}\n</body></html>`;
 fs.mkdirSync(path.join(__dirname, 'pwa'), { recursive: true });
 fs.copyFileSync(path.join(__dirname, 'data', 'cedears.json'), path.join(__dirname, 'pwa', 'cedears.json'));
 fs.writeFileSync(path.join(__dirname, 'pwa', 'index.html'), pwaHtml);
