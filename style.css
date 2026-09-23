@@ -828,3 +828,38 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 .lote-m{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
 .lote-v{grid-column:1/4;font-size:12px;color:var(--ink-3)}
 .icon-btn.sm{width:30px;height:30px}
+
+/* reserva: alta en una pantalla y ficha */
+.rs-lbl{font-size:13px;color:var(--ink-3);margin:16px 0 6px}
+.rs-lbl:first-child{margin-top:0}
+.rs-srch{font-size:16px}
+.rs-res{margin-top:8px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.rs-it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:15px}
+.rs-it:last-child{border-bottom:0}
+.rs-it span{font-size:12.5px;color:var(--ink-3);text-align:right;flex:none}
+.rs-it.on{background:rgba(45,226,240,.10)} .rs-it.on b{color:var(--accent)}
+.rs-hint{font-size:12.5px;color:var(--ink-3);line-height:1.4;padding:12px 14px;margin:0}
+p.rs-hint{padding:8px 0 0}
+.rs-top{margin-bottom:14px}
+.rs-big{font-family:var(--font-display);font-size:34px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.rs-cols{display:flex;gap:18px;margin-top:6px;font-size:13px;color:var(--ink-3);flex-wrap:wrap}
+.rs-cols b{color:var(--ink);font-size:15px}
+.rs-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rs-btns .btn{justify-content:center;padding:14px;font-size:15px}
+.rs-mov{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer}
+.rs-mov:last-child{border-bottom:0}
+.rs-mov .t{font-weight:700} .rs-mov .t.r{color:var(--crit-text)} .rs-mov .m{font-weight:800;font-variant-numeric:tabular-nums}
+.rs-det{margin-top:12px;font-size:13px;color:var(--ink-3)} .rs-det summary{cursor:pointer;margin-bottom:8px}
+
+.rs-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rs-two .input{font-weight:700;font-variant-numeric:tabular-nums;min-width:0}
+.rs-sub{font-size:13px;color:var(--ink-3)}
+.rs-modal .m-head h2:empty{display:none}
+.rs-modal .rs-big{margin-top:4px}
+.rs-btns{margin:16px 0 4px}
+.rs-borrar{margin-top:14px;text-align:center} .rs-borrar .link-btn{color:var(--crit-text);font-size:13px}
+.rs-panel{margin-top:16px;padding:16px;border-radius:18px;background:var(--surface-2);box-shadow:0 -8px 30px rgba(0,0,0,.45)}
+.rs-panel-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.rs-panel-h b{font-size:18px;font-family:var(--font-display)}
+.rs-panel .input{background:var(--surface)}
+.rs-save{width:100%;justify-content:center;margin-top:12px;padding:14px;font-size:15px}

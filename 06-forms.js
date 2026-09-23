@@ -3,7 +3,7 @@
 const Modal = {
   onSubmit: null,
   open({ title, body, submit = 'Guardar', extra = '', onSubmit, wide = false }) {
-    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null;
+    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal');
     $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">${submit ? 'Cancelar' : 'Cerrar'}</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
     $('#modal').style.width = wide ? 'min(820px,100%)' : '';
     $('#overlay').classList.add('open');
@@ -1026,7 +1026,6 @@ function formActivo(id) {
       const tipo = Modal.val('ac-tipo'); const nombre = Modal.val('ac-nombre').trim() || E.TIPOS_ACTIVO[tipo];
       const n = k => M.parse(Modal.val(k)) || null;
       const nuevo = { id: a ? a.id : uid(), tipo, nombre, moneda: tipo === 'btc' ? 'USD' : Modal.val('ac-moneda'), nota: Modal.val('ac-nota').trim() || undefined };
-      if (tipo === 'fci' && isNew) { const f = { id: uid(), tipo: 'fci', nombre: nombre || 'Fondo', moneda: 'ARS', lotes: [] }; (state.cartera.activos = state.cartera.activos || []).push(f); Persist.save(); setTimeout(() => formReserva(f.id), 50); return; }
       if (tipo === 'efectivo' || tipo === 'otro') { nuevo.monto = n('ac-monto'); nuevo.fecha = Modal.val('ac-fecha') || D.today(); if (!nuevo.monto) { toast('Falta el monto'); return false; } }
       else if (tipo === 'btc') { nuevo.cantidad = n('ac-cantidad'); nuevo.precioManual = n('ac-pxmanual'); if (!nuevo.cantidad) { toast('Falta la cantidad'); return false; } }
       else { nuevo.capital = n('ac-capital'); nuevo.tna = n('ac-tna') || 0; nuevo.desde = Modal.val('ac-desde') || D.today(); nuevo.vence = Modal.val('ac-vence') || undefined; const vm = n('ac-vmanual'); if (vm) nuevo.valorManual = { v: vm, fecha: Modal.val('ac-vfecha') || D.today() }; if (!nuevo.capital && !vm) { toast('Falta el capital o el valor de hoy'); return false; } }
@@ -1037,7 +1036,7 @@ function formActivo(id) {
     } });
   // mostrar solo los campos del tipo elegido
   const ajustar = () => { const t = $('#ac-tipo').value; const grupo = t === 'efectivo' ? 'ac-efectivo' : t === 'otro' ? 'ac-otro' : t === 'btc' ? 'ac-btc' : 'ac-tasa'; $$('#modal .ac-f').forEach(el => { el.style.display = el.classList.contains(grupo) || (el.classList.contains('ac-moneda') && t !== 'btc') ? '' : 'none'; }); };
-  ajustar(); $('#ac-tipo').addEventListener('change', ajustar);
+  ajustar(); $('#ac-tipo').addEventListener('change', () => { if ($('#ac-tipo').value === 'fci' && isNew) { formReservaNueva(); return; } ajustar(); });
 }
 
 /* Versiones anteriores del gist: elegir una, ver que tenia, restaurar */
@@ -1067,57 +1066,93 @@ async function formVersion(sha) {
     onSubmit: () => { state = Persist.migrate(d); state.updatedAt = Date.now(); Persist.local(); Persist.save(); lastView = null; render(); toast('Versi\u00f3n restaurada'); } });
 }
 
-/* Reserva en un fondo: elegir el fondo de la lista de la CNV (ArgentinaDatos), cargar suscripciones y rescates
- * con fecha y monto; el valor cuota lo trae la app. Si el fondo no aparece, queda con TNA manual como antes. */
-function formReserva(id) {
+/* ---------- Reserva en pesos: un fondo con valor cuota real (CNV via ArgentinaDatos) ----------
+ * Alta en una sola pantalla (buscar fondo mientras se escribe + fecha + monto) y ficha con "Puse plata" / "Saqué plata". */
+const vcTxt = v => v.toLocaleString('es-AR', { maximumFractionDigits: v >= 100 ? 2 : 6 });
+function formReservaNueva() {
+  ui.rsNueva = { slug: null, nombre: '' };
+  Modal.open({ title: 'Nueva reserva', submit: 'Guardar reserva', body: `
+    <div class="rs-lbl">\u00bfEn qu\u00e9 fondo?</div>
+    <input class="input rs-srch" id="rs-q" placeholder="Escrib\u00ed: balanz lecap" autocomplete="off">
+    <div id="rs-res" class="rs-res"><div class="rs-hint">Cargando la lista de fondos de la CNV\u2026</div></div>
+    <div class="rs-lbl">\u00bfCu\u00e1ndo y cu\u00e1nto pusiste?</div>
+    <div class="rs-two">${F.input('rs-fecha', D.today(), 'type="date"')}${F.input('rs-monto', '', 'inputmode="decimal" placeholder="$ 370.000"')}</div>
+    <p class="rs-hint">El valor cuota de ese d\u00eda lo trae la app. Con esto ya compara contra Mercado Pago, el d\u00f3lar y la inflaci\u00f3n.</p>`,
+    onSubmit: () => {
+      const n = ui.rsNueva, monto = M.parse(Modal.val('rs-monto')), fecha = Modal.val('rs-fecha');
+      if (!n.slug) { toast('Eleg\u00ed el fondo de la lista'); return false; }
+      if (!monto || !fecha) { toast('Falta la fecha o el monto'); return false; }
+      const f = { id: uid(), tipo: 'fci', nombre: n.nombre, slug: n.slug, moneda: 'ARS', lotes: [{ id: uid(), tipo: 'suscripcion', fecha, monto }] };
+      const arr = state.cartera.activos = state.cartera.activos || [];
+      if (ui.rsReemplaza) { const i = arr.findIndex(x => x.id === ui.rsReemplaza); if (i >= 0) arr.splice(i, 1); ui.rsReemplaza = null; }
+      arr.push(f); Persist.save(); render();
+      AD.actualizar().then(() => render()).catch(() => {});
+    } });
+  const pintar = lista => {
+    const box = $('#rs-res'); if (!box) return; const q = ($('#rs-q') || {}).value || '';
+    if (!q.trim()) { box.innerHTML = '<div class="rs-hint">Escrib\u00ed parte del nombre del fondo.</div>'; return; }
+    const hits = AD.buscar(lista, q).slice(0, 8);
+    const vcDe = sl => { const v = AD.vcUltimo(sl); return v ? `$ ${vcTxt(v.v >= 100 ? v.v / 1000 : v.v)} \u00b7 ${D.fmt(v.fecha)}` : ''; };
+    box.innerHTML = hits.length ? hits.map(f => `<div class="rs-it ${ui.rsNueva.slug === f.slug ? 'on' : ''}" data-act="rs-pick" data-id="${esc(f.slug)}"><b>${esc(f.nombre)}</b><span data-vc="${esc(f.slug)}">${vcDe(f.slug) || esc(f.categoria || '')}</span></div>`).join('') : '<div class="rs-hint">Ning\u00fan fondo con ese nombre. Prob\u00e1 con menos palabras.</div>';
+    // valor cuota de los 3 primeros para reconocer el fondo de un vistazo (cacheado por dia)
+    clearTimeout(ui.rsT); ui.rsT = setTimeout(() => hits.slice(0, 3).forEach(f => { if (AD.vcUltimo(f.slug)) return; AD.fondo(f.slug).then(() => { const el = document.querySelector(`[data-vc="${f.slug}"]`); if (el) el.textContent = vcDe(f.slug); }).catch(() => {}); }), 400);
+  };
+  AD.fondos().then(lista => { ui.rsLista = lista; pintar(lista); $('#modal').oninput = e => { if (e.target.id === 'rs-q') { ui.rsNueva.slug = null; pintar(lista); } }; })
+    .catch(e => { const box = $('#rs-res'); if (box) box.innerHTML = `<div class="rs-hint warn-text">No pude leer la lista de fondos (${esc(String(e.message || e))}). Prob\u00e1 de nuevo en un rato.</div>`; });
+}
+async function reservaPick(slug) {
+  const f = (ui.rsLista || []).find(x => x.slug === slug); if (!f) return;
+  ui.rsNueva = { slug, nombre: f.nombre };
+  const q = $('#rs-q'); if (q) q.value = f.nombre;
+  const box = $('#rs-res'); if (box) box.innerHTML = `<div class="rs-it on"><b>${esc(f.nombre)}</b><span id="rs-vc">trayendo valor cuota\u2026</span></div>`;
+  try { await AD.fondo(slug); const v = AD.vcUltimo(slug); const el = $('#rs-vc'); if (el && v) el.textContent = `$ ${vcTxt(v.v >= 100 ? v.v / 1000 : v.v)} \u00b7 ${D.fmt(v.fecha)}`; }
+  catch (e) { const el = $('#rs-vc'); if (el) { el.textContent = 'sin valor cuota: elegí otro'; el.classList.add('warn-text'); } ui.rsNueva.slug = null; }
+}
+function formReserva(id, mov = null) {
   const a = (state.cartera.activos || []).find(x => x.id === id); if (!a) return;
-  a.lotes = a.lotes || [];
-  const vc = a.slug ? AD.vcUltimo(a.slug) : null; const err = a.slug ? AD.box().at['err:' + a.slug] : null;
-  const lotesHtml = a.lotes.slice().sort((x, y) => x.fecha.localeCompare(y.fecha)).map(l => { const v = a.slug ? AD.vcEn(a.slug, l.fecha) : null; return `<div class="lote-r"><span class="lote-f">${D.fmt(l.fecha, { year: true })}</span><span class="lote-t ${l.tipo === 'rescate' ? 'down' : ''}">${l.tipo === 'rescate' ? 'Rescate' : 'Suscripci\u00f3n'}</span><span class="lote-m">$ ${fmtARS.format(Math.round(l.monto))}</span><span class="lote-v">${v ? `${(l.monto / v.v).toLocaleString('es-AR', { maximumFractionDigits: 2 })} cp \u00b7 vc ${v.v.toLocaleString('es-AR', { maximumFractionDigits: 3 })}` : '<span class="warn-text">sin valor cuota</span>'}</span><button type="button" class="icon-btn sm" data-act="lote-del" data-id="${l.id}" aria-label="Borrar">${ICONS.trash}</button></div>`; }).join('');
-  const body = `
-    ${F.field('Nombre', F.input('rs-nombre', a.nombre || '', 'placeholder="Fondo Lecaps Balanz"'))}
-    <div class="f-sec"><div class="t">Fondo en la CNV</div>
-      <div class="row" style="gap:8px"><input class="input" id="rs-buscar" placeholder="Buscar: balanz performance" value="${esc(a.slug ? '' : (a.nombre || ''))}"><button type="button" class="btn sm" data-act="rs-buscar">Buscar</button></div>
-      <div id="rs-lista" class="small muted" style="margin-top:6px">${a.slug ? `Elegido: <b>${esc((AD.box().fondos[a.slug] || {}).nombre || a.slug)}</b>${vc ? ` \u00b7 valor cuota ${vc.v.toLocaleString('es-AR', { maximumFractionDigits: 4 })} al ${D.fmt(vc.fecha)}` : err ? ` \u00b7 <span class="warn-text">no se pudo traer (${esc(err)})</span>` : ' \u00b7 trayendo valor cuota\u2026'}` : 'Busc\u00e1 y eleg\u00ed tu fondo: con eso la app trae el valor cuota sola.'}</div>
-    </div>
-    <div class="f-sec"><div class="t">Movimientos</div>
-      <div id="rs-lotes">${lotesHtml || '<p class="small muted" style="margin:0">Todav\u00eda no hay suscripciones.</p>'}</div>
-      <div class="grid2" style="margin-top:10px">
-        ${F.field('Tipo', F.select('rs-tipo', [['suscripcion', 'Suscripci\u00f3n'], ['rescate', 'Rescate']], 'suscripcion'))}
-        ${F.field('Fecha', F.input('rs-fecha', D.today(), 'type="date"'))}
-        ${F.field('Monto $', F.input('rs-monto', '', 'inputmode="decimal" placeholder="360000"'))}
-        ${F.field('Valor cuota', F.input('rs-vc', '', 'inputmode="decimal" placeholder="solo si falta"'), 'del comprobante, opcional')}
-      </div>
-      <button type="button" class="btn sm" data-act="lote-add">${ICONS.plus} Agregar movimiento</button>
-    </div>
-    ${!a.slug ? `<div class="grid2">${F.field('TNA % (sin CNV)', F.input('rs-tna', a.tna || '', 'inputmode="decimal"'), 'estimaci\u00f3n mientras no haya valor cuota')}</div>` : ''}
-    ${F.field('Nota', F.input('rs-nota', a.nota || '', 'placeholder="opcional"'))}`;
-  Modal.open({ title: 'Reserva en pesos', body, extra: `<button class="btn danger" data-act="del-activo" data-id="${a.id}">Borrar</button>`,
-    onSubmit: () => { a.nombre = Modal.val('rs-nombre').trim() || a.nombre; a.nota = Modal.val('rs-nota').trim() || undefined; if (!a.slug) a.tna = M.parse(Modal.val('rs-tna')) || 0; Persist.save(); render(); } });
+  if (!a.slug) { return formActivoViejoFci(a); }
+  ui.rsId = a.id; a.lotes = a.lotes || [];
+  const r = AD.vcUltimo(a.slug) && a.lotes.length ? E.reserva(a) : null;
+  const l = mov && mov.loteId ? a.lotes.find(x => x.id === mov.loteId) : null; const tipo = l ? l.tipo : mov && mov.tipo;
+  const movs = a.lotes.slice().sort((x, y) => y.fecha.localeCompare(x.fecha)).map(x => `<div class="rs-mov" data-act="rs-edit" data-id="${x.id}"><span>${D.fmt(x.fecha)}</span><span class="t ${x.tipo === 'rescate' ? 'r' : ''}">${x.tipo === 'rescate' ? 'Rescate' : 'Suscripci\u00f3n'}</span><span class="m">${x.tipo === 'rescate' ? '\u2212' : ''}$ ${fmtARS.format(Math.round(x.monto))}</span></div>`).join('');
+  const panel = mov ? `<div class="rs-panel"><div class="rs-panel-h"><b>${tipo === 'rescate' ? 'Saqu\u00e9 plata' : 'Puse plata'}</b>${l ? `<button type="button" class="link-btn" data-act="rs-del-lote" data-id="${l.id}">borrar</button>` : ''}</div>
+      <div class="rs-two">${F.input('rs-fecha', l ? l.fecha : D.today(), 'type="date"')}${F.input('rs-monto', l ? String(l.monto) : '', 'inputmode="decimal" placeholder="$ monto"')}</div>
+      <details class="rs-det"><summary>Valor cuota del comprobante (opcional)</summary>${F.input('rs-vc', l && l.vc ? String(l.vc) : '', 'inputmode="decimal" placeholder="2,140265"')}</details>
+      <button type="button" class="btn primary rs-save" data-act="rs-save">Guardar</button></div>` : '';
+  Modal.open({ title: '', submit: '', body: `
+    <div class="rs-sub">Reserva en pesos \u00b7 ${esc(a.nombre || '')}</div>
+    <div class="rs-big">${r ? `$ ${fmtARS.format(Math.round(r.valor))}` : `$ ${fmtARS.format(Math.round(sum(a.lotes.map(x => (x.tipo === 'rescate' ? -1 : 1) * x.monto))))}`}</div>
+    <div class="rs-cols">${r ? `<span>US$ <b>${r.usdHoy != null ? fmtARS.format(Math.round(r.usdHoy)) : '\u2014'}</b></span><span>${r.ganado >= 0 ? '+' : '\u2212'}$ <b>${fmtARS.format(Math.round(Math.abs(r.ganado)))}</b></span><span>vc al <b>${D.fmt(r.corte)}</b></span>` : '<span class="warn-text">Sin valor cuota todav\u00eda: se actualiza con los precios.</span>'}</div>
+    <div class="rs-btns"><button type="button" class="btn ${tipo === 'rescate' ? '' : 'primary'}" data-act="rs-mov" data-id="suscripcion">+ Puse plata</button><button type="button" class="btn ${tipo === 'rescate' ? 'primary' : ''}" data-act="rs-mov" data-id="rescate">\u2212 Saqu\u00e9 plata</button></div>
+    <div class="rs-lbl">Movimientos</div>
+    ${movs || '<div class="rs-hint">Sin movimientos.</div>'}
+    <div class="rs-borrar"><button type="button" class="link-btn" data-act="del-activo" data-id="${a.id}">Borrar reserva</button></div>
+    ${panel}` });
+  $('#modal').classList.add('rs-modal');
+  if (mov) { const p = $('#modal .rs-panel'); if (p) p.scrollIntoView({ block: 'end' }); }
+}
+/* un fondo cargado antes, sin fondo de la CNV: se ofrece elegirlo */
+function formActivoViejoFci(a) {
   ui.rsId = a.id;
+  Modal.open({ title: a.nombre || 'Fondo', submit: '', extra: `<button class="btn danger" data-act="del-activo" data-id="${a.id}">Borrar</button>`, body: `
+    <p class="rs-hint" style="margin-top:0">Este fondo no est\u00e1 vinculado a la CNV, as\u00ed que se valora con una tasa estimada. Vinculalo para usar el valor cuota real.</p>
+    <button type="button" class="btn primary" data-act="rs-vincular">Elegir fondo de la CNV</button>` });
+}
+function formReservaMov(tipo, loteId) { formReserva(ui.rsId, { tipo, loteId }); }
+function reservaGuardarMov() {
+  const a = (state.cartera.activos || []).find(x => x.id === ui.rsId); if (!a) return;
+  const p = $('#modal .rs-panel'); if (!p) return;
+  const monto = M.parse(Modal.val('rs-monto')), fecha = Modal.val('rs-fecha'), vc = M.parse(Modal.val('rs-vc'));
+  if (!monto || !fecha) { toast('Falta la fecha o el monto'); return; }
+  const tipo = p.querySelector('.rs-panel-h b').textContent.startsWith('Saqu') ? 'rescate' : 'suscripcion';
+  const edit = p.querySelector('[data-act="rs-del-lote"]'); const l = edit ? a.lotes.find(x => x.id === edit.dataset.id) : null;
+  if (l) Object.assign(l, { fecha, monto, vc: vc || undefined }); else a.lotes.push({ id: uid(), tipo, fecha, monto, vc: vc || undefined });
+  Persist.save(); render(); formReserva(a.id); toast('Guardado');
 }
 const ReservaUI = {
-  async buscar() {
-    const q = ($('#rs-buscar') || {}).value || ''; const box = $('#rs-lista'); if (!box) return;
-    box.innerHTML = 'Buscando en la CNV\u2026';
-    try {
-      const lista = await AD.fondos(); const hits = AD.buscar(lista, q);
-      box.innerHTML = hits.length ? hits.map(f => `<div class="lote-r pick" data-act="rs-pick" data-id="${esc(f.slug)}"><span>${esc(f.nombre)}</span><span class="muted small">${esc(f.categoria || '')}</span></div>`).join('') : 'Nada con ese nombre. Prob\u00e1 con menos palabras.';
-    } catch (e) { box.innerHTML = `<span class="warn-text">No pude leer la lista (${esc(String(e.message || e))}). Pod\u00e9s seguir con TNA manual.</span>`; }
-  },
-  async elegir(slug) {
-    const a = (state.cartera.activos || []).find(x => x.id === ui.rsId); if (!a) return;
-    a.slug = slug; const f = (AD._fondos || []).find(x => x.slug === slug); if (f && (!a.nombre || a.nombre === 'Fondo')) a.nombre = f.nombre; Persist.save();
-    toast('Trayendo el valor cuota\u2026'); try { await AD.fondo(slug, true); await AD.actualizar(); } catch (e) { AD.box().at['err:' + slug] = String(e.message || e); }
-    formReserva(a.id); render();
-  },
-  agregar() {
-    const a = (state.cartera.activos || []).find(x => x.id === ui.rsId); if (!a) return;
-    const monto = M.parse(Modal.val('rs-monto')), fecha = Modal.val('rs-fecha'), tipo = Modal.val('rs-tipo'), vcM = M.parse(Modal.val('rs-vc'));
-    if (!monto || !fecha) { toast('Falta fecha o monto'); return; }
-    a.lotes.push({ id: uid(), tipo, fecha, monto, vc: vcM || undefined }); Persist.save(); formReserva(a.id); render();
-  },
-  borrar(id) { const a = (state.cartera.activos || []).find(x => x.id === ui.rsId); if (!a) return; a.lotes = a.lotes.filter(l => l.id !== id); Persist.save(); formReserva(a.id); render(); },
+  pick(slug) { reservaPick(slug); },
+  vincular() { const a = (state.cartera.activos || []).find(x => x.id === ui.rsId); formReservaNueva(); if (a) ui.rsReemplaza = a.id; },
+  borrarLote(id) { const a = (state.cartera.activos || []).find(x => x.id === ui.rsId); if (!a) return; a.lotes = a.lotes.filter(l => l.id !== id); Persist.save(); render(); formReserva(a.id); },
 };
 
 function formImportar() {
