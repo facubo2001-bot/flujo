@@ -933,3 +933,47 @@ h2 .i-btn{vertical-align:3px}
 .info-txt{font-size:15px;line-height:1.5;color:var(--ink-2);margin:0}
 .rsv-sucio{font-size:13px;color:var(--warn-text);line-height:1.35}
 .kpi.rsv .rsv-sem .rsv-c{transition:opacity .2s}
+.m-head h2 .i-btn{vertical-align:4px}
+.list-item .i-btn{margin-left:6px}
+
+/* ===== Ficha de empresa ===== */
+#modal.ficha .fp{display:none}
+#modal.ficha[data-ftab="fund"] .fp-fund,#modal.ficha[data-ftab="pos"] .fp-pos,#modal.ficha[data-ftab="al"] .fp-al{display:block}
+.fh2{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.fh2 .tk{font-family:var(--font-display);font-size:30px;font-weight:900;letter-spacing:-.03em;display:flex;align-items:center;gap:8px;line-height:1.1}
+.fh2 .tk .pz-dot{width:9px;height:9px}
+.fh2 .nm{font-size:13px;color:var(--ink-3);margin-top:2px}
+.fh2 .px{text-align:right;flex:none}.fh2 .px b{display:block;font-family:var(--font-mono);font-size:20px;font-weight:800}
+.fh2 .px span{font-size:13px;font-weight:800}.fh2 .px .up{color:var(--good-text)}.fh2 .px .down{color:var(--crit-text)}
+.fund .ds{font-size:13px;color:var(--ink-2);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.fund .rg{margin:14px 0 12px}.fund .rg .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.12);position:relative}
+.fund .rg .bar i{position:absolute;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;transform:translateX(-50%)}
+.fund .rl{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);margin-top:8px;font-variant-numeric:tabular-nums}
+.fund .acts{display:flex;gap:8px;margin:12px 0}
+.fund .acts .a{flex:1;border:0;border-radius:12px;padding:10px 4px;font:inherit;font-size:13.5px;font-weight:700;background:var(--surface-3);color:var(--ink);cursor:pointer}
+.fund .acts .a.p{background:var(--ink);color:var(--bg)}
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface-3);border-radius:12px;padding:3px;margin-bottom:4px}
+.seg3 button{border:0;background:transparent;font:inherit;padding:8px 0;font-size:13.5px;font-weight:700;color:var(--ink-3);border-radius:10px;cursor:pointer}
+.seg3 button.on{background:var(--ink);color:var(--bg)}
+#modal.ficha .fs{margin-top:16px}
+#modal.ficha .fs-t{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin-bottom:8px}
+#modal.ficha .fs-t .i-btn{vertical-align:1px}
+#modal.ficha .fg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#modal.ficha .ft{border:1px solid var(--line);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:78px;min-width:0}
+#modal.ficha .ft.tap{cursor:pointer}
+#modal.ficha .ft .k{font-size:12px;color:var(--ink-3);line-height:1.2}
+#modal.ficha .ft b{font-size:19px;font-weight:900;margin:3px 0 2px;font-variant-numeric:tabular-nums;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+#modal.ficha .ft b.pos{color:var(--good-text)} #modal.ficha .ft b.mid{color:var(--warn-text)} #modal.ficha .ft b.neg{color:var(--crit-text)}
+#modal.ficha .ft .s{font-size:11px;color:var(--ink-3);line-height:1.25}
+.fchart .gl{stroke:rgba(255,255,255,.08)} .fchart .gt{font-size:10.5px;fill:var(--ink-3);font-family:var(--font-ui)}
+.flg{display:flex;gap:14px;font-size:12px;color:var(--ink-3);margin-top:4px;align-items:center}
+.flg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px} .flg .u{margin-left:auto}
+.fbal{margin-top:16px;font-size:14px;display:flex;align-items:center;gap:8px}
+.fpie{margin-top:14px;font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.al3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.al3 .field label{font-size:12.5px;white-space:nowrap}
+.al3 .input{font-weight:800;font-variant-numeric:tabular-nums;text-align:center;min-width:0}
+.al-up{font-size:13px;color:var(--ink-3);margin:2px 0 12px}
+#modal.ficha .fp-al .field{margin-top:10px}
+#modal.ficha .fp-pos .ft b{font-size:16.5px}
+.fund .rg{margin-bottom:6px}

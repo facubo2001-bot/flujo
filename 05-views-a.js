@@ -21,6 +21,40 @@ const medioLabel = (m) => m.medio === 'tarjeta' ? (L.tarjeta(m.tarjetaId) ? L.ta
 const deltaPill = (cur, prev, invert = false) => { if (!prev) return ''; const d = (cur - prev) / prev; const up = d > 0; const good = invert ? up : !up; return `<b class="${Math.abs(d) < 0.02 ? 'neutral' : good ? 'down' : 'up'}">${up ? '+' : ''}${M.pct(d)}</b>`; };
 /** aclaraciones: una "i" chica que al tocarla muestra el texto (Facu: ahorrar espacio, hay cosas que ya sabe) */
 const infoBtn = t => `<button type="button" class="i-btn" data-act="info" data-id="${esc(encodeURIComponent(t))}" aria-label="Qu\u00e9 es esto">i</button>`;
+/** pasa a "i" las aclaraciones: p.aclara y las descripciones largas de los items de Ajustes/Plan.
+ *  La "i" va al lado del titulo mas cercano (h2/h3 de la tarjeta o del modal) o, si no hay, al final del item. */
+function aplicarInfo(root) {
+  if (!root) return;
+  root.querySelectorAll('p.aclara').forEach(p => {
+    const txt = p.textContent.trim(); if (!txt) return;
+    const cont = p.closest('.card, #modal'); let h = cont ? cont.querySelector('.card-head h2, .card-head h3, .m-head h2') : null;
+    if (h && !h.textContent.trim()) h = null;
+    const btn = document.createElement('span'); btn.innerHTML = infoBtn(txt);
+    if (h) h.appendChild(btn.firstChild); else { const row = document.createElement('div'); row.className = 'i-row'; row.appendChild(btn.firstChild); p.before(row); }
+    p.remove();
+  });
+  // ayudas de campos largas (sin links ni botones adentro) -> "i" al lado de la etiqueta
+  root.querySelectorAll('.field > .help').forEach(h => {
+    const txt = h.textContent.trim(); if (txt.length <= 30) return;
+    const lab = h.parentElement.querySelector('label'); if (!lab) return;
+    const acc = [...h.querySelectorAll('a, button')];
+    const solo = acc.length ? [...h.childNodes].filter(n => !acc.includes(n)).map(n => n.textContent).join('').trim() : txt;
+    if (solo.length <= 30) return;
+    const tmp = document.createElement('span'); tmp.innerHTML = infoBtn(solo); lab.appendChild(tmp.firstChild);
+    if (acc.length) { h.innerHTML = ''; acc.forEach(a => h.appendChild(a)); } else h.remove();
+  });
+  // subtitulos largos de tarjetas -> "i" en el titulo
+  root.querySelectorAll('.card-head > .hint').forEach(h => {
+    const txt = h.textContent.trim(); if (txt.length <= 40 || h.querySelector('a, button, .crit-text, .warn-text')) return;
+    const t = h.parentElement.querySelector('h2, h3'); if (!t) return;
+    const tmp = document.createElement('span'); tmp.innerHTML = infoBtn(txt); t.appendChild(tmp.firstChild); h.remove();
+  });
+  root.querySelectorAll('.list-item > div > .sub.small.muted').forEach(sub => {
+    const txt = sub.textContent.trim(); if (txt.length <= 55 || sub.classList.contains('ver')) return;  // .ver = estado, queda a la vista
+    const b = sub.parentElement.querySelector('b'); if (!b) return;
+    const tmp = document.createElement('span'); tmp.innerHTML = infoBtn(txt); b.after(tmp.firstChild); sub.remove();
+  });
+}
 const kpi = ({ label, value, sub = '', cls = '', spark = '', stats = null, foot = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div>${stats ? `<div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>` : ''}${sub ? `<div class="delta">${sub}</div>` : ''}${foot ? `<div class="foot">${foot}</div>` : ''}${spark}</div>`;
 
 /* ---------- RESUMEN ---------- */
@@ -144,7 +178,7 @@ function renderMargen(mg, proj) {
   let acc = 0; const maxV = Math.max(mg.presupuesto, mg.fijos + mg.cuotas + mg.compras, 1);
   const wf = rows.map(([l, v, color]) => { let left, width; if (color === 'in') { left = 0; width = v / maxV * 100; acc = v; } else { const from = acc; acc += v; left = Math.max(0, acc) / maxV * 100; width = (Math.max(from, 0) - Math.max(acc, 0)) / maxV * 100; } return `<div class="wf"><span>${l}</span><div class="bar"><i style="left:${left}%;width:${width}%;background:${color === 'in' ? 'var(--line-2)' : color}"></i></div><span class="n">${v < 0 ? '−' : ''}${M.f(Math.abs(v))}</span></div>`; }).join('');
   return `<div style="font-family:var(--font-display);font-size:30px;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:${mg.queda < 0 ? 'var(--crit-text)' : 'var(--ink)'}">${M.f(mg.queda)}</div>
-    <p class="small muted" style="margin:2px 0 12px">${mg.queda < 0 ? 'Ya te pasaste del presupuesto del mes.' : isCur ? `Podés gastar hasta ahí en lo que queda de ${D.monthName(mg.ym).split(' ')[0]}.` : 'Lo que quedó del presupuesto después de fijos, cuotas y compras.'}</p>
+    <p class="small muted aclara" style="margin:2px 0 12px">${mg.queda < 0 ? 'Ya te pasaste del presupuesto del mes.' : isCur ? `Podés gastar hasta ahí en lo que queda de ${D.monthName(mg.ym).split(' ')[0]}.` : 'Lo que quedó del presupuesto después de fijos, cuotas y compras.'}</p>
     <div class="waterfall">${wf}<div class="wf total"><span>Queda</span><div class="bar"><i style="left:0;width:${clamp(Math.max(0, mg.queda) / maxV * 100, 0, 100)}%;background:var(--accent)"></i></div><span class="n">${M.f(mg.queda)}</span></div></div>
     ${isCur && proj && proj.pace != null ? `<div class="callout ${mg.quedaProj < 0 ? 'crit' : ''}" style="margin-top:12px">Al ritmo actual (${M.f(proj.pace)}/día en compras) cerrás el mes ${mg.quedaProj < 0 ? `<b>${M.f(-mg.quedaProj)}</b> por encima del presupuesto.` : `con <b>${M.f(mg.quedaProj)}</b> sin usar.`}</div>` : ''}
     ${mg.ingreso ? `<p class="small muted" style="margin-top:10px">Sueldo ${M.f(mg.ingreso)} − presupuesto ${M.f(mg.presupuesto)} = <b>${M.f(mg.ahorro)}</b> para invertir / ahorrar.</p>` : ''}`;

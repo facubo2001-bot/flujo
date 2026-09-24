@@ -29,7 +29,7 @@ function render() {
   document.body.classList.toggle('onboarding', onb);
   $('#view').innerHTML = (onb ? '' : renderTopbar()) + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
   if (window.innerWidth > 900) $('#btn-new-desktop').style.display = '';
-  ChartQ.mount();
+  ChartQ.mount(); aplicarInfo($('.main'));
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
   headLine();
@@ -140,6 +140,7 @@ const Actions = {
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
+  'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
   'tj-sel'(id) { ui.resCard = id; ui.resMes = null; render(); },
   'cq-mes'(i) { ui.cqMes = Number(i); render(); },
   'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },

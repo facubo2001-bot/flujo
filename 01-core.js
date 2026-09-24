@@ -615,6 +615,7 @@ const Fund = {
     patrimonioTotal: ['StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
     minoritarios: ['MinorityInterest', 'StockholdersEquityAttributableToNoncontrollingInterest'],
     caja: ['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'],
+    invCorto: ['ShortTermInvestments', 'MarketableSecuritiesCurrent', 'AvailableForSaleSecuritiesDebtSecuritiesCurrent'],
     cfo: ['NetCashProvidedByUsedInOperatingActivities', 'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations'],
     capex: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets', 'PaymentsForCapitalImprovements', 'PaymentsToAcquireOtherPropertyPlantAndEquipment', 'PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets'],
     acciones: ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic', 'CommonStockSharesOutstanding'],
@@ -637,7 +638,7 @@ const Fund = {
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
         acciones: V(ic, C.acciones) || V(bs, C.acciones),
         roicNopat: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
-        capital: Fund.capitalTotal(bs),
+        capital: Fund.capitalTotal(bs), caja: V(bs, C.caja), invCorto: V(bs, C.invCorto),
       };
     }).filter(f => f.anio && (f.ventas || f.neto));
     const vistos = {}; for (const f of filas) if (!vistos[f.anio] || f.fin > vistos[f.anio].fin) vistos[f.anio] = f;
@@ -737,7 +738,11 @@ const Fund = {
     if (!fin && previa && !previa.parcial) return previa;
     const m = (met && met.metric) || {}; const serie = (met && met.series && met.series.annual) || {};
     const filas = Fund.anios(fin);
-    const peHist = (serie.pe || []).map(x => Number(x.v)).filter(Number.isFinite);
+    // las series de Finnhub vienen de la mas nueva a la mas vieja: se ordenan antes de cortar los ultimos N años
+    const hist = k => (Array.isArray(serie[k]) ? serie[k] : []).filter(x => x && x.period && Number.isFinite(Number(x.v))).sort((a, b) => String(a.period).localeCompare(String(b.period))).map(x => Number(x.v));
+    const prom5 = k => { const xs = hist(k).slice(-5); return xs.length >= 3 ? sum(xs) / xs.length : null; };
+    const med10 = k => { const xs = hist(k).slice(-10); return xs.length >= 3 ? Fund.mediana(xs) : null; };
+    const peHist = hist('pe');
     const bal = cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
     const d = {
       at: Date.now(), ticker: t,
@@ -754,6 +759,13 @@ const Fund = {
       divCrec5: Number(m.dividendGrowthRate5Y) / 100 || null, payout: Number(m.payoutRatioTTM) / 100 || null,
       crecVentas5: Number(m.revenueGrowth5Y) / 100 || null, crecEps5: Number(m.epsGrowth5Y) / 100 || null, roiFinnhub: Number(m.roiTTM) / 100 || null,
       beta: Number(m.beta) || null,
+      roe5: Number(m.roe5Y) / 100 || null, margenBruto5: Number(m.grossMargin5Y) / 100 || null, margenOper5: Number(m.operatingMargin5Y) / 100 || null,
+      currentRatio: Number(m.currentRatioQuarterly ?? m.currentRatioAnnual) || null, currentRatio5: prom5('currentRatio'),
+      quickRatio: Number(m.quickRatioQuarterly ?? m.quickRatioAnnual) || null, quickRatio5: prom5('quickRatio'),
+      deudaPat5: prom5('totalDebtToEquity'),
+      ps: Number(m.psTTM ?? m.psAnnual) || null, psMed: med10('ps'),
+      pfcf: Number(m.pfcfShareTTM ?? m.pfcfShareAnnual) || null, pfcfMed: med10('pfcf'), pbMed: med10('pb'),
+      interesCob: Number(m.netInterestCoverageTTM ?? m.netInterestCoverageAnnual) || null,
       balance: bal ? { fecha: bal.date, hora: bal.hour || '', epsEst: bal.epsEstimate ?? null, trimestre: bal.quarter ?? null } : null,
       filas: filas.slice(-12).map(f => ({ anio: f.anio, ventas: f.ventas, neto: f.neto, eps: f.eps, fcf: f.fcf, acciones: f.acciones, roic: f.roic, capital: f.capital ? f.capital.total : null })),
     };
@@ -761,6 +773,9 @@ const Fund = {
     d.avisos = [];
     d.cagrVentas5 = Fund.cagr(filas, 'ventas', 5); d.cagrNeto5 = Fund.cagr(filas, 'neto', 5);
     d.cagrVentas10 = Fund.cagr(filas, 'ventas', 10); d.cagrNeto10 = Fund.cagr(filas, 'neto', 10);
+    d.cagrFcf5 = Fund.cagr(filas, 'fcf', 5); d.cagrAcc5 = Fund.cagr(filas, 'acciones', 5);
+    { const xs = filas.slice(-5).filter(f => f.neto > 0 && Number.isFinite(f.fcf)).map(f => f.fcf / f.neto).filter(x => Math.abs(x) <= 15); d.fcfSobreNeto5 = xs.length >= 3 ? sum(xs) / xs.length : null; }
+    { const u = filas[filas.length - 1]; d.netCash = u && u.capital && (u.caja != null || u.invCorto != null) ? (u.caja || 0) + (u.invCorto || 0) - u.capital.deuda : null; }
     // EPS: el de los balances no esta ajustado por splits (NVDA, GOOGL, AMZN daban negativo). Manda el de Finnhub;
     // el propio solo si Finnhub no lo da y ademas es coherente con la ganancia neta
     const epsPropio = Fund.cagr(filas, 'eps', 5);

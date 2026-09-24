@@ -3,12 +3,13 @@
 const Modal = {
   onSubmit: null,
   open({ title, body, submit = 'Guardar', extra = '', onSubmit, wide = false }) {
-    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal');
+    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal', 'ficha'); delete $('#modal').dataset.ftab;
     $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">${submit ? 'Cancelar' : 'Cerrar'}</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
     $('#modal').style.width = wide ? 'min(820px,100%)' : '';
     $('#overlay').classList.add('open');
     // sin foco automático: en iOS el teclado saltaba solo al abrir cualquier ventana (pedido de Facu); el campo se toca cuando se quiere escribir
     $$('#modal [autofocus]').forEach(el => el.removeAttribute('autofocus'));
+    aplicarInfo($('#modal'));
   },
   close() { $('#overlay').classList.remove('open'); Modal.onSubmit = null; },
   submit() { if (Modal.onSubmit && Modal.onSubmit() !== false) Modal.close(); },
@@ -471,91 +472,98 @@ function formOpCalc() {
 /** Ficha de empresa: una hoja continua, no siete cajas apiladas dentro de un modal de 390 px.
  *  El unico bloque con borde es el rango de 52 semanas, porque es un control visual y no una lista.
  *  El valor lleva color solo cuando es un juicio; debajo, una linea que dice por que. */
+/* ---------- FICHA DE EMPRESA ----------
+ * Cabecera (ticker, precio, que hace en una linea, 52W), botones de accion y tres pestañas:
+ * Fundamentals (bloques con su historico) · Mi posicion · Alertas. Las tres se dibujan siempre (los campos de
+ * Alertas tienen que existir para Guardar) y la pestaña se cambia sin re-dibujar (#modal[data-ftab]). */
 function fundHTML(t, pos) {
   const precio = pos && pos.precio != null ? pos.precio : null;
   const d = Fund.de(t);
   const pct1 = v => v == null ? '\u2014' : `${v >= 0 ? '' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
   const num = (v, n = 1) => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
-  const enM = v => Math.abs(v) >= 1e7 ? `${fmtU(v / 1e6, 0)} M` : fmtU(v, 0);
-  const sem = (v, bueno, malo, inv) => v == null ? '' : inv ? (v <= bueno ? 'ok' : v <= malo ? 'mid' : 'bad') : (v >= bueno ? 'ok' : v >= malo ? 'mid' : 'bad');
-  /** k: clave · v: valor · cls: color solo si hay juicio · por: la linea de abajo que explica el juicio */
-  const r = (k, v, cls, por) => `<div class="r"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span>${por ? `<span class="por">${por}</span>` : ''}</div>`;
-  const sec = (titulo, filas) => `<div class="f-sec"><div class="t">${titulo}</div>${filas}</div>`;
+  const bil = v => { const a = Math.abs(v); const s = v < 0 ? '\u2212' : ''; return a >= 1e12 ? `${s}US$ ${num(a / 1e12, 1)} T` : a >= 1e9 ? `${s}US$ ${num(a / 1e9, 0)} B` : `${s}US$ ${num(a / 1e6, 0)} M`; };
+  // color contra su propio historico: mejor = verde, parecido = amarillo, peor = rojo (en valuacion, mas bajo es mejor)
+  const vsH = (v, h, masEsMejor = true) => { if (v == null || h == null || !h) return ''; const r = (v - h) / Math.abs(h); return masEsMejor ? (r > 0.05 ? 'pos' : r < -0.10 ? 'neg' : 'mid') : (r < -0.05 ? 'pos' : r > 0.10 ? 'neg' : 'mid'); };
+  const abs = (v, bueno, malo, inv) => v == null ? '' : inv ? (v <= bueno ? 'pos' : v <= malo ? 'mid' : 'neg') : (v >= bueno ? 'pos' : v >= malo ? 'mid' : 'neg');
+  const tile = (k, v, cls, sub, act) => `<div class="ft ${act ? 'tap' : ''}" ${act || ''}><span class="k">${k}</span><b class="${cls || ''}">${v}</b><span class="s">${sub || '&nbsp;'}</span></div>`;
+  const grupo = (titulo, info, tiles) => `<div class="fs"><div class="fs-t">${titulo} ${infoBtn(info)}</div><div class="fg">${tiles.join('')}</div></div>`;
 
   const ced = pos && pos.cedear ? pos.cedear : Cedears.de(t);
   const ident = [d && d.nombre ? esc(d.nombre) : null, d && d.mercado ? esc(d.mercado) : (ced ? esc(ced.mercado || '') : null),
-    ced ? `CEDEAR ${Cedears.ratioTxt(ced)}` : null].filter(Boolean).join(' \u00b7 ');
+    ced ? `CEDEAR ${Cedears.ratioTxt(ced)}` : null, d && d.capUSD ? bil(d.capUSD) : null].filter(Boolean).join(' \u00b7 ');
   const dp = pos && pos.dp != null ? pos.dp : null;
-  const cab = `<div class="f-head">
-    <div><h3>${esc(t)}</h3>${ident ? `<div class="n">${ident}</div>` : ''}${(() => { const a = state.cartera.alertas[t]; return a && a.desc ? `<div class="n desc">${esc(a.desc)}</div>` : ''; })()}</div>
-    <div class="f-px">${precio != null ? `<b>${fmtU(precio)}</b>` : '<b class="muted">US$ x.xxx</b>'}
-      ${dp != null ? `<span class="dp ${dp > 0 ? 'up' : dp < 0 ? 'down' : ''}">${dp > 0 ? '+' : ''}${MENOS(dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} % hoy</span>` : ''}</div>
-  </div>`;
-
-  if (!d) return `<div class="fund hoja" id="fund-box">${cab}<div class="n">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes, secci\u00f3n Cartera, para ver los fundamentales.'}</div></div>`;
-
-  const cap = d.capUSD ? 'US$ ' + (d.capUSD >= 1e12 ? `${num(d.capUSD / 1e12, 2)} billones` : d.capUSD >= 1e9 ? `${num(d.capUSD / 1e9, 0)} mil M` : `${num(d.capUSD / 1e6, 0)} M`) : '\u2014';
-
-  // rango de 52 semanas: el unico con borde, porque es un control visual
+  const al = state.cartera.alertas[t] || {};
+  const est = pos && pos.estado; const b = Fund.balance(t);
+  const cab = `<div class="fh2">
+    <div style="min-width:0"><div class="tk">${esc(t)}${est ? `<i class="pz-dot ${est}"></i>` : ''}${b && b.dias <= 14 ? '<i class="pz-dot bal"></i>' : ''}</div>${ident ? `<div class="nm">${ident}</div>` : ''}</div>
+    <div class="px">${precio != null ? `<b>${fmtU(precio)}</b>` : '<b class="muted">\u2014</b>'}${dp != null ? `<span class="${dp > 0 ? 'up' : dp < 0 ? 'down' : ''}">${dp > 0 ? '+' : ''}${MENOS(dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} %</span>` : ''}</div>
+  </div>${al.desc ? `<div class="ds">${esc(al.desc)}</div>` : ''}`;
   let rango = '';
-  if (d.min52 != null && d.max52 != null && precio != null && d.max52 > d.min52) {
+  if (d && d.min52 != null && d.max52 != null && precio != null && d.max52 > d.min52) {
     const p52 = clamp((precio - d.min52) / (d.max52 - d.min52), 0, 1);
-    rango = `<div class="f-rng"><div class="t">Rango 52 semanas</div>
-      <div class="rng"><i style="left:${(p52 * 100).toFixed(1)}%"></i></div>
-      <div class="f-rng-pies"><span>${fmtU(d.min52)}</span><span>${(p52 * 100).toFixed(0)} % del rango</span><span>${fmtU(d.max52)}</span></div></div>`;
+    rango = `<div class="rg"><div class="bar"><i style="left:${(p52 * 100).toFixed(1)}%"></i></div><div class="rl"><span>${num(d.min52, d.min52 < 100 ? 2 : 0)}</span><span>52W \u00b7 ${(p52 * 100).toFixed(0)} %</span><span>${num(d.max52, d.max52 < 100 ? 2 : 0)}</span></div></div>`;
   }
+  const tieneAcc = pos && pos.acciones;
+  const acciones = `<div class="acts"><button type="button" class="a p" data-act="op-para" data-id="${esc(t)}|compra">+ Comprar</button>${tieneAcc ? `<button type="button" class="a" data-act="op-para" data-id="${esc(t)}|venta">Vender</button><button type="button" class="a" data-act="op-para" data-id="${esc(t)}|dividendo">Dividendo</button>` : ''}<button type="button" class="a" data-act="comparar" data-id="${esc(t)}">Comparar</button></div>`;
+  const tab = ui.fichaTab || 'fund';
+  const tabs = `<div class="seg3">${[['fund', 'Fundamentals'], ['pos', 'Mi posici\u00f3n'], ['al', 'Alertas']].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
 
-  // calidad del negocio (Buffett: retorno sobre el capital, margenes estables, poca deuda, caja real)
-  const margenVs = d.margenNeto != null && d.margenNeto5 ? d.margenNeto / d.margenNeto5 - 1 : null;
-  const calidad = sec('Calidad del negocio', [
-    r('ROIC', pct1(d.roicAct), sem(d.roicAct, 0.15, 0.10), `${d.roicFuente === 'ttm' ? '\u00daltimos 12 meses' : d.roicFuente === 'anual' ? '\u00daltimo balance anual' : d.roicFuente === 'finnhub' ? 'ROI seg\u00fan Finnhub' : 'Lo que rinde cada d\u00f3lar puesto en el negocio'}${d.roicProm5 != null ? ` \u00b7 promedio 5 a\u00f1os ${pct1(d.roicProm5)}` : ''}${d.roicCuenta ? ` <button type="button" class="link-btn" data-act="fund-cuenta" data-id="${esc(t)}">ver cuenta</button>` : ''}`),
-    d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">Ganancia neta ${d.roicFuente === 'ttm' ? '\u00faltimos 12 meses' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })}: <b>${enM(d.roicCuenta.neto)}</b><br>Capital total (patrimonio + deuda): <b>${enM(d.roicCuenta.capital)}</b>${d.roicCuenta.capitalPrev != null ? ` \u00b7 un a\u00f1o antes ${enM(d.roicCuenta.capitalPrev)}` : ' (sin el a\u00f1o anterior: no se promedia)'}<br>ROIC = ganancia \u00f7 capital promedio = <b>${pct1(d.roicAct)}</b>. Misma f\u00f3rmula que TradingView.${d.roicSerie && d.roicSerie.length > 1 ? `<br>Por a\u00f1o: ${d.roicSerie.map(x => `${x.anio} ${pct1(x.roic)}`).join(' \u00b7 ')}` : ''}</div>` : '',
-    r('ROE', pct1(d.roe), sem(d.roe, 0.15, 0.10), ''),
-    r('Margen neto', pct1(d.margenNeto), sem(margenVs, -0.05, -0.25), d.margenNeto5 != null ? `${margenVs > 0.05 ? 'Mejor' : margenVs < -0.05 ? 'Peor' : 'En l\u00ednea'} que su promedio de 5 a\u00f1os (${pct1(d.margenNeto5)})` : ''),
-    r('Margen bruto / operativo', `${pct1(d.margenBruto)} / ${pct1(d.margenOper)}`, '', ''),
-    r('Deuda / patrimonio', d.deudaPat != null ? num(d.deudaPat, 2) : '\u2014', d.deudaPat == null ? '' : (d.deudaPat < 0 ? 'mid' : sem(d.deudaPat, 0.6, 1.5, true)), d.deudaPat < 0 ? 'Patrimonio negativo: el ratio no dice nada' : ''),
-    r('Caja libre / ganancia', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', sem(d.fcfSobreNeto, 0.9, 0.6), 'La ganancia declarada, \u00bfse convierte en caja?'),
-    d.accionesCambio ? r('Acciones en circulaci\u00f3n', pct1(d.accionesCambio.pct), d.accionesCambio.pct <= -0.01 ? 'ok' : d.accionesCambio.pct >= 0.02 ? 'bad' : '', `${d.accionesCambio.desde}\u2013${d.accionesCambio.hasta}: ${d.accionesCambio.pct < 0 ? 'recompra acciones' : 'diluye'}`) : '',
-  ].join(''));
-
-  // crecimiento (Lynch: que crezca de verdad)
-  const crec = sec('Crecimiento', [
-    r('Ventas', pct1(d.cagrVentas5 ?? d.crecVentas5), sem(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), `CAGR de 5 a\u00f1os${d.cagrVentas10 != null ? `; a 10 a\u00f1os, ${pct1(d.cagrVentas10)}` : ''}`),
-    r('Ganancia neta', pct1(d.cagrNeto5), sem(d.cagrNeto5, 0.10, 0.04), `CAGR de 5 a\u00f1os${d.cagrNeto10 != null ? `; a 10 a\u00f1os, ${pct1(d.cagrNeto10)}` : ''}`),
-    r('EPS', pct1(d.cagrEps5), sem(d.cagrEps5, 0.10, 0.04), d.cagrEps5 == null ? 'Sin dato confiable' : `CAGR de 5 a\u00f1os${d.epsFuente === 'finnhub' ? ' (Finnhub, ajustado por splits)' : ''}`),
-  ].join(''));
-
-  // valuacion: contra si misma, el mismo criterio que tus zonas de alerta
-  const peVs = d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null;
-  const val = sec('Valuaci\u00f3n', [
-    r('P/E', num(d.pe, 1), sem(peVs, -0.10, 0.20, true), d.peMediana ? `${peVs > 0.2 ? 'Caro' : peVs < -0.1 ? 'Barata' : 'En l\u00ednea'} contra su propia mediana de 10 a\u00f1os (${num(d.peMediana, 1)})` : ''),
-    r('PEG', num(d.peg, 2), sem(d.peg, 1, 2, true), 'Lynch: por debajo de 1 es barata para lo que crece'),
-    d.pb != null ? r('P/B', num(d.pb, 2), '', '') : '',
-    d.yieldDiv ? r('Dividendo', pct1(d.yieldDiv), '', `Payout ${pct1(d.payout)}${d.divCrec5 != null ? ` \u00b7 crece ${pct1(d.divCrec5)} por a\u00f1o` : ''}`) : '',
-    r('Capitalizaci\u00f3n', cap, '', d.beta ? `Beta ${num(d.beta, 2)}${d.sector ? ` \u00b7 ${esc(d.sector)}` : ''}` : (d.sector ? esc(d.sector) : '')),
-  ].join(''));
-
-  // ganancia neta por año: la serie larga de los balances presentados a la SEC
-  let serie = '';
-  const fs = (d.filas || []).filter(f => Number.isFinite(f.neto));
-  if (fs.length > 3) {
-    const mx = Math.max(...fs.map(f => Math.abs(f.neto)));
-    const barras = fs.map((f, i) => `<i class="${f.neto < 0 ? 'neg' : ''}" style="height:${Math.max(2, Math.abs(f.neto) / mx * 100)}%;opacity:${(0.30 + 0.70 * (i / Math.max(1, fs.length - 1))).toFixed(2)}" title="${f.anio}: ${fmtU(f.neto / 1e6, 0)} M"></i>`).join('');
-    serie = `<div class="f-sec"><div class="t">Ganancia neta por a\u00f1o</div>
-      <div class="nibars">${barras}</div>
-      <div class="f-rng-pies" style="margin-top:6px"><span>${fs[0].anio}</span><span>${fmtU(fs[fs.length - 1].neto / 1e6, 0)} M en ${fs[fs.length - 1].anio}</span><span>${fs[fs.length - 1].anio}</span></div></div>`;
+  let pane;
+  if (!d) pane = `<div class="n" style="padding:14px 0">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes para ver los fundamentales.'}</div>`;
+  else {
+    const q = grupo('Quality', 'Contra su propio promedio de 5 a\u00f1os: verde si hoy est\u00e1 mejor, amarillo si est\u00e1 parecido, rojo si est\u00e1 peor. ROIC al estilo TradingView (ganancia neta / patrimonio + deuda). FCF / NI: cu\u00e1nto de la ganancia se convierte en caja.', [
+      tile('ROIC', pct1(d.roicAct), d.roicProm5 ? vsH(d.roicAct, d.roicProm5) : abs(d.roicAct, 0.15, 0.10), d.roicProm5 ? `5Y avg ${pct1(d.roicProm5)}` : (d.roicFuente === 'ttm' ? 'TTM' : ''), `data-act="fund-cuenta" data-id="${esc(t)}"`),
+      tile('ROE', d.roe != null && d.roe > 1 ? '>100 %' : pct1(d.roe), d.roe5 ? vsH(d.roe, d.roe5) : abs(d.roe, 0.15, 0.10), d.roe5 ? `5Y avg ${pct1(d.roe5)}` : ''),
+      tile('Net margin', pct1(d.margenNeto), vsH(d.margenNeto, d.margenNeto5), d.margenNeto5 ? `5Y avg ${pct1(d.margenNeto5)}` : ''),
+      tile('Gross margin', pct1(d.margenBruto), vsH(d.margenBruto, d.margenBruto5), d.margenBruto5 ? `5Y avg ${pct1(d.margenBruto5)}` : ''),
+      tile('Op. margin', pct1(d.margenOper), vsH(d.margenOper, d.margenOper5), d.margenOper5 ? `5Y avg ${pct1(d.margenOper5)}` : ''),
+      tile('FCF / NI', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', d.fcfSobreNeto5 ? vsH(d.fcfSobreNeto, d.fcfSobreNeto5) : abs(d.fcfSobreNeto, 0.9, 0.6), d.fcfSobreNeto5 ? `5Y avg ${num(d.fcfSobreNeto5, 2)}\u00d7` : ''),
+    ]);
+    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. EPS de Finnhub, ajustado por splits. Share count: si baja, la empresa recompra acciones.', [
+      tile('Revenue', pct1(d.cagrVentas5 ?? d.crecVentas5), abs(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), '5Y CAGR'),
+      tile('Net income', pct1(d.cagrNeto5), abs(d.cagrNeto5, 0.10, 0.04), '5Y CAGR'),
+      tile('EPS', pct1(d.cagrEps5), abs(d.cagrEps5, 0.10, 0.04), '5Y CAGR'),
+      tile('FCF', pct1(d.cagrFcf5), abs(d.cagrFcf5, 0.10, 0.04), '5Y CAGR'),
+      tile('Dividend', d.divCrec5 != null ? pct1(d.divCrec5) : '\u2014', abs(d.divCrec5, 0.06, 0.02), d.divCrec5 != null ? '5Y CAGR' : 'no paga'),
+      tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', '5Y CAGR'),
+    ]);
+    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece.', [
+      tile('P/E', num(d.pe, 1), vsH(d.pe, d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''),
+      tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'),
+      tile('P/S', num(d.ps, 1), vsH(d.ps, d.psMed, false), d.psMed ? `10Y med ${num(d.psMed, 1)}` : ''),
+      tile('P/FCF', num(d.pfcf, 1), vsH(d.pfcf, d.pfcfMed, false), d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : ''),
+      tile('P/B', num(d.pb, 1), vsH(d.pb, d.pbMed, false), d.pbMed ? `10Y med ${num(d.pbMed, 1)}` : ''),
+      tile('Div. yield', d.yieldDiv ? pct1(d.yieldDiv) : '\u2014', '', d.payout ? `payout ${pct1(d.payout)}` : ''),
+    ]);
+    const bs = grupo('Balance sheet', 'Debt / Equity con la deuda total (incluye leases). Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana. Net cash: caja e inversiones de corto plazo menos la deuda total.', [
+      tile('Debt / Equity', d.deudaPat != null ? num(d.deudaPat, 2) : '\u2014', d.deudaPat == null ? '' : d.deudaPat < 0 ? 'mid' : d.deudaPat5 ? vsH(d.deudaPat, d.deudaPat5, false) : abs(d.deudaPat, 0.6, 1.5, true), d.deudaPat < 0 ? 'patrimonio neg.' : d.deudaPat5 ? `5Y avg ${num(d.deudaPat5, 2)}` : ''),
+      tile('Current ratio', num(d.currentRatio, 2), abs(d.currentRatio, 1.2, 0.9), d.currentRatio5 ? `5Y avg ${num(d.currentRatio5, 2)}` : ''),
+      tile('Quick ratio', num(d.quickRatio, 2), abs(d.quickRatio, 1, 0.7), d.quickRatio5 ? `5Y avg ${num(d.quickRatio5, 2)}` : ''),
+      tile('Interest cov.', d.interesCob != null ? num(d.interesCob, 0) + '\u00d7' : '\u2014', abs(d.interesCob, 8, 3), 'EBIT / inter\u00e9s'),
+      tile('Net cash', d.netCash != null && Math.abs(d.netCash) >= 5e5 ? bil(d.netCash) : '\u2014', d.netCash == null || Math.abs(d.netCash) < 5e5 ? '' : d.netCash >= 0 ? 'pos' : 'mid', 'caja \u2212 deuda'),
+      tile('Beta', num(d.beta, 2), '', 'vs S&amp;P 500'),
+    ]);
+    // Revenue · Net income · FCF por año, con escala
+    let chart = '';
+    const fs = (d.filas || []).filter(f => Number.isFinite(f.ventas) || Number.isFinite(f.neto)).slice(-7);
+    if (fs.length >= 3) {
+      const mx = Math.max(...fs.flatMap(f => [f.ventas, f.neto, f.fcf].filter(Number.isFinite).map(Math.abs)), 1);
+      const div = mx >= 5e9 ? 1e9 : 1e6, u = div === 1e9 ? 'US$ B' : 'US$ M';
+      const top = (() => { const raw = mx / div; const e = Math.pow(10, Math.floor(Math.log10(raw))); const n = Math.ceil(raw / e); return (n <= 2 ? 2 : n <= 3 ? 3 : n <= 5 ? 5 : 10) * e; })();
+      const W = 358, H = 170, pl = 34, pb = 22, pt = 10, iw = W - pl - 6, ih = H - pb - pt; const Y = v => pt + ih - Math.max(0, v) / div / top * ih;
+      const grid = [0, 1 / 3, 2 / 3, 1].map(f => { const v = top * f; return `<line x1="${pl}" x2="${W - 6}" y1="${Y(v * div).toFixed(1)}" y2="${Y(v * div).toFixed(1)}" class="gl"/><text x="${pl - 6}" y="${(Y(v * div) + 4).toFixed(1)}" text-anchor="end" class="gt">${num(v, v < 10 ? 1 : 0)}</text>`; }).join('');
+      const slot = iw / fs.length, bw = slot * 0.26;
+      const bars = fs.map((f, i) => { const x0 = pl + slot * i + slot * 0.1; return [[f.ventas, 'rgba(255,255,255,.28)'], [f.neto, 'rgba(255,255,255,.8)'], [f.fcf, 'var(--accent)']].map(([val, col], j) => Number.isFinite(val) && val > 0 ? `<rect x="${(x0 + j * bw).toFixed(1)}" y="${Y(val).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${(pt + ih - Y(val)).toFixed(1)}" rx="2" fill="${col}"/>` : '').join('') + `<text x="${(pl + slot * i + slot / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" class="gt">${String(f.anio).slice(2)}</text>`; }).join('');
+      chart = `<div class="fs"><div class="fs-t">Revenue \u00b7 Net income \u00b7 FCF</div><svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>
+        <div class="flg"><span><i style="background:rgba(255,255,255,.28)"></i>Revenue</span><span><i style="background:rgba(255,255,255,.8)"></i>Net income</span><span><i style="background:var(--accent)"></i>FCF</span><span class="u">${u}</span></div></div>`;
+    }
+    const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / capital promedio <b>${fmtU(d.roicCuenta.base / 1e6, 0)} M</b></div>` : '';
+    const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
+    const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
+    const pie = `<div class="fpie">Finnhub \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} ${infoBtn(`Datos de Finnhub y de los balances presentados a la SEC${d.aniosDatos ? ` (${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta})` : ''}. Si un n\u00famero no coincide con TradingView, copi\u00e1 los datos crudos y pegalos en el chat.`)} <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>`;
+    pane = q + cuenta + g + v + bs + chart + bal + avisos + pie;
   }
-
-  // proximo balance: una fila con punto, sin caja
-  const b = Fund.balance(t);
-  const bal = b ? `<div class="f-bal"><span class="dot warn"></span><span>Pr\u00f3ximo balance <b>${D.fmt(b.fecha, { year: true })}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}</span>${b.epsEst != null ? `<span class="n">EPS esperado ${fmtU(b.epsEst)}</span>` : ''}</div>` : '';
-
-  const faltan = [d.roicAct, d.roe, d.margenNeto, d.deudaPat, d.fcfSobreNeto, d.cagrNeto5, d.pe, d.peg].filter(v => v == null).length;
-  return `<div class="fund hoja" id="fund-box">
-    ${cab}${rango}${calidad}${crec}${val}${serie}${bal}
-    ${d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : ''}
-    <div class="f-pie">Datos de Finnhub (balances presentados a la SEC${d.aniosDatos ? `, ${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta}`: ''}) \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}${faltan ? ` \u00b7 ${faltan} valor${faltan === 1 ? '' : 'es'} sin datos, marcado${faltan === 1 ? '' : 's'} con \u2014` : ''} \u00b7 <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>
-  </div>`;
+  return `<div class="fund hoja" id="fund-box">${cab}${rango}${acciones}${tabs}<div class="fp fp-fund">${pane}</div></div>`;
 }
 /** refresca los fundamentales del ticker y repinta solo ese bloque */
 async function fundRefrescar(t, pos) {
@@ -563,38 +571,39 @@ async function fundRefrescar(t, pos) {
   try { await Fund.traer(t); } catch (e) {}
   const box = $('#fund-box'); if (!box) return;
   const tmp = document.createElement('div'); tmp.innerHTML = fundHTML(t, pos);
-  box.replaceWith(tmp.firstElementChild);
+  box.replaceWith(tmp.firstElementChild); aplicarInfo($('#modal'));
 }
 function formPosicion(ticker) {
   const k = E.cartera(); const p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker); if (!p) return;
   const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
   const al = p.alerta || {};
-  const body = `<div class="stack">
-    ${fundHTML(ticker, p)}
-    ${p.acciones ? `<div class="hoja"><div class="f-sec"><div class="t">Tu tenencia</div>
-      <div class="r"><span class="k">Tenés</span><span class="v">${fmtAcc(p.acciones)} acc</span><span class="por">PPC ${fmtU(p.ppc)}</span></div>
-      <div class="r"><span class="k">Valor hoy</span><span class="v">${fmtU(p.valor != null ? p.valor : p.costo, 0)}</span>${p.precio != null ? `<span class="por">${fmtAcc(p.acciones)} × ${fmtU(p.precio)}</span>` : ''}</div>
-      <div class="r"><span class="k">Resultado total</span><span class="v ${p.gpTotal > 0 ? 'ok' : p.gpTotal < 0 ? 'bad' : ''}">${p.gpTotal != null ? (p.gpTotal >= 0 ? '+' : '−') + fmtU(Math.abs(p.gpTotal), 0) : '—'}</span><span class="por">${p.rendTotal != null ? pctS(p.rendTotal) : ''}${p.dividendos ? ` · incluye ${fmtU(p.dividendos, 2)} de dividendos` : ''}</span></div>
-      <div class="r"><span class="k">vs S&P 500</span><span class="v ${p.alfaUSD > 0 ? 'ok' : p.alfaUSD < 0 ? 'bad' : ''}">${p.alfaUSD != null ? (p.alfaUSD >= 0 ? '+' : '−') + fmtU(Math.abs(p.alfaUSD), 0) : '—'}</span><span class="por">${p.alfaUSD != null ? 'Las mismas compras hechas en SPY' : ''}</span></div>
-    </div></div>` : `<div class="callout">Watchlist: no tenés ${esc(ticker)}, solo lo vigilás.${p.precio != null ? ` Hoy ${fmtU(p.precio)}.` : ''}</div>`}
-    ${p.objetivo ? `<div class="small"><b>Precio objetivo:</b> ${fmtU(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside)} desde hoy)` : ''}</div>` : ''}
-    ${al.nota ? `<div class="callout" style="font-size:13px"><b>Tesis / nota:</b> ${esc(al.nota)}</div>` : ''}
-    <div class="form-grid"><div class="full"><div class="eyebrow" style="margin-bottom:6px">Alertas y objetivo (USD)</div></div>
-      ${F.field('<span class="dot warn"></span>Che, mirala ' + G.le, F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="0"'))}
-      ${F.field('<span class="dot crit"></span>Comprá urgente ' + G.le, F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="0"'))}
-      ${F.field('Precio objetivo 12 m', F.input('a-objetivo', al.objetivo || '', 'inputmode="decimal" placeholder="opcional"'))}
-      ${F.field('Qué hace', F.input('a-desc', al.desc || '', 'maxlength="120" placeholder="una línea, fija"'), '', 'full')}
-      ${F.field('Tesis / nota', F.input('a-nota', al.nota || '', 'placeholder="tier · por qué la tenés, qué mirar"'), '', 'full')}
-    </div>
-    <div class="row" style="gap:8px"><button type="button" class="btn sm" data-act="comparar" data-id="${esc(ticker)}">Comparar</button><button type="button" class="btn sm primary" data-act="op-para" data-id="${esc(ticker)}|compra">${ICONS.plus} Comprar</button>${p.acciones ? `<button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|venta">Vender</button><button type="button" class="btn sm" data-act="op-para" data-id="${esc(ticker)}|dividendo">Dividendo</button>` : ''}${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>
-    ${ops.length ? `<div><div class="eyebrow" style="margin:6px 0">Operaciones <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(tocá para editar)</span></div>${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${fmtAcc(o.acciones)} × ${fmtU(o.precio)}` : ''}</span></div><span class="mono op-amt">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0), 2)}</span></div>`).join('')}</div>` : ''}
-  </div>`;
+  const tile = (kk, v, cls, sub) => `<div class="ft"><span class="k">${kk}</span><b class="${cls || ''}">${v}</b><span class="s">${sub || '&nbsp;'}</span></div>`;
+  const sg = v => v >= 0 ? '+' : '\u2212';
+  const posPane = p.acciones ? `<div class="fs"><div class="fg">
+      ${tile('Ten\u00e9s', fmtU(p.valor != null ? p.valor : p.costo, 0), '', `${fmtAcc(Math.round(p.acciones * 100) / 100)} acciones`)}
+      ${tile('Resultado', p.gpTotal != null ? `${sg(p.gpTotal)}${fmtU(Math.abs(p.gpTotal), 0)}` : '\u2014', p.gpTotal > 0 ? 'pos' : p.gpTotal < 0 ? 'neg' : '', p.rendTotal != null ? pctS(p.rendTotal) : '')}
+      ${tile('vs S&amp;P 500', p.alfaUSD != null ? `${sg(p.alfaUSD)}${fmtU(Math.abs(p.alfaUSD), 0)}` : '\u2014', p.alfaUSD > 0 ? 'pos' : p.alfaUSD < 0 ? 'neg' : '', 'mismas compras')}
+      ${tile('PPC', fmtU(p.ppc), '', p.precio != null && p.ppc ? `${pctS(p.precio / p.ppc - 1)} vs hoy` : '')}
+      ${tile('Peso', p.peso != null ? M.pct(p.peso, 1) : '\u2014', '', 'de la cartera')}
+      ${tile('Dividendos', p.dividendos ? `+${fmtU(p.dividendos, 2)}` : '\u2014', p.dividendos ? 'pos' : '', 'cobrados')}
+    </div></div>` : `<div class="callout" style="margin-top:14px">Watchlist: no ten\u00e9s ${esc(ticker)}, solo lo vigil\u00e1s.</div>`;
+  const opsHtml = ops.length ? `<div class="fs"><div class="fs-t">Operaciones</div>${ops.map(o => `<div class="mv" data-act="edit-op" data-id="${o.id}"><div style="min-width:0"><div class="m1"><b>${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b></div><div class="m2">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` \u00b7 ${fmtAcc(o.acciones)} \u00d7 ${fmtU(o.precio)}` : ''}${o.legado ? ' \u00b7 fecha estimada' : ''}</div></div><div class="mm">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0), 2)}</div></div>`).join('')}</div>` : '';
+  const alPane = `<div class="fs"><div class="al3">
+      ${F.field('<span class="dot warn"></span>Mirala ' + G.le, F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="\u2014"'))}
+      ${F.field('<span class="dot crit"></span>Urgente ' + G.le, F.input('a-urgente', al.urgente || '', 'inputmode="decimal" placeholder="\u2014"'))}
+      ${F.field('Objetivo 12m', F.input('a-objetivo', al.objetivo || '', 'inputmode="decimal" placeholder="\u2014"'))}
+    </div>${p.objetivo && p.upside != null ? `<div class="al-up">Objetivo ${fmtU(p.objetivo)} \u00b7 <b class="${p.upside >= 0 ? 'up' : 'down'}">${pctS(p.upside)}</b> desde hoy</div>` : ''}
+    ${F.field('Qu\u00e9 hace', F.input('a-desc', al.desc || '', 'maxlength="120" placeholder="una l\u00ednea, fija"'))}
+    ${F.field('Tesis / nota', `<textarea class="input" id="a-nota" rows="3" placeholder="tier \u00b7 por qu\u00e9 la ten\u00e9s, qu\u00e9 mirar">${esc(al.nota || '')}</textarea>`)}
+    ${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>`;
+  const body = `${fundHTML(ticker, p)}<div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
     if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null };
     Persist.save(); toast('Guardado'); render();
   } });
-  fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atrás
+  $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
+  fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atras
 }
 /* ---------- COMPARAR EMPRESAS ----------
  * Hasta tres tickers de la cartera o la watchlist, las mismas metricas que la ficha, una al lado de la otra.
@@ -958,7 +967,7 @@ function formExportar() {
         <div class="r"><span class="k">Con fundamentales</span><span class="v" id="ctx-fund-v"></span><span class="por" id="ctx-fund-por"></span></div>
       </div></div>
       <div class="row" style="gap:8px">${puedeCompartir ? '<button type="button" class="btn primary" data-act="export-share">Compartir archivo</button>' : ''}<button type="button" class="btn ${puedeCompartir ? '' : 'primary'}" data-act="export-copy">Copiar texto</button></div>
-      <p class="ob-nota" style="margin-top:0">Pegalo o adjuntalo al empezar un chat del proyecto Inversiones: sirve para preguntar por una acci\u00f3n o para la revisi\u00f3n completa. Si Claude cambia niveles, us\u00e1 "Cargar actualizaciones".</p>
+      <p class="ob-nota aclara" style="margin-top:0">Pegalo o adjuntalo al empezar un chat del proyecto Inversiones: sirve para preguntar por una acci\u00f3n o para la revisi\u00f3n completa. Si Claude cambia niveles, us\u00e1 "Cargar actualizaciones".</p>
       <textarea class="input textarea" id="export-md" readonly style="min-height:180px">${esc(md)}</textarea>`;
     // lo que falte se completa en segundo plano y el texto se rehace solo
     if (ctxResumenFund().faltan.length && !sinClave) Fund.calentar(30, 65000);
@@ -992,7 +1001,7 @@ function formBalances() {
     ${grupo('Esta semana', semana)}${grupo('Pr\u00f3ximos 30 d\u00edas', quincena)}${grupo('M\u00e1s adelante', luego)}
     ${sin.length ? `<div class="f-sec"><div class="t">Sin fecha</div><p class="small muted" style="margin:0">${sin.map(x => `${esc(x.t)} (${x.motivo})`).join(' \u00b7 ')}</p></div>` : ''}
     ${pasados.length ? `<div class="f-sec"><div class="t">Ya presentaron (ficha vieja)</div><p class="small muted" style="margin:0">${pasados.map(x => `${esc(x.t)} el ${D.fmt(x.b.fecha)}`).join(' \u00b7 ')}. Se actualiza al abrir la ficha.</p></div>` : ''}
-    <p class="ob-nota">Fechas del calendario de resultados de Finnhub, que las toma de los anuncios de cada empresa y las estima cuando todav\u00eda no hay anuncio. Se traen junto con la ficha (hasta 200 d\u00edas adelante) y se refrescan cada vez que la ficha se actualiza. Toc\u00e1 una fila para abrir la ficha.</p>
+    <p class="ob-nota aclara">Fechas del calendario de resultados de Finnhub, que las toma de los anuncios de cada empresa y las estima cuando todav\u00eda no hay anuncio. Se traen junto con la ficha (hasta 200 d\u00edas adelante) y se refrescan cada vez que la ficha se actualiza. Toc\u00e1 una fila para abrir la ficha.</p>
   </div>`;
   Modal.open({ title: 'Balances que vienen', submit: '', body });
 }
@@ -1047,7 +1056,8 @@ async function formVersiones() {
   const fmt = iso => new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
   const filas = vs.map((v, i) => `<div class="ver-r" data-act="gist-ver" data-id="${esc(v.sha)}"><div><b>${fmt(v.fecha)}</b><span class="sub small muted">${i === 0 ? 'la m\u00e1s reciente' : haceTxt(new Date(v.fecha).getTime())}${v.cambios != null ? ` \u00b7 ${v.cambios} cambios` : ''}</span></div><span class="muted">\u203a</span></div>`).join('');
   const box = $('#modal .ctx-paso'); if (!box) return;
-  box.outerHTML = `<div class="hoja"><p class="small muted" style="margin:0 0 8px">GitHub guarda una versi\u00f3n cada vez que la app sube tus datos. Toc\u00e1 una para ver qu\u00e9 ten\u00eda antes de restaurarla.</p>${filas || '<p class="muted">Todav\u00eda no hay versiones.</p>'}</div>`;
+  setTimeout(() => aplicarInfo($('#modal')), 0);
+  box.outerHTML = `<div class="hoja"><p class="small muted aclara" style="margin:0 0 8px">GitHub guarda una versi\u00f3n cada vez que la app sube tus datos. Toc\u00e1 una para ver qu\u00e9 ten\u00eda antes de restaurarla.</p>${filas || '<p class="muted">Todav\u00eda no hay versiones.</p>'}</div>`;
 }
 async function formVersion(sha) {
   toast('Trayendo esa versi\u00f3n\u2026');
@@ -1077,7 +1087,7 @@ function formReservaNueva() {
     <div id="rs-res" class="rs-res"><div class="rs-hint">Cargando la lista de fondos de la CNV\u2026</div></div>
     <div class="rs-lbl">\u00bfCu\u00e1ndo y cu\u00e1nto pusiste?</div>
     <div class="rs-two">${F.input('rs-fecha', D.today(), 'type="date"')}${F.input('rs-monto', '', 'inputmode="decimal" placeholder="$ 370.000"')}</div>
-    <p class="rs-hint">El valor cuota de ese d\u00eda lo trae la app. Con esto ya compara contra Mercado Pago, el d\u00f3lar y la inflaci\u00f3n.</p>`,
+    <p class="rs-hint aclara">El valor cuota de ese d\u00eda lo trae la app. Con esto ya compara contra Mercado Pago, el d\u00f3lar y la inflaci\u00f3n.</p>`,
     onSubmit: () => {
       const n = ui.rsNueva, monto = M.parse(Modal.val('rs-monto')), fecha = Modal.val('rs-fecha');
       if (!n.slug) { toast('Eleg\u00ed el fondo de la lista'); return false; }
@@ -1158,7 +1168,7 @@ const ReservaUI = {
 function formImportar() {
   Intercambio._pendiente = null;  // ventana nueva: siempre se analiza de cero (si no, un texto igual al de la última vez se aplicaba sin vista previa)
   Modal.open({ title: 'Cargar actualizaciones de Claude', submit: 'Analizar', body: `<div class="stack">
-    <p class="small muted">Pegá la respuesta de Claude (o solo su bloque JSON). Vas a ver qué cambia antes de aplicar nada.</p>
+    <p class="small muted aclara">Pegá la respuesta de Claude (o solo su bloque JSON). Vas a ver qué cambia antes de aplicar nada.</p>
     <textarea class="input textarea" id="import-txt" placeholder='{ "tipo": "gestor-gastos-cambios", ... }' style="min-height:160px" autofocus></textarea>
     <label class="btn sm" style="width:fit-content">Elegir archivo… <input type="file" id="import-claude-file" accept=".json,.md,.txt" hidden></label>
     <div id="import-out"></div>
