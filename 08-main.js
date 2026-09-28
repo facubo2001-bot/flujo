@@ -141,6 +141,9 @@ const Actions = {
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
+  'gastos-todas'() { ui.gastosTodas = !ui.gastosTodas; render(); },
+  'grupo-sel'(id) { ui.grupoSel = id; render(); },
+  'ver-cat'(id) { ui.filtros = { ...(ui.filtros || {}), cat: id }; go('movimientos'); },
   'tj-sel'(id) { ui.resCard = id; ui.resMes = null; render(); },
   'cq-mes'(i) { ui.cqMes = Number(i); render(); },
   'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
@@ -175,7 +178,7 @@ const Actions = {
   'pick-destino'(d) { const el = $('#i-destino'); if (el) el.value = d; },
   'set-date-inv'(v) { const f = $('#i-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
   'set-date'(v) { const f = $('#f-fecha'); if (f) { f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); f.dispatchEvent(new Event('change', { bubbles: true })); } },
-  'pick-cat'(id) { const s = $('#f-cat'); if (s) { s.value = id; s.dataset.touched = '1'; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === id)); } },
+  'pick-cat'(id) { const s = $('#f-cat'); if (s) { s.value = id; s.dispatchEvent(new Event('change', { bubbles: true })); s.dataset.touched = '1'; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === id)); } },
   close() { Modal.close(); },
   submit() { Modal.submit(); },
   reload() { location.reload(); },
@@ -272,7 +275,7 @@ function importarCSV(txt) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) continue;
     const monto = Math.abs(M.parse(c[iM])); if (!monto) continue;
     const desc = (iD >= 0 ? c[iD] : 'Importado').trim(); const s = Smart.suggest(desc);
-    let catId = s ? s.catId : 'otros'; if (iC >= 0 && c[iC]) { const found = state.categorias.find(k => norm(k.nombre) === norm(c[iC]) || k.id === norm(c[iC])); if (found) catId = found.id; }
+    let catId = s ? s.catId : 'revisar'; if (iC >= 0 && c[iC]) { const found = state.categorias.find(k => norm(k.nombre) === norm(c[iC]) || k.id === norm(c[iC])); if (found) catId = found.id; }
     state.movimientos.push({ id: uid(), fecha, desc, monto, moneda: 'ARS', catId, medio: state.tarjetas.length ? 'tarjeta' : 'debito', tarjetaId: (state.tarjetas[0] || {}).id, necesidad: s ? s.necesidad : 2, cuotas: iQ >= 0 ? Number(c[iQ]) || 1 : 1 }); n++;
   }
   Persist.save(); toast(`${n} movimientos importados`); go('movimientos');

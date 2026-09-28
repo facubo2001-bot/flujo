@@ -147,23 +147,22 @@ function viewResumen() {
 
   // insights + donut
   const ins = Insights.build(ym);
-  const grupos = Object.entries(c.byGrupo).map(([g, v]) => ({ name: L.grupo(g).nombre, value: v, color: L.slotColor(L.grupo(g).slot), id: g })).sort((a, b) => b.value - a.value);
+  const grupos = Object.entries(c.byGrupo).map(([g, v]) => ({ name: L.grupo(g).nombre, value: v, id: g })).sort((a, b) => b.value - a.value);
+  // --- Donde se fue: mapa anidado (grupo = marco, categoria = bloque del tamaño de lo gastado)
+  const tot = c.total || 0;
+  let dondeHTML = '';
+  if (grupos.length && tot > 0) {
+    const gdat = grupos.map(g => ({ id: g.id, label: g.name, v: g.value, items: Object.entries(c.byCat).filter(([id]) => L.cat(id).grupo === g.id).map(([id, v]) => ({ id, label: L.cat(id).nombre, v, eleg: !L.cat(id).esencial })) }));
+    dondeHTML = mapaAnidado(gdat, 360);
+  } else dondeHTML = empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ym)}`, sub: 'Cuando cargues gastos, acá ves en qué se fue la plata.' });
   html += `<div class="grid g-21 section">
     <div class="card"><div class="card-head"><h2>Lectura del mes</h2><span class="hint">Alertas y patrones calculados sobre tus datos</span></div>${renderInsights(ins)}</div>
-    <div class="card"><div class="card-head"><h2>Dónde se fue</h2><span class="hint">${D.monthName(ym)}</span></div>
-      ${grupos.length ? (() => { const tot = c.total || 1; const big = grupos.filter(g => g.value / tot >= 0.05), chicos = grupos.filter(g => g.value / tot < 0.05); const resto = sum(chicos.map(g => g.value));
-        // lo que pesa menos de 5 % no entra al mapa (quedaba una tira de 20 px ilegible): va en la franja de abajo
-        return mapaBloques(big.map(g => ({ label: g.name.split(' ')[0], peso: g.value / tot, der: M.c(g.value) })), chicos.length ? { n: chicos.length, peso: resto / tot, label: chicos.length === 1 ? chicos[0].name : `Otros ${chicos.length} \u00b7 ${chicos.map(g => g.name.split(' ')[0]).join(', ')}`, der: `${M.pct(resto / tot, 1)} \u00b7 ${M.c(resto)}` } : null); })() : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
-    </div>
+    <div class="card"><div class="card-head"><h2>Dónde se fue ${infoBtn('Cada marco es un grupo (Comida, Movilidad…) y cada bloque adentro, una categoría: el tamaño es lo que gastaste y cuanto más claro, más pesó. Tocá un bloque para ver esos gastos.')}</h2><span class="hint">${D.monthName(ym)}</span></div>${dondeHTML}</div>
   </div>`;
 
-  // categorías + horizonte
-  const cats = Object.entries(c.byCat).map(([id, v]) => ({ cat: L.cat(id), v, avg: E.promedioCat(id, ym, 3) })).sort((a, b) => b.v - a.v);
+  // horizonte
   const hz = E.horizonte(D.thisMonth(), 12); const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
   html += `<div class="grid g-2 section">
-    <div class="card"><div class="card-head"><h2>Por categoría</h2><span class="hint">Barra = vs presupuesto o promedio 3 meses</span></div>
-      ${cats.length ? cats.slice(0, 9).map(({ cat, v, avg }) => { const ref = cat.presupuesto || avg || v; const r = v / (ref || 1); const sobre = avg > 0 && v > avg * 1.001; return `<div class="meter-row"><div class="l"><span>${esc(cat.nombre)}</span>${cat.presupuesto ? `<span class="pill ${r > 1 ? 'crit' : r > .8 ? 'warn' : 'neutral'}" style="font-size:10.5px">${r > 1 ? `+${M.pct(r - 1, 0)}` : M.pct(r)}</span>` : ''}</div><div class="v"><b class="mono">${M.f(v)}</b>${cat.presupuesto ? ` <span class="muted">/ ${M.c(cat.presupuesto)}</span>` : avg ? ` <span class="muted">prom. ${M.c(avg)}</span>` : ''}</div><div class="meter neutral ${sobre ? 'warn' : ''}"><i style="width:${clamp(r * 100, 2, 100)}%"></i>${!cat.presupuesto && avg ? `<span class="mark" style="left:${clamp(avg / Math.max(v, avg) * 100, 0, 100)}%"></span>` : ''}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
-    </div>
     <div class="card"><div class="card-head"><h2>Próximos 12 meses</h2><span class="hint">Fijos + cuotas ya comprometidos vs presupuesto</span></div>
       ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 230)}
       ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Alerta ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
@@ -362,6 +361,38 @@ function renderMovTable(movs, opts = {}) {
   </tbody></table></div>`;
 }
 
+/** Arriba de la lista de Gastos: velocimetro de cuanto fue innecesario, top 3 categorias y a donde se va la plata.
+ *  Todo sale de "¿Hacia falta?" de cada gasto (se sugiere por la categoria y se puede cambiar a mano). */
+function gastosAnalisis(c) {
+  const tot = c.total || 0; if (tot <= 0) return '';
+  const byNec = { 1: 0, 2: 0, 3: 0 }; for (const m of c.movs) byNec[m.necesidad || 1] += E.rowAmount(m);
+  const pIn = byNec[3] / tot;
+  // velocimetro: 0 = nada innecesario, 100 = todo innecesario
+  const R = 78, cx = 95, cy = 88; const ang = p => Math.PI * (1 - p); const pt = (p, r = R) => [cx + r * Math.cos(ang(p)), cy - r * Math.sin(ang(p))];
+  const arc = (p0, p1) => { const [x0, y0] = pt(p0), [x1, y1] = pt(p1); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(p => { const [a1, b1] = pt(p, R - 14), [a2, b2] = pt(p, R - 8); return `<line x1="${a1.toFixed(1)}" y1="${b1.toFixed(1)}" x2="${a2.toFixed(1)}" y2="${b2.toFixed(1)}" class="vt"/>`; }).join('');
+  const [nx, ny] = pt(Math.min(1, pIn), R - 22);
+  const velo = `<svg viewBox="0 0 190 100" class="velo"><path d="${arc(0, 1)}" class="vb"/>${pIn > 0.002 ? `<path d="${arc(0, Math.min(1, pIn))}" class="vf"/>` : ''}${ticks}
+    <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" class="vn"/><circle cx="${cx}" cy="${cy}" r="5" class="vc"/>
+    </svg>`;
+  // 1) macro: grupos en tarjetas (tono por tamaño) con aviso si ya pasaron su promedio de 3 meses
+  const grupos = Object.entries(c.byGrupo).filter(([, v]) => v > 0).map(([g, v]) => ({ g: L.grupo(g), v, avg: sum(state.categorias.filter(k => L.grupo(k.grupo).id === g).map(k => E.promedioCat(k.id, ui.mes, 3))) })).sort((a, b) => b.v - a.v);
+  const gmx = grupos.length ? grupos[0].v : 1;
+  const gTile = x => { const d = x.avg > 0 ? x.v - x.avg : null; const alto = d != null && d > Math.max(1000, x.avg * 0.1); const bajo = d != null && d < -Math.max(1000, x.avg * 0.1);
+    return `<div class="gt" data-act="filtro" data-id="grupo:${esc(x.g.id)}" style="background:rgba(255,255,255,${(0.05 + 0.20 * Math.pow(x.v / gmx, 0.8)).toFixed(3)})"><span class="n">${esc(x.g.nombre)}</span><b>${M.c(x.v)}</b><span class="p">${M.pct(x.v / tot, 0)} del mes</span><span class="p">${alto ? `<em class="neg">+${M.c(d)} vs promedio</em>` : bajo ? `<em class="pos">−${M.c(-d)} vs promedio</em>` : 'en tu promedio'}</span></div>`; };
+  const macro = `<div class="card ga-g"><div class="ga-t">Por grupo ${infoBtn('Cuánto se fue en cada grupo este mes. En rojo, lo que ya gastaste de más contra tu promedio de los últimos 3 meses; en verde, lo que vas por debajo. Tocá un grupo para ver sus gastos.')}</div><div class="gts">${grupos.map(gTile).join('')}</div></div>`;
+  // 3) ¿hacia falta?: compacto, una linea con un mini velocimetro
+  const neces = `<div class="card ga-nec"><div class="ga-nec-b">${velo}<div class="vl1"><div><b class="in">${M.pct(pIn, 0)} innecesario</b> · ${M.c(byNec[3])} ${infoBtn('Sale de lo que marcás en cada gasto (Necesario, Útil o Innecesario). Al cargar se sugiere según la categoría y lo podés cambiar.')}</div><div class="vl2">Necesario ${M.c(byNec[1])} · Útil ${M.c(byNec[2])}</div></div></div></div>`;
+  // 2) micro: top 3 categorias y el resto en lista (sin repetir el top)
+  const cats = Object.entries(c.byCat).map(([id, v]) => ({ cat: L.cat(id), v })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+  const top = cats.slice(0, 3);
+  const top3 = `<div class="ga-top">${top.map((x, i) => `<div class="card ga-tc" data-act="ver-cat" data-id="${esc(x.cat.id)}"><span class="r">${i + 1}</span><span class="n">${esc(x.cat.nombre)}</span><b>${M.c(x.v)}</b><em>${M.pct(x.v / tot, 0)} del mes</em></div>`).join('')}</div>`;
+  const mx = cats.length ? cats[0].v : 1; const resto = cats.slice(3); const todas = !!ui.gastosTodas; const lista = todas ? resto : resto.slice(0, 6);
+  const tono = v => (0.18 + 0.62 * Math.pow(v / mx, 0.8)).toFixed(3);
+  const donde = !resto.length ? '' : `<div class="card ga-dv"><div class="ga-t">Y el resto</div>${lista.map(x => `<div class="dv" data-act="ver-cat" data-id="${esc(x.cat.id)}"><div class="dv1"><span>${esc(x.cat.nombre)}</span><b>${M.c(x.v)}</b></div><div class="dv2"><span class="dvb"><i style="width:${Math.max(2, x.v / mx * 100).toFixed(1)}%;background:rgba(255,255,255,${tono(x.v)})"></i></span><em>${M.pct(x.v / tot, 0)}</em></div></div>`).join('')}
+    ${resto.length > 6 ? `<button type="button" class="dv-mas" data-act="gastos-todas">${todas ? 'ver menos' : `ver las ${resto.length}`}</button>` : ''}</div>`;
+  return `<div class="ga">${macro}<div class="ga-t ga-sep">Por categoría</div>${top3}${donde}${neces}</div>`;
+}
 function viewMovimientos() {
   const ym = ui.mes; const f = ui.filtros; const c = E.consumo(ym);
   let movs = c.movs;
@@ -377,8 +408,9 @@ function viewMovimientos() {
   const cuotas = sum(movs.filter(m => m.cuotaRow || (m.cuotas || 1) > 1).map(E.rowAmount));
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
-  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} \u00b7 innecesario <b>${M.f(innec)}</b> ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
+  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
     <div class="gh-stats"><div><span>Compras</span><b>${kARS(compras)}</b></div><div><span>Cuotas</span><b>${kARS(cuotas)}</b></div><div><span>Fijos</span><b>${kARS(fijos)}</b></div></div>
+    ${Object.values(f).some(Boolean) ? '' : gastosAnalisis(c)}
     <div class="gh-list">
     ${(() => {
       const chip = (k, v, label) => `<button type="button" data-act="filtro" data-id="${k}:${v}" class="${(f[k] || '') === v ? 'on' : ''}">${esc(label)}</button>`;

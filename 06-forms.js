@@ -22,6 +22,8 @@ const F = {
   select: (id, opts, cur) => `<select class="input" id="${id}">${opts.map(o => `<option value="${o[0]}" ${String(cur) === String(o[0]) ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`,
   choice: (id, opts, cur, cls = '') => `<div class="choice" id="${id}">${opts.map(o => `<button type="button" data-v="${o[0]}" class="${String(cur) === String(o[0]) ? 'on ' + (o[2] || '') : ''}" data-cls="${o[2] || ''}">${esc(o[1])}</button>`).join('')}</div>`,
   catOpts: () => state.categorias.map(c => [c.id, c.nombre]),
+  /** select de categoria agrupado por grupo (optgroup): con 29 categorias la lista plana no se lee */
+  catSelect: (id, cur) => `<select class="input" id="${id}">${GRUPOS.map(g => { const cs = state.categorias.filter(c => (L.grupo(c.grupo).id) === g.id); return cs.length ? `<optgroup label="${esc(g.nombre)}">${cs.map(c => `<option value="${c.id}" ${String(cur) === String(c.id) ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>`,
   medioOpts: () => [...state.tarjetas.map(t => ['t:' + t.id, t.nombre]), ['debito', 'Débito'], ['efectivo', 'Efectivo'], ['transferencia', 'Transf. / MP']],
   medioVal: (m) => m.medio === 'tarjeta' ? 't:' + (m.tarjetaId || (state.tarjetas[0] || {}).id) : (m.medio || 'debito'),
   parseMedio: (v) => v.startsWith('t:') ? { medio: 'tarjeta', tarjetaId: v.slice(2) } : { medio: v, tarjetaId: undefined },
@@ -44,7 +46,7 @@ function formMov(m = null, opts = {}) {
     ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
-    ${F.field('Categoría', `<div class="chips" id="f-catchips">${topCats.map(c => `<button type="button" data-act="pick-cat" data-id="${c.id}" class="${c.id === base.catId ? 'on' : ''}"><i style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</button>`).join('')}</div>${F.select('f-cat', F.catOpts(), base.catId)}`, '', 'full')}
+    ${F.field('Categoría', `<div class="chips" id="f-catchips">${topCats.map(c => `<button type="button" data-act="pick-cat" data-id="${c.id}" class="${c.id === base.catId ? 'on' : ''}"><i style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</button>`).join('')}</div>${F.catSelect('f-cat', base.catId)}`, '', 'full')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date" data-id="ayer">Ayer</button>${F.input('f-fecha', base.fecha, 'type="date"')}</div>`, '', 'full')}
     ${F.field('Medio de pago', F.choice('f-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('Cuotas', `<div class="row" style="gap:6px;flex-wrap:nowrap">${F.choice('f-cuotas', [[1, 'Un pago'], [3, '3'], [6, '6'], [12, '12']], [1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? (base.cuotas || 1) : '')}<input class="input sm mono" id="f-cuotas-n" inputmode="numeric" placeholder="otra" style="width:70px" value="${[1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? '' : base.cuotas}"></div>`, '<span id="f-pago-hint"></span>', 'full')}
@@ -76,7 +78,10 @@ function formMov(m = null, opts = {}) {
     const cid = $('#f-cat').value; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === cid));
   };
   $('#modal').onchange = upd; $('#modal').oninput = e => { if (e.target.id === 'f-monto' || e.target.id === 'f-cuotas-n') upd(); };
-  $('#f-cat').addEventListener('change', () => { $('#f-cat').dataset.touched = '1'; });
+  // "¿Hacia falta?" arranca segun la categoria (esencial -> Necesario, si no Util) mientras no lo toques a mano
+  $('#f-nec').addEventListener('click', e => { if (e.isTrusted) $('#f-nec').dataset.touched = '1'; });
+  const necDeCat = () => { if (!isNew || $('#f-nec').dataset.touched) return; const k = L.cat($('#f-cat').value); const nb = $(`#f-nec button[data-v="${k && k.esencial ? 1 : 2}"]`); if (nb) nb.click(); };
+  $('#f-cat').addEventListener('change', () => { $('#f-cat').dataset.touched = '1'; necDeCat(); });
   $('#f-monto').addEventListener('blur', () => { const el = $('#f-monto'); const v = M.parse(el.value); if (!v) return; el.value = (Modal.choice('f-moneda') || 'ARS') === 'USD' ? String(v).replace('.', ',') : fmtARS.format(v); });
   $('#f-cuotas-n').addEventListener('input', () => { if ($('#f-cuotas-n').value) $$('#f-cuotas button').forEach(b => b.className = ''); });
   $('#f-cuotas').addEventListener('change', () => { $('#f-cuotas-n').value = ''; });
@@ -100,7 +105,7 @@ function formRec(r = null, fromMov = null) {
     ${F.field('Concepto', F.input('r-desc', base.desc || '', 'placeholder="Seguro del auto, Claude, alquiler…" autofocus'), '', 'full')}
     ${F.field('Monto por mes', `<div class="amount-input"><span class="cur">${base.moneda === 'USD' ? 'US$' : '$'}</span><input class="input" id="r-monto" inputmode="decimal" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}"></div>`)}
     ${F.field('Moneda', F.choice('r-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda || 'ARS'))}
-    ${F.field('Categoría', F.select('r-cat', F.catOpts(), base.catId))}
+    ${F.field('Categoría', F.catSelect('r-cat', base.catId))}
     ${F.field('Día del mes', F.input('r-dia', base.dia || 1, 'inputmode="numeric"'))}
     ${F.field('Medio de pago', F.choice('r-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('¿Hacía falta?', F.choice('r-nec', [[1, 'Necesario'], [2, 'Útil'], [3, 'Innecesario', 'n3']], base.necesidad || 1))}
@@ -242,13 +247,14 @@ function formIng() {
 
 /* ---------- categoría ---------- */
 function formCat(c = null) {
-  const base = c || { grupo: 'otros', tipo: 'variable' };
+  const base = c || { grupo: 'otros', tipo: 'variable', esencial: false };
   const body = `<div class="form-grid">
     ${F.field('Nombre', F.input('k-nombre', base.nombre || '', 'autofocus'))}
     ${F.field('Grupo (define el color en los gráficos)', F.select('k-grupo', GRUPOS.map(g => [g.id, g.nombre]), base.grupo))}
     ${F.field('Tipo', F.choice('k-tipo', [['variable', 'Variable'], ['fijo', 'Fijo']], base.tipo))}
+    ${F.field('¿Se puede recortar?', F.choice('k-esencial', [['1', 'Esencial'], ['0', 'Elegible']], base.esencial ? '1' : '0'), 'Esencial: no lo pod\u00e9s evitar (s\u00faper, nafta). Elegible: es donde se puede ahorrar (salidas, antojos, taxis).')}
   </div>`;
-  Modal.open({ title: c ? 'Editar categoría' : 'Nueva categoría', body, onSubmit: () => { const nombre = Modal.val('k-nombre').trim(); if (!nombre) return false; const rec = { id: c ? c.id : 'c_' + uid(), nombre, grupo: Modal.val('k-grupo'), tipo: Modal.choice('k-tipo') || 'variable', presupuesto: c ? c.presupuesto : 0 }; if (c) Object.assign(c, rec); else state.categorias.splice(state.categorias.length - 1, 0, rec); Persist.save(); render(); } });
+  Modal.open({ title: c ? 'Editar categoría' : 'Nueva categoría', body, onSubmit: () => { const nombre = Modal.val('k-nombre').trim(); if (!nombre) return false; const rec = { id: c ? c.id : 'c_' + uid(), nombre, grupo: Modal.val('k-grupo'), tipo: Modal.choice('k-tipo') || 'variable', esencial: Modal.choice('k-esencial') === '1', presupuesto: c ? c.presupuesto : 0 }; if (c) Object.assign(c, rec); else state.categorias.splice(state.categorias.length - 1, 0, rec); Persist.save(); render(); } });
 }
 
 /* ---------- confirm ---------- */

@@ -128,7 +128,7 @@ const E = {
   /** Gasto del mes (devengado): fijos del mes + cuotas que caen en el mes + compras del mes (primera cuota) */
   consumo(ym) {
     const pieces = E.data().pieces.filter(p => p.mesGasto === ym);
-    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0 };
+    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0, esencial: 0, elegible: 0 };
     const dias = D.daysIn(ym);
     for (const p of pieces) {
       const m = p.m; const v = p.montoARS;
@@ -139,6 +139,7 @@ const E = {
       agg.total += v; agg.count++; agg.movs.push(row);
       agg.byCat[m.catId] = (agg.byCat[m.catId] || 0) + v;
       const g = L.grupoDeCat(m.catId).id; agg.byGrupo[g] = (agg.byGrupo[g] || 0) + v;
+      if (L.cat(m.catId).esencial) agg.esencial += v; else agg.elegible += v;
       agg.byNec[m.necesidad || 1] += v;
       agg.byMedio[m.medio] = (agg.byMedio[m.medio] || 0) + v;
       // las cuotas de compras viejas ya estan comprometidas el 1 del mes: si se dibujan en el dia de la compra
@@ -606,7 +607,7 @@ const E = {
   },
   /** Simulate a new purchase in cuotas */
   simular({ monto, moneda, cuotas, tarjetaId, desde }) {
-    const fake = { id: 'sim', fecha: desde ? D.dateIn(desde, 1) : D.today(), monto, moneda, cuotas, medio: tarjetaId ? 'tarjeta' : 'debito', tarjetaId, catId: 'otros', necesidad: 2 };
+    const fake = { id: 'sim', fecha: desde ? D.dateIn(desde, 1) : D.today(), monto, moneda, cuotas, medio: tarjetaId ? 'tarjeta' : 'debito', tarjetaId, catId: 'revisar', necesidad: 2 };
     const pieces = E.expand(fake);
     const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
     return pieces.map(p => {
@@ -618,33 +619,7 @@ const E = {
 };
 
 /* ---------- smart categorization ---------- */
-const DICT = [
-  [/carrefour|coto|dia %|d[ií]a\b|jumbo|disco|vea\b|chango|super|mercado|almacen|verduler|carnicer|panader|chino/, 'super', 1],
-  [/rappi|pedidos ?ya|mcdonald|burger|pizza|sushi|delivery|restaurante|resto\b|parrilla|cafe|caf[eé]|starbucks|helader|empanada/, 'delivery', 2],
-  [/ypf|shell|axion|puma|nafta|combustible|gnc/, 'nafta', 1],
-  [/seguro|patente|service|taller|gomer|lavadero|cochera|peaje|vtv|estacionamiento/, 'auto', 1],
-  [/uber|cabify|didi|sube|colectivo|tren|subte|taxi|remis/, 'transporte', 1],
-  [/edenor|edesur|metrogas|naturgy|aysa|fibertel|personal|claro|movistar|telecentro|flow|internet|luz\b|gas\b|agua\b|celular/, 'servicios', 1],
-  [/netflix|spotify|claude|chatgpt|openai|youtube|disney|hbo|max\b|prime|amazon prime|apple|icloud|google one|suscripci|dropbox|notion|github|steam|playstation|xbox|gym ?pass|canva/, 'subs', 2],
-  [/bar\b|birra|cerveza|boliche|fiesta|salida|cine|teatro|recital|entrada|show|previa|vino/, 'salidas', 3],
-  [/vuelo|aerol|flybondi|jetsmart|latam|hotel|airbnb|booking|despegar|viaje|hostel|pasaje/, 'viajes', 2],
-  [/gimnasio|gym|club|padel|f[uú]tbol|deporte|megatlon|sportclub|crossfit|natacion/, 'deporte', 1],
-  [/farmac|farmacity|m[eé]dico|dentista|odont|obra social|prepaga|osde|swiss|galeno|psic[oó]|kinesi|laborator|hospital|cl[ií]nica/, 'salud', 1],
-  [/curso|udemy|coursera|platzi|libro|librer|universidad|facultad|clase|profesor|ingl[eé]s/, 'educacion', 1],
-  [/zara|nike|adidas|ropa|zapat|remera|jean|camisa|dexter|solido|h&m|uniqlo|calzado|campera/, 'ropa', 2],
-  [/mercado ?libre|meli|fravega|garbarino|musimundo|notebook|celular|iphone|samsung|monitor|auricular|tecnolog|cablecito|cargador/, 'tech', 2],
-  [/regalo|cumple|flores/, 'regalos', 2],
-  [/alquiler|expensas|abl|inmobiliaria/, 'alquiler', 1],
-  [/easy\b|sodimac|ikea|mueble|ferreter|pintur|electrodom|colch[oó]n|s[aá]bana|decor|hogar/, 'hogar', 2],
-  [/asato|sushi|miaokou|anapat|antares|bar\b/, 'salidas', 2],
-  [/del viento|de la colonia|helader|chocolater/, 'delivery', 3],
-  [/puppy|mascota|veterinar|huellas|pet ?shop/, 'mascotas', 1],
-  [/barber|peluquer|safe ?razor|estilo ?barber/, 'personal', 1],
-  [/emova|subte\b/, 'transporte', 1],
-  [/federacion patronal|telepase|axion/, 'auto', 1],
-  [/spot alem|green apple|open ?25|kiosco/, 'delivery', 2],
-  [/afip|arca|monotributo|impuesto|ganancias|iva\b|sellado|comisi[oó]n|mantenimiento de cuenta|banco|interes/, 'impuestos', 1],
-];
+const DICT = CAT_REGLAS;  // una sola lista de reglas: la de la migracion v2 (01-core)
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 const Smart = {
   suggest(desc) {

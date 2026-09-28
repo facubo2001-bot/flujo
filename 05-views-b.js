@@ -195,7 +195,7 @@ function viewConfig() {
   </div>`;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Categorías</h2><button class="btn sm" data-act="new-cat">${ICONS.plus} Categoría</button></div>
-      <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Grupo</th><th>Tipo</th><th></th></tr></thead><tbody>${state.categorias.map(c => { const used = state.movimientos.some(m => m.catId === c.id) || state.recurrentes.some(r => r.catId === c.id); return `<tr><td><span class="row nowrap" style="gap:6px;flex-wrap:nowrap"><i class="swatch" style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</span></td><td class="small">${esc(L.grupo(c.grupo).nombre)}</td><td class="small">${c.tipo}</td><td class="r" style="white-space:nowrap"><button class="mini-btn" data-act="edit-cat" data-id="${c.id}">${ICONS.edit}</button>${!used && c.id !== 'otros' ? `<button class="mini-btn" data-act="del-cat" data-id="${c.id}">${ICONS.trash}</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
+      ${GRUPOS.map(g => { const cs = state.categorias.filter(c => L.grupo(c.grupo).id === g.id); if (!cs.length) return ''; return `<div class="kg"><div class="kg-h">${esc(g.nombre)}</div>${cs.map(c => { const used = state.movimientos.some(m => m.catId === c.id) || state.recurrentes.some(r => r.catId === c.id); return `<div class="kg-r"><span data-act="edit-cat" data-id="${c.id}">${esc(c.nombre)}${c.esencial ? '' : '<i class="eleg">elegible</i>'}</span><span class="kg-b"><button class="mini-btn" data-act="edit-cat" data-id="${c.id}">${ICONS.edit}</button>${!used && c.id !== 'revisar' ? `<button class="mini-btn" data-act="del-cat" data-id="${c.id}">${ICONS.trash}</button>` : ''}</span></div>`; }).join('')}</div>`; }).join('')}
     </div>
     <div class="card"><div class="card-head"><h2>Datos</h2></div>
       <div class="stack">
@@ -362,6 +362,42 @@ function squarify(vals, x, y, w, h) {
   if (fila.length) cerrar(fila);
   return out;
 }
+/** Mapa anidado para "Donde se fue": los grupos son marcos y adentro cada categoria es un bloque del tamaño
+ *  de lo que gastaste. Esencial en gris, elegible (lo que se puede recortar) en celeste: de un vistazo se ve
+ *  cuanta plata se fue en cosas evitables y en cuales. grupos: [{ id, label, v, items: [{ id, label, v, eleg }] }] */
+function mapaAnidado(grupos, alto = 300) {
+  const W = 358, H = alto; const gs = grupos.filter(g => g.v > 0).sort((a, b) => b.v - a.v); if (!gs.length) return '';
+  const tot = sum(gs.map(g => g.v)); const maxCat = Math.max(...gs.flatMap(g => g.items.map(it => it.v)), 1);
+  // tono por tamaño en todo el mapa: lo que mas pesa, mas claro; lo chico, oscuro (Facu: aplica a todos los bloques)
+  const tono = v => (0.07 + 0.30 * Math.pow(Math.min(1, v / maxCat), 0.8)).toFixed(3);
+  const outer = squarify(gs.map(g => g.v / tot * W * H), 0, 0, W, H);
+  const pct = (v, T) => (v / T * 100).toFixed(3);
+  let html = '';
+  gs.forEach((g, i) => {
+    const [x, y, w, h] = outer[i];
+    const cab = w >= 56 && h >= 58; const hh = cab ? 20 : 0; const pad = 3;
+    const nombre = w < 130 ? g.label.split(' ')[0] : g.label;
+    html += `<div class="nm-g" style="left:${pct(x, W)}%;top:${pct(y, H)}%;width:${pct(w, W)}%;height:${pct(h, H)}%">${cab ? `<div class="nm-gh"><span>${esc(nombre)}</span>${w >= 96 ? `<b>${M.c(g.v)}</b>` : ''}</div>` : ''}</div>`;
+    // categorias dentro del marco: las que quedarian en un bloque ilegible (< ~48x48) se juntan en "+N"
+    const ix = x + pad, iy = y + hh + pad, iw = Math.max(1, w - 2 * pad), ih = Math.max(1, h - hh - 2 * pad);
+    const its = g.items.filter(it => it.v > 0).sort((a, b) => b.v - a.v);
+    const area = it => it.v / g.v * iw * ih;
+    const chicos = its.filter(it => area(it) < 2300);
+    const juntar = chicos.length > 1 || (chicos.length === 1 && area(chicos[0]) < 1200 && its.length > 1);
+    const grandes = juntar ? its.filter(it => !chicos.includes(it)) : its;
+    const lista = juntar ? [...grandes, { id: null, label: `+${chicos.length} m\u00e1s`, v: sum(chicos.map(c => c.v)), eleg: chicos.every(c => c.eleg), resto: chicos.map(c => `${c.label} ${M.c(c.v)}`).join(' \u00b7 ') }] : grandes;
+    const inner = squarify(lista.map(it => it.v / g.v * iw * ih), ix, iy, iw, ih);
+    const corto = t => String(t).replace(/\s*\(.*\)\s*$/, '').split(',')[0];
+    lista.forEach((it, j) => {
+      const [cx, cy, cw, ch] = inner[j];
+      const t = ch < 34 || cw < 46 ? 'xs' : ch < 50 || cw < 84 ? 's' : ch < 72 ? 'm' : '';
+      const act = it.id ? ` data-act="ver-cat" data-id="${esc(it.id)}"` : '';
+      html += `<div class="nm-c ${t}" style="left:${pct(cx, W)}%;top:${pct(cy, H)}%;width:${pct(cw, W)}%;height:${pct(ch, H)}%"${act} title="${esc(it.resto || it.label)}"><div style="background:rgba(255,255,255,${tono(it.v)})">${t === 'xs' ? '' : `<span>${esc(corto(it.label))}</span>`}${t === 'xs' && (cw < 40 || ch < 24) ? '' : `<b>${M.c(it.v)}</b>`}</div></div>`;
+    });
+    if (!cab) html += `<div class="nm-tag" style="left:${pct(x, W)}%;top:${pct(y, H)}%">${esc(g.label.split(' ')[0])}</div>`;
+  });
+  return `<div class="nmap" style="height:${alto}px">${html}</div>`;
+}
 function mapaBloques(items, otras = null) {
   const top = items.filter(it => it.peso > 0).sort((a, b) => b.peso - a.peso).slice(0, 9); if (!top.length) return '';
   const tot = sum(top.map(it => it.peso)); const mx = top[0].peso;
@@ -369,18 +405,19 @@ function mapaBloques(items, otras = null) {
   const bs = top.map((it, i) => {
     const [x, y, w, h] = rects[i];
     // tono por peso (no por puesto): el mas pesado casi blanco, el mas liviano gris oscuro
-    const a = 0.16 + 0.78 * Math.pow(it.peso / mx, 0.85);
-    const oscuro = a >= 0.55;
+    // bloque oscuro con tinte por peso (el mas pesado mas claro) y texto siempre blanco: se lee mejor que el gris lavado
+    const a = 0.07 + 0.23 * Math.pow(it.peso / mx, 0.9);
+    const oscuro = false;
     // bloques chicos: primero se cae la cifra de la derecha, despues todo va en un renglon;
     // el nombre achica la letra hasta entrar (nunca "ME...")
     const tam = h < 40 ? 'fila' : w < 84 ? 'ang' : w < 118 || h < 60 ? 's' : '';
-    const conDer = tam === '' || (tam === 's' && w >= 132);
+    const conDer = (tam === '' && w >= 150) || (tam === 's' && w >= 150);
     const base = tam === '' ? 16 : tam === 's' ? 14 : 13;
-    const fs = Math.max(10, Math.min(base, Math.floor((w * 0.9 - (tam === 'fila' ? 44 : 14)) / (String(it.label).length * 0.72))));
+    const fs = Math.max(10, Math.min(base, Math.floor((w * 0.88 - (tam === 'fila' ? 44 : 16)) / (String(it.label).length * 0.8))));
     const pos = `left:${(x / CMAP_W * 100).toFixed(3)}%;top:${(y / CMAP_H * 100).toFixed(3)}%;width:${(w / CMAP_W * 100).toFixed(3)}%;height:${(h / CMAP_H * 100).toFixed(3)}%`;
     const act = it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}"` : '';
-    return `<div class="cmap-c" style="${pos}"><div class="cmap-b ${tam}"${act} style="background:rgba(255,255,255,${a.toFixed(3)});color:${oscuro ? 'var(--on-fill)' : '#FFFFFF'}">
-      <b style="font-size:${fs}px">${esc(it.label)}</b><span class="n"><i>${M.pct(it.peso, 1)}</i>${conDer ? `<em>${it.der || ''}</em>` : ''}</span></div></div>`;
+    return `<div class="cmap-c" style="${pos}"><div class="cmap-b ${tam} ${it.sel ? 'sel' : ''}"${act} style="background:rgba(255,255,255,${a.toFixed(3)});color:#FFFFFF">
+      <b style="font-size:${fs}px">${esc(it.label)}</b><span class="n"><i>${M.pct(it.peso, 1)}</i>${conDer ? `<em class="${it.derCls || ''}">${it.der || ''}</em>` : ''}</span></div></div>`;
   }).join('');
   const franja = otras && otras.n ? `<div class="cmap-otras"${otras.act ? ` data-act="${otras.act}" role="button" style="cursor:pointer"` : ''}><span>${esc(otras.label)}</span><span>${otras.der != null ? otras.der : M.pct(otras.peso, 1)}</span></div>` : '';
   return `<div class="cmap"><div class="cmap-area">${bs}</div>${franja}</div>`;
@@ -398,7 +435,7 @@ function mapaCartera(k) {
   const franja = resto.length ? { n: resto.length, peso: pesoResto, label: todas ? `Otras ${resto.length} \u00b7 ocultar` : `Otras ${resto.length} ${resto.length === 1 ? 'posici\u00f3n' : 'posiciones'} \u00b7 ver`, act: 'cmap-todas' } : null;
   const mx = Math.max(...resto.map(p => p.peso || 0), 0.0001);
   const lista = todas ? `<div class="cmap-lista">${resto.map(p => `<div class="cl-r" data-act="pos" data-id="${esc(p.ticker)}"><b>${esc(p.ticker)}</b><span class="cl-bar"><i style="width:${Math.max(2, Math.round((p.peso || 0) / mx * 100))}%"></i></span><span class="cl-p">${M.pct(p.peso, 1)}</span><span class="cl-d">${dpTxt(p)}</span></div>`).join('')}</div>` : '';
-  return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), act: 'pos', id: p.ticker })), franja) + lista;
+  return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), derCls: p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : '', act: 'pos', id: p.ticker })), franja) + lista;
 }
 
 function renderEvolucion(k, seg) {

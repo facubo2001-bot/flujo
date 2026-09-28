@@ -998,6 +998,107 @@ h2 .i-btn{vertical-align:3px}
 #modal.ficha .fp-pos .ft b{font-size:16.5px}
 .fund .rg{margin-bottom:6px}
 
+/* Donde se fue: esencial / elegible, bloques por grupo y detalle del grupo */
+.ee{margin-bottom:12px}
+.ee-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.06);gap:2px}
+.ee-bar i{display:block;height:100%} .ee-bar i.e{background:rgba(255,255,255,.55)} .ee-bar i.l{background:var(--accent)}
+.ee-leg{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:12.5px;color:var(--ink-3)}
+.ee-leg b{color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums} .ee-leg .l b{color:var(--accent)}
+.cmap-b.sel{box-shadow:0 0 0 2px var(--accent) inset}
+.gdet{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.gdet-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.gdet-h b{font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:-.02em}
+.gdet-h .mono{font-size:18px;font-weight:800}
+.gdet-s{font-size:13px;color:var(--ink-3);margin:2px 0 6px}
+.gdet-s .neg,.gc .neg{color:var(--crit-text);font-weight:700} .gdet-s .pos,.gc .pos{color:var(--good-text);font-weight:700}
+.gc{padding:8px 0;cursor:pointer}
+.gc-1{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.gc-1 span{font-size:15px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gc-1 b{font-size:15px;font-weight:800;white-space:nowrap}
+.gc-1 .eleg{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-left:8px;vertical-align:1px}
+.gc-2{display:flex;align-items:center;gap:10px;margin-top:5px}
+.gc-bar{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
+.gc-bar i{display:block;height:100%;background:rgba(255,255,255,.55);border-radius:2px} .gc-bar i.l{background:var(--accent)}
+.gc-p{font-size:12.5px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.kg{margin-top:6px}.kg+.kg{margin-top:12px}
+.kg-h{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.kg-r{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;font-size:15px}
+.kg-r>span:first-child{cursor:pointer;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kg-r .eleg{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-left:8px}
+.kg-b{display:flex;gap:2px;flex:none}
+
+/* Donde se fue: mapa anidado */
+.nmap{position:relative;margin:2px -2px 0}
+.nm-g{position:absolute;box-sizing:border-box;padding:0;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.025)}
+.nm-gh{display:flex;justify-content:space-between;gap:6px;align-items:baseline;padding:4px 8px 0;height:20px;box-sizing:border-box;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:800;white-space:nowrap;overflow:hidden}
+.nm-gh span{overflow:hidden;text-overflow:ellipsis} .nm-gh b{color:var(--ink-2);letter-spacing:0;font-variant-numeric:tabular-nums}
+.nm-c{position:absolute;box-sizing:border-box;padding:2px;cursor:pointer}
+.nm-c>div{width:100%;height:100%;border-radius:8px;background:rgba(255,255,255,.12);padding:7px 8px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.nm-c.eleg>div{background:rgba(45,226,240,.22);box-shadow:inset 0 0 0 1px rgba(45,226,240,.35)}
+.nm-c span{font-size:12px;line-height:1.15;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nm-c b{font-size:16px;font-weight:900;letter-spacing:-.02em;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.nm-c.eleg b{color:#E8FDFF}
+.nm-c.s>div{padding:5px 6px}.nm-c.s span{font-size:10.5px;-webkit-line-clamp:1}.nm-c.s b{font-size:12.5px}
+.nm-c.xs>div{padding:3px 5px;justify-content:center}.nm-c.xs b{font-size:10px}
+.nm-tag{position:absolute;transform:translate(6px,-8px);font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);background:var(--bg);padding:0 4px;pointer-events:none}
+.nm-leg{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ink-3)}
+.nm-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(255,255,255,.18);margin-right:6px;vertical-align:-1px}
+.nm-leg .l i{background:rgba(45,226,240,.4)}
+
+/* composicion: bloques oscuros, texto blanco, % grande */
+.cmap-b{border:1px solid rgba(255,255,255,.07)}
+.cmap-b b{font-size:17px}
+.cmap-b .n i{opacity:1;font-size:1.15em;font-weight:900}
+.cmap-b .n em{opacity:1} .cmap-b .n em.up{color:var(--good-text)} .cmap-b .n em.down{color:var(--crit-text)}
+.cmap-b.sel{box-shadow:0 0 0 2px var(--accent) inset}
+.nm-c.m span{-webkit-line-clamp:1}
+
+/* Gastos: analisis del mes arriba de la lista */
+.ga{display:flex;flex-direction:column;gap:12px;margin:14px 0 6px}
+.ga .card{margin:0}
+.ga-t{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:800;margin-bottom:8px}
+.ga-nec-b{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.velo{width:100%;max-width:200px;display:block}
+.velo .vb{fill:none;stroke:rgba(255,255,255,.10);stroke-width:12;stroke-linecap:round}
+.velo .vf{fill:none;stroke:var(--accent);stroke-width:12;stroke-linecap:round}
+.velo .vt{stroke:rgba(255,255,255,.35);stroke-width:1.5}
+.velo .vn{stroke:var(--ink);stroke-width:3;stroke-linecap:round} .velo .vc{fill:var(--ink)}
+.velo .vv{fill:var(--accent);font-family:var(--font-display);font-weight:900;font-size:24px;letter-spacing:-.02em}
+.velo .vl{fill:var(--ink-3);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.vrs{display:flex;flex-direction:column;gap:8px;min-width:132px}
+.vr{display:grid;grid-template-columns:auto auto;gap:0 10px;align-items:baseline}
+.vr span{grid-column:1/-1;font-size:11.5px;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase;font-weight:700}
+.vr b{font-size:17px;font-weight:900;font-variant-numeric:tabular-nums} .vr em{font-style:normal;font-size:12.5px;color:var(--ink-3);text-align:right}
+.vr.in span,.vr.in b{color:var(--accent)}
+.ga-top{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ga-tc{padding:10px 10px 11px!important;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0}
+.ga-tc .r{font-size:11px;font-weight:900;color:var(--ink-3)}
+.ga-tc .n{font-size:13px;line-height:1.2;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:31px}
+.ga-tc b{font-size:18px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ga-tc em{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+.dv{padding:7px 0;cursor:pointer}
+.dv1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.dv1 span{font-size:14.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv1 b{font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dv2{display:flex;align-items:center;gap:10px;margin-top:4px}
+.dvb{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}.dvb i{display:block;height:100%;border-radius:3px}
+.dv2 em{font-style:normal;font-size:12px;color:var(--ink-3);min-width:32px;text-align:right;font-variant-numeric:tabular-nums}
+.dv-mas{margin-top:6px;background:none;border:0;color:var(--accent);font:inherit;font-size:13px;text-decoration:underline;padding:4px 0;cursor:pointer}
+
+/* Gastos: grupos (macro) con presencia y "¿hacia falta?" compacto */
+.gts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gt{border-radius:12px;padding:10px 12px 11px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0;border:1px solid rgba(255,255,255,.06)}
+.gt .n{font-size:13px;color:var(--ink-2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gt b{font-size:22px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.gt .p{font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gt em{font-style:normal;font-weight:800} .gt em.neg{color:var(--crit-text)} .gt em.pos{color:var(--good-text)}
+.ga-nec{padding:10px 14px!important}
+.ga-nec .ga-nec-b{grid-template-columns:70px minmax(0,1fr);gap:12px}
+.ga-nec .velo{max-width:70px}
+.vl1{font-size:14px;color:var(--ink-2)} .vl1 b.in{color:var(--accent);font-weight:900}
+.vl2{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+.ga-sep{margin:4px 0 -4px 2px}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1145,40 +1246,111 @@ const M = {
 };
 
 /* ---------- default data ---------- */
+/* Categorias v2 (27-sep, con los gastos reales de Facu): dos niveles. El GRUPO es la pregunta macro
+ * ("¿cuanto se va en comida?") y la CATEGORIA el detalle ("¿y de eso cuanto en antojos?").
+ * Cada categoria dice si es esencial o elegible: la parte elegible es donde se puede ahorrar. */
 const GRUPOS = [
-  { id: 'hogar',     nombre: 'Hogar y vivienda',   slot: 1 },
-  { id: 'comida',    nombre: 'Comida',             slot: 2 },
-  { id: 'auto',      nombre: 'Auto y transporte',  slot: 3 },
-  { id: 'servicios', nombre: 'Servicios y subs',   slot: 4 },
-  { id: 'ocio',      nombre: 'Ocio y viajes',      slot: 5 },
-  { id: 'compras',   nombre: 'Compras',            slot: 6 },
-  { id: 'salud',     nombre: 'Salud y educación',  slot: 7 },
-  { id: 'otros',     nombre: 'Otros',              slot: 8 },
+  { id: 'comida',    nombre: 'Comida',           slot: 1 },
+  { id: 'movilidad', nombre: 'Movilidad',        slot: 2 },
+  { id: 'salud',     nombre: 'Salud y cuidado',  slot: 3 },
+  { id: 'ocio',      nombre: 'Ocio',             slot: 4 },
+  { id: 'compras',   nombre: 'Compras',          slot: 5 },
+  { id: 'fijos',     nombre: 'Fijos y digital',  slot: 6 },
+  { id: 'otros',     nombre: 'Otros',            slot: 8 },
 ];
+// [id, nombre, grupo, tipo, esencial]
 const DEFAULT_CATS = [
-  ['alquiler',   'Alquiler / expensas', 'hogar', 'fijo'],
-  ['hogar',      'Casa y muebles',      'hogar', 'variable'],
-  ['super',      'Supermercado',        'comida', 'variable'],
-  ['delivery',   'Delivery y comida afuera', 'comida', 'variable'],
-  ['nafta',      'Nafta',               'auto', 'variable'],
-  ['auto',       'Auto (seguro, service, patente)', 'auto', 'fijo'],
-  ['transporte', 'Transporte público / Uber', 'auto', 'variable'],
-  ['servicios',  'Luz, gas, agua, internet, celu', 'servicios', 'fijo'],
-  ['subs',       'Suscripciones',       'servicios', 'fijo'],
-  ['salidas',    'Salidas y bares',     'ocio', 'variable'],
-  ['viajes',     'Viajes',              'ocio', 'variable'],
-  ['deporte',    'Deporte y gimnasio',  'salud', 'fijo'],
-  ['salud',      'Salud y farmacia',    'salud', 'variable'],
-  ['educacion',  'Educación y libros',  'salud', 'variable'],
-  ['mascotas',   'Mascotas',            'hogar', 'variable'],
-  ['personal',   'Cuidado personal',    'salud', 'variable'],
-  ['ropa',       'Ropa y calzado',      'compras', 'variable'],
-  ['compras_otros', 'Compras online (ML y otros)', 'compras', 'variable'],
-  ['tech',       'Tecnología',          'compras', 'variable'],
-  ['regalos',    'Regalos',             'compras', 'variable'],
-  ['impuestos',  'Impuestos y bancos',  'otros', 'fijo'],
-  ['otros',      'Otros',               'otros', 'variable'],
-].map(([id, nombre, grupo, tipo]) => ({ id, nombre, grupo, tipo, presupuesto: 0 }));
+  ['super',          'Supermercado',                 'comida',    'variable', 1],
+  ['comida_trabajo', 'Comida del trabajo',           'comida',    'variable', 1],
+  ['restaurantes',   'Restaurantes y parrillas',     'comida',    'variable', 0],
+  ['fastfood',       'Delivery y fast food',         'comida',    'variable', 0],
+  ['antojos',        'Cafés, kioscos y antojos',     'comida',    'variable', 0],
+  ['nafta',          'Nafta',                        'movilidad', 'variable', 1],
+  ['auto',           'Seguro y mantenimiento del auto', 'movilidad', 'fijo',  1],
+  ['peajes',         'Peajes y estacionamiento',     'movilidad', 'variable', 1],
+  ['transporte',     'Transporte público',           'movilidad', 'variable', 1],
+  ['taxi',           'Taxis (Uber, Cabify)',         'movilidad', 'variable', 0],
+  ['medicos',        'Médicos, estudios y óptica',   'salud',     'variable', 1],
+  ['farmacia',       'Farmacia',                     'salud',     'variable', 1],
+  ['peluqueria',     'Peluquería',                   'salud',     'variable', 1],
+  ['personal',       'Cuidado personal',             'salud',     'variable', 1],
+  ['gimnasio',       'Gimnasio y suplementos',       'salud',     'variable', 0],
+  ['odi',            'Odi (perro)',                  'salud',     'variable', 1],
+  ['bares',          'Bares y noche',                'ocio',      'variable', 0],
+  ['river',          'River',                        'ocio',      'variable', 0],
+  ['entretenimiento','Cine y entretenimiento',       'ocio',      'variable', 0],
+  ['viajes',         'Viajes y escapadas',           'ocio',      'variable', 0],
+  ['regalos',        'Regalos',                      'ocio',      'variable', 0],
+  ['ropa',           'Ropa y calzado',               'compras',   'variable', 0],
+  ['tech',           'Tecnología',                   'compras',   'variable', 0],
+  ['casa',           'Casa y deco',                  'compras',   'variable', 0],
+  ['compras_otros',  'Otras compras (ML, AliExpress)', 'compras', 'variable', 0],
+  ['servicios',      'Teléfono y servicios',         'fijos',     'fijo',     1],
+  ['subs',           'Claude y suscripciones',       'fijos',     'fijo',     0],
+  ['impuestos',      'Impuestos y percepciones',     'fijos',     'fijo',     1],
+  ['revisar',        'Otros',                        'otros',     'variable', 0],
+].map(([id, nombre, grupo, tipo, esencial]) => ({ id, nombre, grupo, tipo, esencial: !!esencial, presupuesto: 0 }));
+/** reglas por descripcion (texto normalizado, sin acentos): las usan la migracion a v2 y las sugerencias al cargar.
+ *  Van de lo especifico a lo general: la primera que matchea gana. */
+const CAT_REGLAS = [
+  [/\bodi\b|\bperro\b|huellas|puppy|curupet|veterinar|mascota|pet ?shop/, 'odi', 1],
+  [/afeitar|safe ?razor|maquinita|crema|perfum|desodor|shampoo/, 'personal', 1],
+  [/barber|peluquer/, 'peluqueria', 1],
+  [/farmac|farmacity/, 'farmacia', 1],
+  [/optica|oculus|medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
+  [/suplement|proteina|creatina|whey|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel/, 'gimnasio', 2],
+  [/comida (del )?laburo|morfi (del )?laburo|almuerzo (del )?laburo|vianda/, 'comida_trabajo', 1],
+  [/uber|cabify|didi|taxi|remis/, 'taxi', 2],
+  [/subte|emova|\bsube\b|colectivo|\btren\b/, 'transporte', 1],
+  [/telepase|peaje|ausa|autopista|park ?work|estacionamiento|cochera/, 'peajes', 1],
+  [/nafta|axion|\bypf\b|shell|puma energy|combustible|\bgnc\b/, 'nafta', 1],
+  [/federacion patronal|seguro (del )?auto|auto ?partes|repuesto|patente|\bvtv\b|service|taller|gomeria|lavadero/, 'auto', 1],
+  [/river|\bcarp\b/, 'river', 2],
+  [/helad|chocolat|kiosco|kiosko|golosin|gomitas|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|starbucks|havanna|alfajor/, 'antojos', 3],
+  [/mcdonald|burger|\bmc\b|pedidos ?ya|rappi|\bwtb\b|mostaza|pizza|empanada|delivery/, 'fastfood', 2],
+  [/asato|anapat|franks|mooi|miaokou|mostrador|lanelly|parrilla|restaurant|resto\b|sushi|cena|asado|almuerzo/, 'restaurantes', 2],
+  [/antares|\bbar\b|jobs bar|bar jps|cerveza|birra|boliche|salida con|campari|vermouth|fernet|previa/, 'bares', 3],
+  [/\bcine\b|teatro|recital|show|entrada/, 'entretenimiento', 3],
+  [/hotel|lucania|vuelo|aerol|flybondi|jetsmart|airbnb|booking|despegar|hostel|pasaje/, 'viajes', 2],
+  [/regalo|cumple|flores/, 'regalos', 2],
+  [/personal telefono|\btelefono\b|internet|edenor|edesur|metrogas|naturgy|aysa|fibertel|telecentro|movistar|claro\b|\bluz\b|\bgas\b/, 'servicios', 1],
+  [/claude|anthropic|chatgpt|openai|netflix|spotify|youtube|disney|\bhbo\b|icloud|google one|suscripci/, 'subs', 2],
+  [/percepci|impuesto|reembolso|comision|mantenimiento de cuenta|\biva\b|sellado|afip|arca/, 'impuestos', 1],
+  [/stanley|vinilo|sodimac|easy\b|ikea|mueble|ferreter|pintur|decor|colchon|sabana/, 'casa', 2],
+  [/zara|nike|adidas|dexter|campero|alpargatas|bowie|ropa|zapat|remera|jean|camisa|calzado|campera|solido|uniqlo/, 'ropa', 2],
+  [/monitor|notebook|celular|iphone|samsung|auricular|cargador|tecnolog|portal insumos|fravega|garbarino|musimundo/, 'tech', 2],
+  [/aliexpress|\bchina\b|mercado ?libre|amazon|temu|shein/, 'compras_otros', 2],
+  [/jumbo|carrefour|coto|\bdia\b|disco|\bvea\b|chango|super|almacen|verduler|carniceria|panaderia|tienda molinos|nestle/, 'super', 1],
+];
+/** migracion de categorias v1 -> v2: se reclasifica cada gasto, fijo y aprendido de las categorias viejas por defecto
+ *  (primero por su descripcion, si no por la equivalencia vieja->nueva). Las categorias propias se conservan. */
+const CAT_V1_A_V2 = { super: 'super', delivery: 'fastfood', salidas: 'restaurantes', nafta: 'nafta', auto: 'auto', transporte: 'transporte', subs: 'subs', deporte: 'gimnasio', salud: 'medicos', personal: 'personal', mascotas: 'odi', ropa: 'ropa', tech: 'tech', hogar: 'casa', compras_otros: 'compras_otros', regalos: 'regalos', viajes: 'viajes', impuestos: 'impuestos', otros: 'revisar', servicios: 'servicios', alquiler: 'alquiler', educacion: 'educacion' };
+const GRUPO_V1_A_V2 = { hogar: 'fijos', comida: 'comida', auto: 'movilidad', servicios: 'fijos', ocio: 'ocio', compras: 'compras', salud: 'salud', otros: 'otros' };
+const normTxt = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+function catPorRegla(desc) { const d = ' ' + normTxt(desc) + ' '; for (const [re, cat, nec] of CAT_REGLAS) if (re.test(d)) return { catId: cat, necesidad: nec }; return null; }
+function migrarCategoriasV2(s) {
+  if (Number(s.settings.catsV) >= 2) return;
+  const viejas = s.categorias || [];
+  const idsV1 = new Set(Object.keys(CAT_V1_A_V2));
+  const esV1 = viejas.some(c => ['delivery', 'salidas', 'mascotas', 'otros', 'hogar', 'deporte'].includes(c.id));
+  if (!esV1) { s.settings.catsV = 2; return; }
+  const nueva = (desc, catId) => { if (!idsV1.has(catId)) return catId; const r = catPorRegla(desc); return r ? r.catId : CAT_V1_A_V2[catId]; };
+  const usadas = new Set();
+  for (const m of s.movimientos || []) { m.catId = nueva(m.desc, m.catId); usadas.add(m.catId); }
+  for (const r of s.recurrentes || []) { r.catId = nueva(r.desc, r.catId); usadas.add(r.catId); }
+  for (const [d, a] of Object.entries(s.aprendido || {})) if (a && a.catId) a.catId = nueva(d, a.catId);
+  const cats = DEFAULT_CATS.map(c => ({ ...c }));
+  // presupuestos por categoria: el de la vieja pasa a su equivalente
+  for (const v of viejas) if (idsV1.has(v.id) && Number(v.presupuesto)) { const k = cats.find(c => c.id === CAT_V1_A_V2[v.id]); if (k) k.presupuesto = (Number(k.presupuesto) || 0) + Number(v.presupuesto); }
+  // alquiler / educacion (viejas sin equivalente) solo quedan si se usan; las propias se conservan con su grupo nuevo
+  for (const v of viejas) {
+    if (cats.find(c => c.id === v.id)) continue;
+    if (idsV1.has(v.id) && !['alquiler', 'educacion'].includes(v.id)) continue;
+    if (['alquiler', 'educacion'].includes(v.id) && !usadas.has(v.id)) continue;
+    cats.splice(cats.length - 1, 0, { ...v, grupo: GRUPO_V1_A_V2[v.grupo] || (GRUPOS.find(g => g.id === v.grupo) ? v.grupo : 'otros'), esencial: v.esencial != null ? !!v.esencial : v.tipo === 'fijo' });
+  }
+  s.categorias = cats; s.settings.catsV = 2;
+}
 
 const NECESIDAD = { 1: 'Necesario', 2: 'Útil', 3: 'Innecesario' };
 /** Un solo umbral para "% del presupuesto", en todas las vistas: verde < 40 %, ambar 40-60 %, rojo > 60 %.
@@ -1204,14 +1376,14 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280002';
+const BUILD = '202609280106';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
 /* ---------- lookups ---------- */
 const L = {
   cat(id) { return state.categorias.find(c => c.id === id) || state.categorias[state.categorias.length - 1]; },
-  grupo(id) { return GRUPOS.find(g => g.id === id) || GRUPOS[7]; },
+  grupo(id) { return GRUPOS.find(g => g.id === id) || GRUPOS[GRUPOS.length - 1]; },
   grupoDeCat(catId) { return L.grupo(L.cat(catId).grupo); },
   slotColor(slot) { return slot >= 8 ? 'var(--c-otras)' : `var(--c${slot})`; },
   catColor(catId) { return L.slotColor(L.grupoDeCat(catId).slot); },
@@ -1304,6 +1476,8 @@ const Persist = {
     for (const a of Object.values(s.cartera.alertas)) if (a && typeof a === 'object' && !a.desc && a.nota && String(a.nota).includes(' | ')) { const t = String(a.nota), i = t.indexOf(' | '); a.desc = t.slice(0, i).trim().slice(0, 120) || null; a.nota = t.slice(i + 3).trim() || null; }
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
+    migrarCategoriasV2(s);
+    for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
   },
@@ -2094,7 +2268,7 @@ const E = {
   /** Gasto del mes (devengado): fijos del mes + cuotas que caen en el mes + compras del mes (primera cuota) */
   consumo(ym) {
     const pieces = E.data().pieces.filter(p => p.mesGasto === ym);
-    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0 };
+    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0, esencial: 0, elegible: 0 };
     const dias = D.daysIn(ym);
     for (const p of pieces) {
       const m = p.m; const v = p.montoARS;
@@ -2105,6 +2279,7 @@ const E = {
       agg.total += v; agg.count++; agg.movs.push(row);
       agg.byCat[m.catId] = (agg.byCat[m.catId] || 0) + v;
       const g = L.grupoDeCat(m.catId).id; agg.byGrupo[g] = (agg.byGrupo[g] || 0) + v;
+      if (L.cat(m.catId).esencial) agg.esencial += v; else agg.elegible += v;
       agg.byNec[m.necesidad || 1] += v;
       agg.byMedio[m.medio] = (agg.byMedio[m.medio] || 0) + v;
       // las cuotas de compras viejas ya estan comprometidas el 1 del mes: si se dibujan en el dia de la compra
@@ -2572,7 +2747,7 @@ const E = {
   },
   /** Simulate a new purchase in cuotas */
   simular({ monto, moneda, cuotas, tarjetaId, desde }) {
-    const fake = { id: 'sim', fecha: desde ? D.dateIn(desde, 1) : D.today(), monto, moneda, cuotas, medio: tarjetaId ? 'tarjeta' : 'debito', tarjetaId, catId: 'otros', necesidad: 2 };
+    const fake = { id: 'sim', fecha: desde ? D.dateIn(desde, 1) : D.today(), monto, moneda, cuotas, medio: tarjetaId ? 'tarjeta' : 'debito', tarjetaId, catId: 'revisar', necesidad: 2 };
     const pieces = E.expand(fake);
     const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
     return pieces.map(p => {
@@ -2584,33 +2759,7 @@ const E = {
 };
 
 /* ---------- smart categorization ---------- */
-const DICT = [
-  [/carrefour|coto|dia %|d[ií]a\b|jumbo|disco|vea\b|chango|super|mercado|almacen|verduler|carnicer|panader|chino/, 'super', 1],
-  [/rappi|pedidos ?ya|mcdonald|burger|pizza|sushi|delivery|restaurante|resto\b|parrilla|cafe|caf[eé]|starbucks|helader|empanada/, 'delivery', 2],
-  [/ypf|shell|axion|puma|nafta|combustible|gnc/, 'nafta', 1],
-  [/seguro|patente|service|taller|gomer|lavadero|cochera|peaje|vtv|estacionamiento/, 'auto', 1],
-  [/uber|cabify|didi|sube|colectivo|tren|subte|taxi|remis/, 'transporte', 1],
-  [/edenor|edesur|metrogas|naturgy|aysa|fibertel|personal|claro|movistar|telecentro|flow|internet|luz\b|gas\b|agua\b|celular/, 'servicios', 1],
-  [/netflix|spotify|claude|chatgpt|openai|youtube|disney|hbo|max\b|prime|amazon prime|apple|icloud|google one|suscripci|dropbox|notion|github|steam|playstation|xbox|gym ?pass|canva/, 'subs', 2],
-  [/bar\b|birra|cerveza|boliche|fiesta|salida|cine|teatro|recital|entrada|show|previa|vino/, 'salidas', 3],
-  [/vuelo|aerol|flybondi|jetsmart|latam|hotel|airbnb|booking|despegar|viaje|hostel|pasaje/, 'viajes', 2],
-  [/gimnasio|gym|club|padel|f[uú]tbol|deporte|megatlon|sportclub|crossfit|natacion/, 'deporte', 1],
-  [/farmac|farmacity|m[eé]dico|dentista|odont|obra social|prepaga|osde|swiss|galeno|psic[oó]|kinesi|laborator|hospital|cl[ií]nica/, 'salud', 1],
-  [/curso|udemy|coursera|platzi|libro|librer|universidad|facultad|clase|profesor|ingl[eé]s/, 'educacion', 1],
-  [/zara|nike|adidas|ropa|zapat|remera|jean|camisa|dexter|solido|h&m|uniqlo|calzado|campera/, 'ropa', 2],
-  [/mercado ?libre|meli|fravega|garbarino|musimundo|notebook|celular|iphone|samsung|monitor|auricular|tecnolog|cablecito|cargador/, 'tech', 2],
-  [/regalo|cumple|flores/, 'regalos', 2],
-  [/alquiler|expensas|abl|inmobiliaria/, 'alquiler', 1],
-  [/easy\b|sodimac|ikea|mueble|ferreter|pintur|electrodom|colch[oó]n|s[aá]bana|decor|hogar/, 'hogar', 2],
-  [/asato|sushi|miaokou|anapat|antares|bar\b/, 'salidas', 2],
-  [/del viento|de la colonia|helader|chocolater/, 'delivery', 3],
-  [/puppy|mascota|veterinar|huellas|pet ?shop/, 'mascotas', 1],
-  [/barber|peluquer|safe ?razor|estilo ?barber/, 'personal', 1],
-  [/emova|subte\b/, 'transporte', 1],
-  [/federacion patronal|telepase|axion/, 'auto', 1],
-  [/spot alem|green apple|open ?25|kiosco/, 'delivery', 2],
-  [/afip|arca|monotributo|impuesto|ganancias|iva\b|sellado|comisi[oó]n|mantenimiento de cuenta|banco|interes/, 'impuestos', 1],
-];
+const DICT = CAT_REGLAS;  // una sola lista de reglas: la de la migracion v2 (01-core)
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 const Smart = {
   suggest(desc) {
@@ -3066,23 +3215,22 @@ function viewResumen() {
 
   // insights + donut
   const ins = Insights.build(ym);
-  const grupos = Object.entries(c.byGrupo).map(([g, v]) => ({ name: L.grupo(g).nombre, value: v, color: L.slotColor(L.grupo(g).slot), id: g })).sort((a, b) => b.value - a.value);
+  const grupos = Object.entries(c.byGrupo).map(([g, v]) => ({ name: L.grupo(g).nombre, value: v, id: g })).sort((a, b) => b.value - a.value);
+  // --- Donde se fue: mapa anidado (grupo = marco, categoria = bloque del tamaño de lo gastado)
+  const tot = c.total || 0;
+  let dondeHTML = '';
+  if (grupos.length && tot > 0) {
+    const gdat = grupos.map(g => ({ id: g.id, label: g.name, v: g.value, items: Object.entries(c.byCat).filter(([id]) => L.cat(id).grupo === g.id).map(([id, v]) => ({ id, label: L.cat(id).nombre, v, eleg: !L.cat(id).esencial })) }));
+    dondeHTML = mapaAnidado(gdat, 360);
+  } else dondeHTML = empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ym)}`, sub: 'Cuando cargues gastos, acá ves en qué se fue la plata.' });
   html += `<div class="grid g-21 section">
     <div class="card"><div class="card-head"><h2>Lectura del mes</h2><span class="hint">Alertas y patrones calculados sobre tus datos</span></div>${renderInsights(ins)}</div>
-    <div class="card"><div class="card-head"><h2>Dónde se fue</h2><span class="hint">${D.monthName(ym)}</span></div>
-      ${grupos.length ? (() => { const tot = c.total || 1; const big = grupos.filter(g => g.value / tot >= 0.05), chicos = grupos.filter(g => g.value / tot < 0.05); const resto = sum(chicos.map(g => g.value));
-        // lo que pesa menos de 5 % no entra al mapa (quedaba una tira de 20 px ilegible): va en la franja de abajo
-        return mapaBloques(big.map(g => ({ label: g.name.split(' ')[0], peso: g.value / tot, der: M.c(g.value) })), chicos.length ? { n: chicos.length, peso: resto / tot, label: chicos.length === 1 ? chicos[0].name : `Otros ${chicos.length} \u00b7 ${chicos.map(g => g.name.split(' ')[0]).join(', ')}`, der: `${M.pct(resto / tot, 1)} \u00b7 ${M.c(resto)}` } : null); })() : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
-    </div>
+    <div class="card"><div class="card-head"><h2>Dónde se fue ${infoBtn('Cada marco es un grupo (Comida, Movilidad…) y cada bloque adentro, una categoría: el tamaño es lo que gastaste y cuanto más claro, más pesó. Tocá un bloque para ver esos gastos.')}</h2><span class="hint">${D.monthName(ym)}</span></div>${dondeHTML}</div>
   </div>`;
 
-  // categorías + horizonte
-  const cats = Object.entries(c.byCat).map(([id, v]) => ({ cat: L.cat(id), v, avg: E.promedioCat(id, ym, 3) })).sort((a, b) => b.v - a.v);
+  // horizonte
   const hz = E.horizonte(D.thisMonth(), 12); const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
   html += `<div class="grid g-2 section">
-    <div class="card"><div class="card-head"><h2>Por categoría</h2><span class="hint">Barra = vs presupuesto o promedio 3 meses</span></div>
-      ${cats.length ? cats.slice(0, 9).map(({ cat, v, avg }) => { const ref = cat.presupuesto || avg || v; const r = v / (ref || 1); const sobre = avg > 0 && v > avg * 1.001; return `<div class="meter-row"><div class="l"><span>${esc(cat.nombre)}</span>${cat.presupuesto ? `<span class="pill ${r > 1 ? 'crit' : r > .8 ? 'warn' : 'neutral'}" style="font-size:10.5px">${r > 1 ? `+${M.pct(r - 1, 0)}` : M.pct(r)}</span>` : ''}</div><div class="v"><b class="mono">${M.f(v)}</b>${cat.presupuesto ? ` <span class="muted">/ ${M.c(cat.presupuesto)}</span>` : avg ? ` <span class="muted">prom. ${M.c(avg)}</span>` : ''}</div><div class="meter neutral ${sobre ? 'warn' : ''}"><i style="width:${clamp(r * 100, 2, 100)}%"></i>${!cat.presupuesto && avg ? `<span class="mark" style="left:${clamp(avg / Math.max(v, avg) * 100, 0, 100)}%"></span>` : ''}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
-    </div>
     <div class="card"><div class="card-head"><h2>Próximos 12 meses</h2><span class="hint">Fijos + cuotas ya comprometidos vs presupuesto</span></div>
       ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 230)}
       ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }, { name: `Alerta ${M.pct(alerta)}`, color: 'var(--warn)', kind: 'dash' }])}
@@ -3281,6 +3429,38 @@ function renderMovTable(movs, opts = {}) {
   </tbody></table></div>`;
 }
 
+/** Arriba de la lista de Gastos: velocimetro de cuanto fue innecesario, top 3 categorias y a donde se va la plata.
+ *  Todo sale de "¿Hacia falta?" de cada gasto (se sugiere por la categoria y se puede cambiar a mano). */
+function gastosAnalisis(c) {
+  const tot = c.total || 0; if (tot <= 0) return '';
+  const byNec = { 1: 0, 2: 0, 3: 0 }; for (const m of c.movs) byNec[m.necesidad || 1] += E.rowAmount(m);
+  const pIn = byNec[3] / tot;
+  // velocimetro: 0 = nada innecesario, 100 = todo innecesario
+  const R = 78, cx = 95, cy = 88; const ang = p => Math.PI * (1 - p); const pt = (p, r = R) => [cx + r * Math.cos(ang(p)), cy - r * Math.sin(ang(p))];
+  const arc = (p0, p1) => { const [x0, y0] = pt(p0), [x1, y1] = pt(p1); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(p => { const [a1, b1] = pt(p, R - 14), [a2, b2] = pt(p, R - 8); return `<line x1="${a1.toFixed(1)}" y1="${b1.toFixed(1)}" x2="${a2.toFixed(1)}" y2="${b2.toFixed(1)}" class="vt"/>`; }).join('');
+  const [nx, ny] = pt(Math.min(1, pIn), R - 22);
+  const velo = `<svg viewBox="0 0 190 100" class="velo"><path d="${arc(0, 1)}" class="vb"/>${pIn > 0.002 ? `<path d="${arc(0, Math.min(1, pIn))}" class="vf"/>` : ''}${ticks}
+    <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" class="vn"/><circle cx="${cx}" cy="${cy}" r="5" class="vc"/>
+    </svg>`;
+  // 1) macro: grupos en tarjetas (tono por tamaño) con aviso si ya pasaron su promedio de 3 meses
+  const grupos = Object.entries(c.byGrupo).filter(([, v]) => v > 0).map(([g, v]) => ({ g: L.grupo(g), v, avg: sum(state.categorias.filter(k => L.grupo(k.grupo).id === g).map(k => E.promedioCat(k.id, ui.mes, 3))) })).sort((a, b) => b.v - a.v);
+  const gmx = grupos.length ? grupos[0].v : 1;
+  const gTile = x => { const d = x.avg > 0 ? x.v - x.avg : null; const alto = d != null && d > Math.max(1000, x.avg * 0.1); const bajo = d != null && d < -Math.max(1000, x.avg * 0.1);
+    return `<div class="gt" data-act="filtro" data-id="grupo:${esc(x.g.id)}" style="background:rgba(255,255,255,${(0.05 + 0.20 * Math.pow(x.v / gmx, 0.8)).toFixed(3)})"><span class="n">${esc(x.g.nombre)}</span><b>${M.c(x.v)}</b><span class="p">${M.pct(x.v / tot, 0)} del mes</span><span class="p">${alto ? `<em class="neg">+${M.c(d)} vs promedio</em>` : bajo ? `<em class="pos">−${M.c(-d)} vs promedio</em>` : 'en tu promedio'}</span></div>`; };
+  const macro = `<div class="card ga-g"><div class="ga-t">Por grupo ${infoBtn('Cuánto se fue en cada grupo este mes. En rojo, lo que ya gastaste de más contra tu promedio de los últimos 3 meses; en verde, lo que vas por debajo. Tocá un grupo para ver sus gastos.')}</div><div class="gts">${grupos.map(gTile).join('')}</div></div>`;
+  // 3) ¿hacia falta?: compacto, una linea con un mini velocimetro
+  const neces = `<div class="card ga-nec"><div class="ga-nec-b">${velo}<div class="vl1"><div><b class="in">${M.pct(pIn, 0)} innecesario</b> · ${M.c(byNec[3])} ${infoBtn('Sale de lo que marcás en cada gasto (Necesario, Útil o Innecesario). Al cargar se sugiere según la categoría y lo podés cambiar.')}</div><div class="vl2">Necesario ${M.c(byNec[1])} · Útil ${M.c(byNec[2])}</div></div></div></div>`;
+  // 2) micro: top 3 categorias y el resto en lista (sin repetir el top)
+  const cats = Object.entries(c.byCat).map(([id, v]) => ({ cat: L.cat(id), v })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+  const top = cats.slice(0, 3);
+  const top3 = `<div class="ga-top">${top.map((x, i) => `<div class="card ga-tc" data-act="ver-cat" data-id="${esc(x.cat.id)}"><span class="r">${i + 1}</span><span class="n">${esc(x.cat.nombre)}</span><b>${M.c(x.v)}</b><em>${M.pct(x.v / tot, 0)} del mes</em></div>`).join('')}</div>`;
+  const mx = cats.length ? cats[0].v : 1; const resto = cats.slice(3); const todas = !!ui.gastosTodas; const lista = todas ? resto : resto.slice(0, 6);
+  const tono = v => (0.18 + 0.62 * Math.pow(v / mx, 0.8)).toFixed(3);
+  const donde = !resto.length ? '' : `<div class="card ga-dv"><div class="ga-t">Y el resto</div>${lista.map(x => `<div class="dv" data-act="ver-cat" data-id="${esc(x.cat.id)}"><div class="dv1"><span>${esc(x.cat.nombre)}</span><b>${M.c(x.v)}</b></div><div class="dv2"><span class="dvb"><i style="width:${Math.max(2, x.v / mx * 100).toFixed(1)}%;background:rgba(255,255,255,${tono(x.v)})"></i></span><em>${M.pct(x.v / tot, 0)}</em></div></div>`).join('')}
+    ${resto.length > 6 ? `<button type="button" class="dv-mas" data-act="gastos-todas">${todas ? 'ver menos' : `ver las ${resto.length}`}</button>` : ''}</div>`;
+  return `<div class="ga">${macro}<div class="ga-t ga-sep">Por categoría</div>${top3}${donde}${neces}</div>`;
+}
 function viewMovimientos() {
   const ym = ui.mes; const f = ui.filtros; const c = E.consumo(ym);
   let movs = c.movs;
@@ -3296,8 +3476,9 @@ function viewMovimientos() {
   const cuotas = sum(movs.filter(m => m.cuotaRow || (m.cuotas || 1) > 1).map(E.rowAmount));
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
-  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} \u00b7 innecesario <b>${M.f(innec)}</b> ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
+  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
     <div class="gh-stats"><div><span>Compras</span><b>${kARS(compras)}</b></div><div><span>Cuotas</span><b>${kARS(cuotas)}</b></div><div><span>Fijos</span><b>${kARS(fijos)}</b></div></div>
+    ${Object.values(f).some(Boolean) ? '' : gastosAnalisis(c)}
     <div class="gh-list">
     ${(() => {
       const chip = (k, v, label) => `<button type="button" data-act="filtro" data-id="${k}:${v}" class="${(f[k] || '') === v ? 'on' : ''}">${esc(label)}</button>`;
@@ -3577,7 +3758,7 @@ function viewConfig() {
   </div>`;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Categorías</h2><button class="btn sm" data-act="new-cat">${ICONS.plus} Categoría</button></div>
-      <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Grupo</th><th>Tipo</th><th></th></tr></thead><tbody>${state.categorias.map(c => { const used = state.movimientos.some(m => m.catId === c.id) || state.recurrentes.some(r => r.catId === c.id); return `<tr><td><span class="row nowrap" style="gap:6px;flex-wrap:nowrap"><i class="swatch" style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</span></td><td class="small">${esc(L.grupo(c.grupo).nombre)}</td><td class="small">${c.tipo}</td><td class="r" style="white-space:nowrap"><button class="mini-btn" data-act="edit-cat" data-id="${c.id}">${ICONS.edit}</button>${!used && c.id !== 'otros' ? `<button class="mini-btn" data-act="del-cat" data-id="${c.id}">${ICONS.trash}</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
+      ${GRUPOS.map(g => { const cs = state.categorias.filter(c => L.grupo(c.grupo).id === g.id); if (!cs.length) return ''; return `<div class="kg"><div class="kg-h">${esc(g.nombre)}</div>${cs.map(c => { const used = state.movimientos.some(m => m.catId === c.id) || state.recurrentes.some(r => r.catId === c.id); return `<div class="kg-r"><span data-act="edit-cat" data-id="${c.id}">${esc(c.nombre)}${c.esencial ? '' : '<i class="eleg">elegible</i>'}</span><span class="kg-b"><button class="mini-btn" data-act="edit-cat" data-id="${c.id}">${ICONS.edit}</button>${!used && c.id !== 'revisar' ? `<button class="mini-btn" data-act="del-cat" data-id="${c.id}">${ICONS.trash}</button>` : ''}</span></div>`; }).join('')}</div>`; }).join('')}
     </div>
     <div class="card"><div class="card-head"><h2>Datos</h2></div>
       <div class="stack">
@@ -3744,6 +3925,42 @@ function squarify(vals, x, y, w, h) {
   if (fila.length) cerrar(fila);
   return out;
 }
+/** Mapa anidado para "Donde se fue": los grupos son marcos y adentro cada categoria es un bloque del tamaño
+ *  de lo que gastaste. Esencial en gris, elegible (lo que se puede recortar) en celeste: de un vistazo se ve
+ *  cuanta plata se fue en cosas evitables y en cuales. grupos: [{ id, label, v, items: [{ id, label, v, eleg }] }] */
+function mapaAnidado(grupos, alto = 300) {
+  const W = 358, H = alto; const gs = grupos.filter(g => g.v > 0).sort((a, b) => b.v - a.v); if (!gs.length) return '';
+  const tot = sum(gs.map(g => g.v)); const maxCat = Math.max(...gs.flatMap(g => g.items.map(it => it.v)), 1);
+  // tono por tamaño en todo el mapa: lo que mas pesa, mas claro; lo chico, oscuro (Facu: aplica a todos los bloques)
+  const tono = v => (0.07 + 0.30 * Math.pow(Math.min(1, v / maxCat), 0.8)).toFixed(3);
+  const outer = squarify(gs.map(g => g.v / tot * W * H), 0, 0, W, H);
+  const pct = (v, T) => (v / T * 100).toFixed(3);
+  let html = '';
+  gs.forEach((g, i) => {
+    const [x, y, w, h] = outer[i];
+    const cab = w >= 56 && h >= 58; const hh = cab ? 20 : 0; const pad = 3;
+    const nombre = w < 130 ? g.label.split(' ')[0] : g.label;
+    html += `<div class="nm-g" style="left:${pct(x, W)}%;top:${pct(y, H)}%;width:${pct(w, W)}%;height:${pct(h, H)}%">${cab ? `<div class="nm-gh"><span>${esc(nombre)}</span>${w >= 96 ? `<b>${M.c(g.v)}</b>` : ''}</div>` : ''}</div>`;
+    // categorias dentro del marco: las que quedarian en un bloque ilegible (< ~48x48) se juntan en "+N"
+    const ix = x + pad, iy = y + hh + pad, iw = Math.max(1, w - 2 * pad), ih = Math.max(1, h - hh - 2 * pad);
+    const its = g.items.filter(it => it.v > 0).sort((a, b) => b.v - a.v);
+    const area = it => it.v / g.v * iw * ih;
+    const chicos = its.filter(it => area(it) < 2300);
+    const juntar = chicos.length > 1 || (chicos.length === 1 && area(chicos[0]) < 1200 && its.length > 1);
+    const grandes = juntar ? its.filter(it => !chicos.includes(it)) : its;
+    const lista = juntar ? [...grandes, { id: null, label: `+${chicos.length} m\u00e1s`, v: sum(chicos.map(c => c.v)), eleg: chicos.every(c => c.eleg), resto: chicos.map(c => `${c.label} ${M.c(c.v)}`).join(' \u00b7 ') }] : grandes;
+    const inner = squarify(lista.map(it => it.v / g.v * iw * ih), ix, iy, iw, ih);
+    const corto = t => String(t).replace(/\s*\(.*\)\s*$/, '').split(',')[0];
+    lista.forEach((it, j) => {
+      const [cx, cy, cw, ch] = inner[j];
+      const t = ch < 34 || cw < 46 ? 'xs' : ch < 50 || cw < 84 ? 's' : ch < 72 ? 'm' : '';
+      const act = it.id ? ` data-act="ver-cat" data-id="${esc(it.id)}"` : '';
+      html += `<div class="nm-c ${t}" style="left:${pct(cx, W)}%;top:${pct(cy, H)}%;width:${pct(cw, W)}%;height:${pct(ch, H)}%"${act} title="${esc(it.resto || it.label)}"><div style="background:rgba(255,255,255,${tono(it.v)})">${t === 'xs' ? '' : `<span>${esc(corto(it.label))}</span>`}${t === 'xs' && (cw < 40 || ch < 24) ? '' : `<b>${M.c(it.v)}</b>`}</div></div>`;
+    });
+    if (!cab) html += `<div class="nm-tag" style="left:${pct(x, W)}%;top:${pct(y, H)}%">${esc(g.label.split(' ')[0])}</div>`;
+  });
+  return `<div class="nmap" style="height:${alto}px">${html}</div>`;
+}
 function mapaBloques(items, otras = null) {
   const top = items.filter(it => it.peso > 0).sort((a, b) => b.peso - a.peso).slice(0, 9); if (!top.length) return '';
   const tot = sum(top.map(it => it.peso)); const mx = top[0].peso;
@@ -3751,18 +3968,19 @@ function mapaBloques(items, otras = null) {
   const bs = top.map((it, i) => {
     const [x, y, w, h] = rects[i];
     // tono por peso (no por puesto): el mas pesado casi blanco, el mas liviano gris oscuro
-    const a = 0.16 + 0.78 * Math.pow(it.peso / mx, 0.85);
-    const oscuro = a >= 0.55;
+    // bloque oscuro con tinte por peso (el mas pesado mas claro) y texto siempre blanco: se lee mejor que el gris lavado
+    const a = 0.07 + 0.23 * Math.pow(it.peso / mx, 0.9);
+    const oscuro = false;
     // bloques chicos: primero se cae la cifra de la derecha, despues todo va en un renglon;
     // el nombre achica la letra hasta entrar (nunca "ME...")
     const tam = h < 40 ? 'fila' : w < 84 ? 'ang' : w < 118 || h < 60 ? 's' : '';
-    const conDer = tam === '' || (tam === 's' && w >= 132);
+    const conDer = (tam === '' && w >= 150) || (tam === 's' && w >= 150);
     const base = tam === '' ? 16 : tam === 's' ? 14 : 13;
-    const fs = Math.max(10, Math.min(base, Math.floor((w * 0.9 - (tam === 'fila' ? 44 : 14)) / (String(it.label).length * 0.72))));
+    const fs = Math.max(10, Math.min(base, Math.floor((w * 0.88 - (tam === 'fila' ? 44 : 16)) / (String(it.label).length * 0.8))));
     const pos = `left:${(x / CMAP_W * 100).toFixed(3)}%;top:${(y / CMAP_H * 100).toFixed(3)}%;width:${(w / CMAP_W * 100).toFixed(3)}%;height:${(h / CMAP_H * 100).toFixed(3)}%`;
     const act = it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}"` : '';
-    return `<div class="cmap-c" style="${pos}"><div class="cmap-b ${tam}"${act} style="background:rgba(255,255,255,${a.toFixed(3)});color:${oscuro ? 'var(--on-fill)' : '#FFFFFF'}">
-      <b style="font-size:${fs}px">${esc(it.label)}</b><span class="n"><i>${M.pct(it.peso, 1)}</i>${conDer ? `<em>${it.der || ''}</em>` : ''}</span></div></div>`;
+    return `<div class="cmap-c" style="${pos}"><div class="cmap-b ${tam} ${it.sel ? 'sel' : ''}"${act} style="background:rgba(255,255,255,${a.toFixed(3)});color:#FFFFFF">
+      <b style="font-size:${fs}px">${esc(it.label)}</b><span class="n"><i>${M.pct(it.peso, 1)}</i>${conDer ? `<em class="${it.derCls || ''}">${it.der || ''}</em>` : ''}</span></div></div>`;
   }).join('');
   const franja = otras && otras.n ? `<div class="cmap-otras"${otras.act ? ` data-act="${otras.act}" role="button" style="cursor:pointer"` : ''}><span>${esc(otras.label)}</span><span>${otras.der != null ? otras.der : M.pct(otras.peso, 1)}</span></div>` : '';
   return `<div class="cmap"><div class="cmap-area">${bs}</div>${franja}</div>`;
@@ -3780,7 +3998,7 @@ function mapaCartera(k) {
   const franja = resto.length ? { n: resto.length, peso: pesoResto, label: todas ? `Otras ${resto.length} \u00b7 ocultar` : `Otras ${resto.length} ${resto.length === 1 ? 'posici\u00f3n' : 'posiciones'} \u00b7 ver`, act: 'cmap-todas' } : null;
   const mx = Math.max(...resto.map(p => p.peso || 0), 0.0001);
   const lista = todas ? `<div class="cmap-lista">${resto.map(p => `<div class="cl-r" data-act="pos" data-id="${esc(p.ticker)}"><b>${esc(p.ticker)}</b><span class="cl-bar"><i style="width:${Math.max(2, Math.round((p.peso || 0) / mx * 100))}%"></i></span><span class="cl-p">${M.pct(p.peso, 1)}</span><span class="cl-d">${dpTxt(p)}</span></div>`).join('')}</div>` : '';
-  return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), act: 'pos', id: p.ticker })), franja) + lista;
+  return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), derCls: p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : '', act: 'pos', id: p.ticker })), franja) + lista;
 }
 
 function renderEvolucion(k, seg) {
@@ -3919,6 +4137,8 @@ const F = {
   select: (id, opts, cur) => `<select class="input" id="${id}">${opts.map(o => `<option value="${o[0]}" ${String(cur) === String(o[0]) ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`,
   choice: (id, opts, cur, cls = '') => `<div class="choice" id="${id}">${opts.map(o => `<button type="button" data-v="${o[0]}" class="${String(cur) === String(o[0]) ? 'on ' + (o[2] || '') : ''}" data-cls="${o[2] || ''}">${esc(o[1])}</button>`).join('')}</div>`,
   catOpts: () => state.categorias.map(c => [c.id, c.nombre]),
+  /** select de categoria agrupado por grupo (optgroup): con 29 categorias la lista plana no se lee */
+  catSelect: (id, cur) => `<select class="input" id="${id}">${GRUPOS.map(g => { const cs = state.categorias.filter(c => (L.grupo(c.grupo).id) === g.id); return cs.length ? `<optgroup label="${esc(g.nombre)}">${cs.map(c => `<option value="${c.id}" ${String(cur) === String(c.id) ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>`,
   medioOpts: () => [...state.tarjetas.map(t => ['t:' + t.id, t.nombre]), ['debito', 'Débito'], ['efectivo', 'Efectivo'], ['transferencia', 'Transf. / MP']],
   medioVal: (m) => m.medio === 'tarjeta' ? 't:' + (m.tarjetaId || (state.tarjetas[0] || {}).id) : (m.medio || 'debito'),
   parseMedio: (v) => v.startsWith('t:') ? { medio: 'tarjeta', tarjetaId: v.slice(2) } : { medio: v, tarjetaId: undefined },
@@ -3941,7 +4161,7 @@ function formMov(m = null, opts = {}) {
     ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
-    ${F.field('Categoría', `<div class="chips" id="f-catchips">${topCats.map(c => `<button type="button" data-act="pick-cat" data-id="${c.id}" class="${c.id === base.catId ? 'on' : ''}"><i style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</button>`).join('')}</div>${F.select('f-cat', F.catOpts(), base.catId)}`, '', 'full')}
+    ${F.field('Categoría', `<div class="chips" id="f-catchips">${topCats.map(c => `<button type="button" data-act="pick-cat" data-id="${c.id}" class="${c.id === base.catId ? 'on' : ''}"><i style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</button>`).join('')}</div>${F.catSelect('f-cat', base.catId)}`, '', 'full')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date" data-id="ayer">Ayer</button>${F.input('f-fecha', base.fecha, 'type="date"')}</div>`, '', 'full')}
     ${F.field('Medio de pago', F.choice('f-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('Cuotas', `<div class="row" style="gap:6px;flex-wrap:nowrap">${F.choice('f-cuotas', [[1, 'Un pago'], [3, '3'], [6, '6'], [12, '12']], [1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? (base.cuotas || 1) : '')}<input class="input sm mono" id="f-cuotas-n" inputmode="numeric" placeholder="otra" style="width:70px" value="${[1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? '' : base.cuotas}"></div>`, '<span id="f-pago-hint"></span>', 'full')}
@@ -3973,7 +4193,10 @@ function formMov(m = null, opts = {}) {
     const cid = $('#f-cat').value; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === cid));
   };
   $('#modal').onchange = upd; $('#modal').oninput = e => { if (e.target.id === 'f-monto' || e.target.id === 'f-cuotas-n') upd(); };
-  $('#f-cat').addEventListener('change', () => { $('#f-cat').dataset.touched = '1'; });
+  // "¿Hacia falta?" arranca segun la categoria (esencial -> Necesario, si no Util) mientras no lo toques a mano
+  $('#f-nec').addEventListener('click', e => { if (e.isTrusted) $('#f-nec').dataset.touched = '1'; });
+  const necDeCat = () => { if (!isNew || $('#f-nec').dataset.touched) return; const k = L.cat($('#f-cat').value); const nb = $(`#f-nec button[data-v="${k && k.esencial ? 1 : 2}"]`); if (nb) nb.click(); };
+  $('#f-cat').addEventListener('change', () => { $('#f-cat').dataset.touched = '1'; necDeCat(); });
   $('#f-monto').addEventListener('blur', () => { const el = $('#f-monto'); const v = M.parse(el.value); if (!v) return; el.value = (Modal.choice('f-moneda') || 'ARS') === 'USD' ? String(v).replace('.', ',') : fmtARS.format(v); });
   $('#f-cuotas-n').addEventListener('input', () => { if ($('#f-cuotas-n').value) $$('#f-cuotas button').forEach(b => b.className = ''); });
   $('#f-cuotas').addEventListener('change', () => { $('#f-cuotas-n').value = ''; });
@@ -3997,7 +4220,7 @@ function formRec(r = null, fromMov = null) {
     ${F.field('Concepto', F.input('r-desc', base.desc || '', 'placeholder="Seguro del auto, Claude, alquiler…" autofocus'), '', 'full')}
     ${F.field('Monto por mes', `<div class="amount-input"><span class="cur">${base.moneda === 'USD' ? 'US$' : '$'}</span><input class="input" id="r-monto" inputmode="decimal" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}"></div>`)}
     ${F.field('Moneda', F.choice('r-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda || 'ARS'))}
-    ${F.field('Categoría', F.select('r-cat', F.catOpts(), base.catId))}
+    ${F.field('Categoría', F.catSelect('r-cat', base.catId))}
     ${F.field('Día del mes', F.input('r-dia', base.dia || 1, 'inputmode="numeric"'))}
     ${F.field('Medio de pago', F.choice('r-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('¿Hacía falta?', F.choice('r-nec', [[1, 'Necesario'], [2, 'Útil'], [3, 'Innecesario', 'n3']], base.necesidad || 1))}
@@ -4139,13 +4362,14 @@ function formIng() {
 
 /* ---------- categoría ---------- */
 function formCat(c = null) {
-  const base = c || { grupo: 'otros', tipo: 'variable' };
+  const base = c || { grupo: 'otros', tipo: 'variable', esencial: false };
   const body = `<div class="form-grid">
     ${F.field('Nombre', F.input('k-nombre', base.nombre || '', 'autofocus'))}
     ${F.field('Grupo (define el color en los gráficos)', F.select('k-grupo', GRUPOS.map(g => [g.id, g.nombre]), base.grupo))}
     ${F.field('Tipo', F.choice('k-tipo', [['variable', 'Variable'], ['fijo', 'Fijo']], base.tipo))}
+    ${F.field('¿Se puede recortar?', F.choice('k-esencial', [['1', 'Esencial'], ['0', 'Elegible']], base.esencial ? '1' : '0'), 'Esencial: no lo pod\u00e9s evitar (s\u00faper, nafta). Elegible: es donde se puede ahorrar (salidas, antojos, taxis).')}
   </div>`;
-  Modal.open({ title: c ? 'Editar categoría' : 'Nueva categoría', body, onSubmit: () => { const nombre = Modal.val('k-nombre').trim(); if (!nombre) return false; const rec = { id: c ? c.id : 'c_' + uid(), nombre, grupo: Modal.val('k-grupo'), tipo: Modal.choice('k-tipo') || 'variable', presupuesto: c ? c.presupuesto : 0 }; if (c) Object.assign(c, rec); else state.categorias.splice(state.categorias.length - 1, 0, rec); Persist.save(); render(); } });
+  Modal.open({ title: c ? 'Editar categoría' : 'Nueva categoría', body, onSubmit: () => { const nombre = Modal.val('k-nombre').trim(); if (!nombre) return false; const rec = { id: c ? c.id : 'c_' + uid(), nombre, grupo: Modal.val('k-grupo'), tipo: Modal.choice('k-tipo') || 'variable', esencial: Modal.choice('k-esencial') === '1', presupuesto: c ? c.presupuesto : 0 }; if (c) Object.assign(c, rec); else state.categorias.splice(state.categorias.length - 1, 0, rec); Persist.save(); render(); } });
 }
 
 /* ---------- confirm ---------- */
@@ -5144,7 +5368,11 @@ function cargarDemo() {
   s.inversiones = months.filter(m => m < ymNow).map(m => ({ id: uid(), fecha: D.dateIn(m, 3), monto: between(400, 700), moneda: 'USD', destino: 'Balanz', desc: 'CEDEARs / ONs' }));
   s.inversiones.push({ id: uid(), fecha: D.dateIn(D.addMonths(ymNow, -1), 15), monto: 150000, moneda: 'ARS', destino: 'BTC', desc: 'Compra mensual' });
   const jun = months.find(m => m.endsWith('-06') || m.endsWith('-12')); if (jun) s.ingresos.push({ id: uid(), fecha: D.dateIn(jun, 30), monto: 1150000, moneda: 'ARS', desc: 'Aguinaldo' });
-  s.categorias.find(c => c.id === 'delivery').presupuesto = 120000; s.categorias.find(c => c.id === 'salidas').presupuesto = 180000; s.categorias.find(c => c.id === 'super').presupuesto = 400000;
+  // el demo se escribio con las categorias v1: se pasa por la misma migracion que los datos reales
+  s.categorias = [...s.categorias, { id: 'delivery', nombre: 'Delivery', grupo: 'comida', tipo: 'variable' }, { id: 'salidas', nombre: 'Salidas', grupo: 'ocio', tipo: 'variable' }]; delete s.settings.catsV;
+  migrarCategoriasV2(s);
+  const pres = (id, v) => { const c = s.categorias.find(k => k.id === id); if (c) c.presupuesto = v; };
+  pres('restaurantes', 180000); pres('fastfood', 120000); pres('super', 400000);
   s.pagos = [{ tarjetaId: 't_visa', mes: ymNow, cuentaId: 'a1', pagado: true }, { tarjetaId: 't_master', mes: ymNow, cuentaId: 'a1', pagado: false }];
   state = s; state.updatedAt = Date.now();
 }
@@ -5293,6 +5521,9 @@ const Actions = {
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
+  'gastos-todas'() { ui.gastosTodas = !ui.gastosTodas; render(); },
+  'grupo-sel'(id) { ui.grupoSel = id; render(); },
+  'ver-cat'(id) { ui.filtros = { ...(ui.filtros || {}), cat: id }; go('movimientos'); },
   'tj-sel'(id) { ui.resCard = id; ui.resMes = null; render(); },
   'cq-mes'(i) { ui.cqMes = Number(i); render(); },
   'ir-alertas'() { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
@@ -5327,7 +5558,7 @@ const Actions = {
   'pick-destino'(d) { const el = $('#i-destino'); if (el) el.value = d; },
   'set-date-inv'(v) { const f = $('#i-fecha'); if (f) f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); },
   'set-date'(v) { const f = $('#f-fecha'); if (f) { f.value = v === 'hoy' ? D.today() : D.addDays(D.today(), -1); f.dispatchEvent(new Event('change', { bubbles: true })); } },
-  'pick-cat'(id) { const s = $('#f-cat'); if (s) { s.value = id; s.dataset.touched = '1'; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === id)); } },
+  'pick-cat'(id) { const s = $('#f-cat'); if (s) { s.value = id; s.dispatchEvent(new Event('change', { bubbles: true })); s.dataset.touched = '1'; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === id)); } },
   close() { Modal.close(); },
   submit() { Modal.submit(); },
   reload() { location.reload(); },
@@ -5424,7 +5655,7 @@ function importarCSV(txt) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) continue;
     const monto = Math.abs(M.parse(c[iM])); if (!monto) continue;
     const desc = (iD >= 0 ? c[iD] : 'Importado').trim(); const s = Smart.suggest(desc);
-    let catId = s ? s.catId : 'otros'; if (iC >= 0 && c[iC]) { const found = state.categorias.find(k => norm(k.nombre) === norm(c[iC]) || k.id === norm(c[iC])); if (found) catId = found.id; }
+    let catId = s ? s.catId : 'revisar'; if (iC >= 0 && c[iC]) { const found = state.categorias.find(k => norm(k.nombre) === norm(c[iC]) || k.id === norm(c[iC])); if (found) catId = found.id; }
     state.movimientos.push({ id: uid(), fecha, desc, monto, moneda: 'ARS', catId, medio: state.tarjetas.length ? 'tarjeta' : 'debito', tarjetaId: (state.tarjetas[0] || {}).id, necesidad: s ? s.necesidad : 2, cuotas: iQ >= 0 ? Number(c[iQ]) || 1 : 1 }); n++;
   }
   Persist.save(); toast(`${n} movimientos importados`); go('movimientos');

@@ -106,40 +106,111 @@ const M = {
 };
 
 /* ---------- default data ---------- */
+/* Categorias v2 (27-sep, con los gastos reales de Facu): dos niveles. El GRUPO es la pregunta macro
+ * ("¿cuanto se va en comida?") y la CATEGORIA el detalle ("¿y de eso cuanto en antojos?").
+ * Cada categoria dice si es esencial o elegible: la parte elegible es donde se puede ahorrar. */
 const GRUPOS = [
-  { id: 'hogar',     nombre: 'Hogar y vivienda',   slot: 1 },
-  { id: 'comida',    nombre: 'Comida',             slot: 2 },
-  { id: 'auto',      nombre: 'Auto y transporte',  slot: 3 },
-  { id: 'servicios', nombre: 'Servicios y subs',   slot: 4 },
-  { id: 'ocio',      nombre: 'Ocio y viajes',      slot: 5 },
-  { id: 'compras',   nombre: 'Compras',            slot: 6 },
-  { id: 'salud',     nombre: 'Salud y educación',  slot: 7 },
-  { id: 'otros',     nombre: 'Otros',              slot: 8 },
+  { id: 'comida',    nombre: 'Comida',           slot: 1 },
+  { id: 'movilidad', nombre: 'Movilidad',        slot: 2 },
+  { id: 'salud',     nombre: 'Salud y cuidado',  slot: 3 },
+  { id: 'ocio',      nombre: 'Ocio',             slot: 4 },
+  { id: 'compras',   nombre: 'Compras',          slot: 5 },
+  { id: 'fijos',     nombre: 'Fijos y digital',  slot: 6 },
+  { id: 'otros',     nombre: 'Otros',            slot: 8 },
 ];
+// [id, nombre, grupo, tipo, esencial]
 const DEFAULT_CATS = [
-  ['alquiler',   'Alquiler / expensas', 'hogar', 'fijo'],
-  ['hogar',      'Casa y muebles',      'hogar', 'variable'],
-  ['super',      'Supermercado',        'comida', 'variable'],
-  ['delivery',   'Delivery y comida afuera', 'comida', 'variable'],
-  ['nafta',      'Nafta',               'auto', 'variable'],
-  ['auto',       'Auto (seguro, service, patente)', 'auto', 'fijo'],
-  ['transporte', 'Transporte público / Uber', 'auto', 'variable'],
-  ['servicios',  'Luz, gas, agua, internet, celu', 'servicios', 'fijo'],
-  ['subs',       'Suscripciones',       'servicios', 'fijo'],
-  ['salidas',    'Salidas y bares',     'ocio', 'variable'],
-  ['viajes',     'Viajes',              'ocio', 'variable'],
-  ['deporte',    'Deporte y gimnasio',  'salud', 'fijo'],
-  ['salud',      'Salud y farmacia',    'salud', 'variable'],
-  ['educacion',  'Educación y libros',  'salud', 'variable'],
-  ['mascotas',   'Mascotas',            'hogar', 'variable'],
-  ['personal',   'Cuidado personal',    'salud', 'variable'],
-  ['ropa',       'Ropa y calzado',      'compras', 'variable'],
-  ['compras_otros', 'Compras online (ML y otros)', 'compras', 'variable'],
-  ['tech',       'Tecnología',          'compras', 'variable'],
-  ['regalos',    'Regalos',             'compras', 'variable'],
-  ['impuestos',  'Impuestos y bancos',  'otros', 'fijo'],
-  ['otros',      'Otros',               'otros', 'variable'],
-].map(([id, nombre, grupo, tipo]) => ({ id, nombre, grupo, tipo, presupuesto: 0 }));
+  ['super',          'Supermercado',                 'comida',    'variable', 1],
+  ['comida_trabajo', 'Comida del trabajo',           'comida',    'variable', 1],
+  ['restaurantes',   'Restaurantes y parrillas',     'comida',    'variable', 0],
+  ['fastfood',       'Delivery y fast food',         'comida',    'variable', 0],
+  ['antojos',        'Cafés, kioscos y antojos',     'comida',    'variable', 0],
+  ['nafta',          'Nafta',                        'movilidad', 'variable', 1],
+  ['auto',           'Seguro y mantenimiento del auto', 'movilidad', 'fijo',  1],
+  ['peajes',         'Peajes y estacionamiento',     'movilidad', 'variable', 1],
+  ['transporte',     'Transporte público',           'movilidad', 'variable', 1],
+  ['taxi',           'Taxis (Uber, Cabify)',         'movilidad', 'variable', 0],
+  ['medicos',        'Médicos, estudios y óptica',   'salud',     'variable', 1],
+  ['farmacia',       'Farmacia',                     'salud',     'variable', 1],
+  ['peluqueria',     'Peluquería',                   'salud',     'variable', 1],
+  ['personal',       'Cuidado personal',             'salud',     'variable', 1],
+  ['gimnasio',       'Gimnasio y suplementos',       'salud',     'variable', 0],
+  ['odi',            'Odi (perro)',                  'salud',     'variable', 1],
+  ['bares',          'Bares y noche',                'ocio',      'variable', 0],
+  ['river',          'River',                        'ocio',      'variable', 0],
+  ['entretenimiento','Cine y entretenimiento',       'ocio',      'variable', 0],
+  ['viajes',         'Viajes y escapadas',           'ocio',      'variable', 0],
+  ['regalos',        'Regalos',                      'ocio',      'variable', 0],
+  ['ropa',           'Ropa y calzado',               'compras',   'variable', 0],
+  ['tech',           'Tecnología',                   'compras',   'variable', 0],
+  ['casa',           'Casa y deco',                  'compras',   'variable', 0],
+  ['compras_otros',  'Otras compras (ML, AliExpress)', 'compras', 'variable', 0],
+  ['servicios',      'Teléfono y servicios',         'fijos',     'fijo',     1],
+  ['subs',           'Claude y suscripciones',       'fijos',     'fijo',     0],
+  ['impuestos',      'Impuestos y percepciones',     'fijos',     'fijo',     1],
+  ['revisar',        'Otros',                        'otros',     'variable', 0],
+].map(([id, nombre, grupo, tipo, esencial]) => ({ id, nombre, grupo, tipo, esencial: !!esencial, presupuesto: 0 }));
+/** reglas por descripcion (texto normalizado, sin acentos): las usan la migracion a v2 y las sugerencias al cargar.
+ *  Van de lo especifico a lo general: la primera que matchea gana. */
+const CAT_REGLAS = [
+  [/\bodi\b|\bperro\b|huellas|puppy|curupet|veterinar|mascota|pet ?shop/, 'odi', 1],
+  [/afeitar|safe ?razor|maquinita|crema|perfum|desodor|shampoo/, 'personal', 1],
+  [/barber|peluquer/, 'peluqueria', 1],
+  [/farmac|farmacity/, 'farmacia', 1],
+  [/optica|oculus|medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
+  [/suplement|proteina|creatina|whey|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel/, 'gimnasio', 2],
+  [/comida (del )?laburo|morfi (del )?laburo|almuerzo (del )?laburo|vianda/, 'comida_trabajo', 1],
+  [/uber|cabify|didi|taxi|remis/, 'taxi', 2],
+  [/subte|emova|\bsube\b|colectivo|\btren\b/, 'transporte', 1],
+  [/telepase|peaje|ausa|autopista|park ?work|estacionamiento|cochera/, 'peajes', 1],
+  [/nafta|axion|\bypf\b|shell|puma energy|combustible|\bgnc\b/, 'nafta', 1],
+  [/federacion patronal|seguro (del )?auto|auto ?partes|repuesto|patente|\bvtv\b|service|taller|gomeria|lavadero/, 'auto', 1],
+  [/river|\bcarp\b/, 'river', 2],
+  [/helad|chocolat|kiosco|kiosko|golosin|gomitas|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|starbucks|havanna|alfajor/, 'antojos', 3],
+  [/mcdonald|burger|\bmc\b|pedidos ?ya|rappi|\bwtb\b|mostaza|pizza|empanada|delivery/, 'fastfood', 2],
+  [/asato|anapat|franks|mooi|miaokou|mostrador|lanelly|parrilla|restaurant|resto\b|sushi|cena|asado|almuerzo/, 'restaurantes', 2],
+  [/antares|\bbar\b|jobs bar|bar jps|cerveza|birra|boliche|salida con|campari|vermouth|fernet|previa/, 'bares', 3],
+  [/\bcine\b|teatro|recital|show|entrada/, 'entretenimiento', 3],
+  [/hotel|lucania|vuelo|aerol|flybondi|jetsmart|airbnb|booking|despegar|hostel|pasaje/, 'viajes', 2],
+  [/regalo|cumple|flores/, 'regalos', 2],
+  [/personal telefono|\btelefono\b|internet|edenor|edesur|metrogas|naturgy|aysa|fibertel|telecentro|movistar|claro\b|\bluz\b|\bgas\b/, 'servicios', 1],
+  [/claude|anthropic|chatgpt|openai|netflix|spotify|youtube|disney|\bhbo\b|icloud|google one|suscripci/, 'subs', 2],
+  [/percepci|impuesto|reembolso|comision|mantenimiento de cuenta|\biva\b|sellado|afip|arca/, 'impuestos', 1],
+  [/stanley|vinilo|sodimac|easy\b|ikea|mueble|ferreter|pintur|decor|colchon|sabana/, 'casa', 2],
+  [/zara|nike|adidas|dexter|campero|alpargatas|bowie|ropa|zapat|remera|jean|camisa|calzado|campera|solido|uniqlo/, 'ropa', 2],
+  [/monitor|notebook|celular|iphone|samsung|auricular|cargador|tecnolog|portal insumos|fravega|garbarino|musimundo/, 'tech', 2],
+  [/aliexpress|\bchina\b|mercado ?libre|amazon|temu|shein/, 'compras_otros', 2],
+  [/jumbo|carrefour|coto|\bdia\b|disco|\bvea\b|chango|super|almacen|verduler|carniceria|panaderia|tienda molinos|nestle/, 'super', 1],
+];
+/** migracion de categorias v1 -> v2: se reclasifica cada gasto, fijo y aprendido de las categorias viejas por defecto
+ *  (primero por su descripcion, si no por la equivalencia vieja->nueva). Las categorias propias se conservan. */
+const CAT_V1_A_V2 = { super: 'super', delivery: 'fastfood', salidas: 'restaurantes', nafta: 'nafta', auto: 'auto', transporte: 'transporte', subs: 'subs', deporte: 'gimnasio', salud: 'medicos', personal: 'personal', mascotas: 'odi', ropa: 'ropa', tech: 'tech', hogar: 'casa', compras_otros: 'compras_otros', regalos: 'regalos', viajes: 'viajes', impuestos: 'impuestos', otros: 'revisar', servicios: 'servicios', alquiler: 'alquiler', educacion: 'educacion' };
+const GRUPO_V1_A_V2 = { hogar: 'fijos', comida: 'comida', auto: 'movilidad', servicios: 'fijos', ocio: 'ocio', compras: 'compras', salud: 'salud', otros: 'otros' };
+const normTxt = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+function catPorRegla(desc) { const d = ' ' + normTxt(desc) + ' '; for (const [re, cat, nec] of CAT_REGLAS) if (re.test(d)) return { catId: cat, necesidad: nec }; return null; }
+function migrarCategoriasV2(s) {
+  if (Number(s.settings.catsV) >= 2) return;
+  const viejas = s.categorias || [];
+  const idsV1 = new Set(Object.keys(CAT_V1_A_V2));
+  const esV1 = viejas.some(c => ['delivery', 'salidas', 'mascotas', 'otros', 'hogar', 'deporte'].includes(c.id));
+  if (!esV1) { s.settings.catsV = 2; return; }
+  const nueva = (desc, catId) => { if (!idsV1.has(catId)) return catId; const r = catPorRegla(desc); return r ? r.catId : CAT_V1_A_V2[catId]; };
+  const usadas = new Set();
+  for (const m of s.movimientos || []) { m.catId = nueva(m.desc, m.catId); usadas.add(m.catId); }
+  for (const r of s.recurrentes || []) { r.catId = nueva(r.desc, r.catId); usadas.add(r.catId); }
+  for (const [d, a] of Object.entries(s.aprendido || {})) if (a && a.catId) a.catId = nueva(d, a.catId);
+  const cats = DEFAULT_CATS.map(c => ({ ...c }));
+  // presupuestos por categoria: el de la vieja pasa a su equivalente
+  for (const v of viejas) if (idsV1.has(v.id) && Number(v.presupuesto)) { const k = cats.find(c => c.id === CAT_V1_A_V2[v.id]); if (k) k.presupuesto = (Number(k.presupuesto) || 0) + Number(v.presupuesto); }
+  // alquiler / educacion (viejas sin equivalente) solo quedan si se usan; las propias se conservan con su grupo nuevo
+  for (const v of viejas) {
+    if (cats.find(c => c.id === v.id)) continue;
+    if (idsV1.has(v.id) && !['alquiler', 'educacion'].includes(v.id)) continue;
+    if (['alquiler', 'educacion'].includes(v.id) && !usadas.has(v.id)) continue;
+    cats.splice(cats.length - 1, 0, { ...v, grupo: GRUPO_V1_A_V2[v.grupo] || (GRUPOS.find(g => g.id === v.grupo) ? v.grupo : 'otros'), esencial: v.esencial != null ? !!v.esencial : v.tipo === 'fijo' });
+  }
+  s.categorias = cats; s.settings.catsV = 2;
+}
 
 const NECESIDAD = { 1: 'Necesario', 2: 'Útil', 3: 'Innecesario' };
 /** Un solo umbral para "% del presupuesto", en todas las vistas: verde < 40 %, ambar 40-60 %, rojo > 60 %.
@@ -172,7 +243,7 @@ const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fech
 /* ---------- lookups ---------- */
 const L = {
   cat(id) { return state.categorias.find(c => c.id === id) || state.categorias[state.categorias.length - 1]; },
-  grupo(id) { return GRUPOS.find(g => g.id === id) || GRUPOS[7]; },
+  grupo(id) { return GRUPOS.find(g => g.id === id) || GRUPOS[GRUPOS.length - 1]; },
   grupoDeCat(catId) { return L.grupo(L.cat(catId).grupo); },
   slotColor(slot) { return slot >= 8 ? 'var(--c-otras)' : `var(--c${slot})`; },
   catColor(catId) { return L.slotColor(L.grupoDeCat(catId).slot); },
@@ -265,6 +336,8 @@ const Persist = {
     for (const a of Object.values(s.cartera.alertas)) if (a && typeof a === 'object' && !a.desc && a.nota && String(a.nota).includes(' | ')) { const t = String(a.nota), i = t.indexOf(' | '); a.desc = t.slice(0, i).trim().slice(0, 120) || null; a.nota = t.slice(i + 3).trim() || null; }
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
+    migrarCategoriasV2(s);
+    for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
   },

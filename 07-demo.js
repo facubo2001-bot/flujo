@@ -50,7 +50,11 @@ function cargarDemo() {
   s.inversiones = months.filter(m => m < ymNow).map(m => ({ id: uid(), fecha: D.dateIn(m, 3), monto: between(400, 700), moneda: 'USD', destino: 'Balanz', desc: 'CEDEARs / ONs' }));
   s.inversiones.push({ id: uid(), fecha: D.dateIn(D.addMonths(ymNow, -1), 15), monto: 150000, moneda: 'ARS', destino: 'BTC', desc: 'Compra mensual' });
   const jun = months.find(m => m.endsWith('-06') || m.endsWith('-12')); if (jun) s.ingresos.push({ id: uid(), fecha: D.dateIn(jun, 30), monto: 1150000, moneda: 'ARS', desc: 'Aguinaldo' });
-  s.categorias.find(c => c.id === 'delivery').presupuesto = 120000; s.categorias.find(c => c.id === 'salidas').presupuesto = 180000; s.categorias.find(c => c.id === 'super').presupuesto = 400000;
+  // el demo se escribio con las categorias v1: se pasa por la misma migracion que los datos reales
+  s.categorias = [...s.categorias, { id: 'delivery', nombre: 'Delivery', grupo: 'comida', tipo: 'variable' }, { id: 'salidas', nombre: 'Salidas', grupo: 'ocio', tipo: 'variable' }]; delete s.settings.catsV;
+  migrarCategoriasV2(s);
+  const pres = (id, v) => { const c = s.categorias.find(k => k.id === id); if (c) c.presupuesto = v; };
+  pres('restaurantes', 180000); pres('fastfood', 120000); pres('super', 400000);
   s.pagos = [{ tarjetaId: 't_visa', mes: ymNow, cuentaId: 'a1', pagado: true }, { tarjetaId: 't_master', mes: ymNow, cuentaId: 'a1', pagado: false }];
   state = s; state.updatedAt = Date.now();
 }
