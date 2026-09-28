@@ -730,17 +730,22 @@ const Intercambio = {
     const k = E.cartera(); const s = state.settings; const hoy = D.today(); const hora = new Date();
     const n = v => v == null ? '' : Number(v).toFixed(2); const pct = v => v == null ? '' : (v * 100).toFixed(1) + ' %';
     const pctO = v => v == null ? 's/d' : pct(v);
-    const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera con dividendos ${pctO(v.rend.realDiv)} · precio contra precio: cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : `- **${nombre}**: no disponible`;
+    const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera con dividendos ${pctO(v.rend.realDiv)} · precio contra precio: cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} ${v.rend.twr != null ? ` · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : ''}` : `- **${nombre}**: no disponible`;
     const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, carteraConDividendos: { acumulado: v.rend.realDiv, tirAnual: v.rend.tirRealDiv, dividendosUSD: +v.rend.dividendosVentana.toFixed(2) }, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
+    const twrR = E.twrReal(k); const ptX = E.patrimonio(k); const valorTot = ptX.activos.length ? ptX.total : k.valor;
+    const parciales = k.posiciones.filter(p => Math.abs(p.realizado) >= 0.005);
+    const realCerr = sum(k.cerradas.map(p => p.realizado)), realParc = sum(parciales.map(p => p.realizado));
+    const ventasDe = t => k.ops.filter(o => o.tipo === 'venta' && o.ticker === t).map(o => `${o.fecha} ${fmtAcc(o.acciones)} acc a ${n(o.precio)}`).join('; ');
     const cerrRows = k.cerradas.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${n(p.dividendos)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} |`).join('\n');
     const ops = k.ops.slice().reverse().slice(0, 40).map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
     const json = {
       tipo: 'gestor-gastos-cartera', version: Intercambio.VERSION, generado: hora.toISOString(), app: BUILD,
       dolar: { mep: k.mep, ccl: k.ccl, spy: k.spyHoy, preciosAl: k.preciosFecha },
-      resumen: { valorUSD: k.valor, valorTotalUSD: k.valorTotal != null ? +k.valorTotal.toFixed(2) : null, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
-      rendimiento: Object.fromEntries(E.VENTANAS.map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
+      resumen: { valorUSD: k.valor, valorTotalUSD: valorTot != null ? +valorTot.toFixed(2) : null, realizadoCerradasUSD: +realCerr.toFixed(2), realizadoVentasParcialesUSD: +realParc.toFixed(2), twrDiario: twrR, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
+      rendimiento: Object.fromEntries(E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
       posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
       watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
+      ventasParciales: parciales.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), ventas: ventasDe(p.ticker) })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
     const c = ctxPartes(pendientes);
@@ -752,9 +757,9 @@ App "Gestor de gastos" v${BUILD}. ${c.estado}
 ${c.verdad}
 
 ## Resumen
-- Valor: **US$ ${n(k.valor)}** \u00b7 costo (lotes FIFO) US$ ${n(k.costo)} \u00b7 resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) \u00b7 **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD \u00b7 rendimiento total sobre el costo de lo que ten\u00e9s ${pct(k.rendTotal)} \u00b7 valor total (acciones + caja US$ ${n(k.caja)}: dividendos + ventas a caja \u2212 compras pagadas con la caja) US$ ${n(k.valorTotal)}
-- Dividendos cobrados US$ ${n(k.dividendos)} \u00b7 resultado realizado (posiciones cerradas) US$ ${n(k.realizado)}
-${E.VENTANAS.map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operaci\u00f3n)' : l)).join('\n')}
+- Valor: **US$ ${n(k.valor)}** \u00b7 costo (lotes FIFO) US$ ${n(k.costo)} \u00b7 resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) \u00b7 **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD \u00b7 rendimiento total sobre el costo de lo que ten\u00e9s ${pct(k.rendTotal)} \u00b7 valor total (acciones + otros activos, como la pantalla) US$ ${n(valorTot)}
+- Dividendos cobrados US$ ${n(k.dividendos)} \u00b7 resultado realizado US$ ${n(k.realizado)} = posiciones cerradas US$ ${n(realCerr)} + ventas parciales de posiciones abiertas US$ ${n(realParc)}${twrR ? `\n- TWR con valuaciones diarias reales (desde ${twrR.desde}, ${twrR.n} valuaciones): cartera ${pctO(twrR.twr)} vs SPY ${pctO(twrR.spy)}. En los rangos que arrancan antes no se informa TWR.` : ''}
+${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operaci\u00f3n)' : l)).join('\n')}
 - "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo d\u00eda. La comparaci\u00f3n es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera \u2212 sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por a\u00f1o); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posici\u00f3n = (precio hoy \u2212 PPC + dividendos cobrados) / costo.
 - Sueldo neto $ ${fmtARS.format(Number(s.ingreso) || 0)} por mes \u00b7 presupuesto de gasto $ ${fmtARS.format(Number(s.presupuesto) || 0)}
 
@@ -782,7 +787,7 @@ ${r.lotes.map(l => `| ${l.fecha} | ${l.tipo === 'rescate' ? 'rescate' : 'suscrip
 | Ticker | Realizado USD | Dividendos | Alfa vs SPY |
 |---|---|---|---|
 ${cerrRows || '| \u2014 | | | |'}
-
+${parciales.length ? `\n## Ventas parciales de posiciones abiertas (realizado US$ ${n(realParc)})\n| Ticker | Realizado USD | Ventas |\n|---|---|---|\n${parciales.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${ventasDe(p.ticker)} |`).join('\n')}\n` : ''}
 ## \u00daltimas operaciones (${Math.min(40, k.ops.length)} de ${k.ops.length})
 | Fecha | Tipo | Ticker | Acciones | Precio USD (o monto) | Detalle |
 |---|---|---|---|---|---|

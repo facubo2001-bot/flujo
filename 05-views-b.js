@@ -441,9 +441,9 @@ function mapaCartera(k) {
 }
 
 function renderEvolucion(k, seg) {
-  const modo = ui.carteraVentana && k.ventanas[ui.carteraVentana] ? ui.carteraVentana : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
+  const modo = ui.carteraVentana && k.ventanas[ui.carteraVentana] && !k.ventanas[ui.carteraVentana].masLargo ? ui.carteraVentana : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
   const v = k.ventanas[modo];
-  const rangos = `<div class="seg rangos">${E.VENTANAS.map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}</div>`;
+  const rangos = `<div class="seg rangos">${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}</div>`;
   if (!v || !v.disponible) return `<div class="card"><div class="card-head"><h2>vs S&P 500</h2>${seg}</div>${rangos}${empty({ kind: 'periodo', icon: 'cal', head: v && v.motivo || 'Sin datos para esta ventana', sub: 'Probá con un período más largo.' })}</div>`;
   const r = v.rend; const alfaOk = r.alfa != null && r.alfa >= 0;
   const serie = E.carteraSerie(k, modo);
@@ -486,7 +486,7 @@ function infoEvolucion(modo) {
   const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
     <tr><td>Acumulado<small>${r.metodo === 'tir' ? 'ponderado por dinero (TIR)' : 'ponderado por dinero (Dietz)'}</small></td><td>${p(r.real)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
     <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirReal) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
-    <tr><td>Ponderado por tiempo<small>TWR, sin efecto de tus aportes</small></td><td>${p(r.twr)}</td><td>${p(r.spyDirecto)}</td><td>${p(r.spyDirecto)}</td></tr>
+    <tr><td>Ponderado por tiempo<small>${r.twr == null && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr)}</td><td>${p(r.spyDirecto)}</td><td>${p(r.spyDirecto)}</td></tr>
   </tbody></table>`;
   Modal.open({ title: 'Cómo se calcula', submit: '', body: `<div class="stack small" style="line-height:1.5">
     ${tabla}

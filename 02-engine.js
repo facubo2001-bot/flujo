@@ -490,6 +490,18 @@ const E = {
     if (!cands.length) return null;
     cands.sort((a, b) => a.fecha.localeCompare(b.fecha)); return cands[cands.length - 1];
   },
+  /** TWR desde la primera valuacion diaria real hasta hoy (encadenando Dietz entre valuaciones guardadas) */
+  twrReal(k) {
+    const h = state.cartera.historial || {}; const hoy = D.today(); if (k.valor == null) return null;
+    const vals = Object.keys(h).filter(f => h[f].v != null && f < hoy).sort().map(f => ({ fecha: f, V: h[f].v, spy: h[f].spy }));
+    if (!vals.length) return null; const desde = vals[0].fecha;
+    vals.push({ fecha: hoy, V: k.valor });
+    const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && f.fecha > desde);
+    let acc = 1;
+    for (let i = 0; i < vals.length - 1; i++) { const a = vals[i], b = vals[i + 1]; const r = E.dietz(a.V, b.V, fl.filter(f => f.fecha > a.fecha && f.fecha <= b.fecha), a.fecha, b.fecha); if (r == null) return null; acc *= 1 + r; }
+    const spy = vals[0].spy && k.spyHoy ? k.spyHoy * Spy.factor(desde, hoy) / vals[0].spy - 1 : null;
+    return { desde, n: vals.length - 1, twr: acc - 1, spy };
+  },
   /** Ventana: {disponible, modo, desde, V0, S0, spy0, flujos, rend:{real, sombra, alfa, alfaUSD, spyDirecto}, sombraValor, nota, aprox} */
   ventana(k, modo) {
     const hoy = D.today(); const spyHoy = k.spyHoy;
@@ -502,6 +514,8 @@ const E = {
     // cuanto puede alejarse la valuacion guardada de la fecha buscada: en un mes, una semana; en seis, un mes
     const tolerancia = modo === '1m' ? 7 : modo === '6m' ? 30 : 45;
     let desde, V0 = 0, S0 = 0, spy0, esInicial = () => false, aprox = false, nota = '';
+    // un rango que arranca antes de la primera operacion es igual a "Todo": no se muestra (3 A / 5 A con 570 dias de historia)
+    if (modo !== 'inicio' && D.daysBetween(objetivo, k.primeraOp) > 15) return { disponible: false, modo, objetivo, masLargo: true, motivo: `Tu historia arranca el ${D.fmt(k.primeraOp, { year: true })}: este rango es igual a Todo.` };
     if (modo === 'inicio' || objetivo <= k.primeraOp) {
       desde = k.primeraOp; spy0 = Spy.at(desde);
       if (k.legados) nota = `${k.legados} lote${k.legados > 1 ? 's' : ''} previo${k.legados > 1 ? 's' : ''} sin fecha real de compra (entran el 2/1/26): corregí la fecha tocando la operación para afinar esta comparación.`;
@@ -533,7 +547,9 @@ const E = {
     // --- tiempo (time-weighted): sub-períodos entre valuaciones conocidas, Dietz en cada uno, encadenados. La sombra es 100 % SPY → su TWR = SPY solo.
     //     Si la ventana arranca en cero (primera operación), las compras de ese día son la valuación inicial.
     let twr = null;
-    if (k.valor != null) {
+    const primerDia = Object.keys(state.cartera.historial || {}).filter(f => (state.cartera.historial[f] || {}).v != null).sort()[0] || null;
+    // TWR solo si la ventana arranca cuando ya habia valuaciones diarias reales; antes seria un Dietz largo disfrazado
+    if (k.valor != null && primerDia && D.daysBetween(primerDia, desde) >= -3) {
       const c = state.cartera; let fl0 = fl, Vstart = V0;
       if (!(V0 > 0)) { Vstart = sum(fl.filter(f => f.fecha === desde).map(f => f.monto)); fl0 = fl.filter(f => f.fecha !== desde); }
       const vals = [{ fecha: desde, V: Vstart }];

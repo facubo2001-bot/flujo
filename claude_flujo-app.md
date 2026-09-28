@@ -32,6 +32,13 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Correcciones del export (28-sep, build 202609281920)
+- **Realizado**: US$ 141,96 = cerradas 105,08 + ventas parciales de posiciones abiertas 36,88 (UNH, 11-may-26, 0,4242 acc a 378,10). El export lo parte y lista las parciales (tabla + `ventasParciales` en el JSON).
+- **Valor total** del export = acciones + otros activos (lo mismo que la card Portfolio); ya no suma la caja contable.
+- **Rangos más largos que la historia** (`masLargo`: arrancan >15 días antes de la primera operación, p. ej. 3 A con 570 días) no se muestran ni se exportan.
+- **TWR** solo si la ventana arranca con valuaciones diarias reales (historial desde 17-sep-26); `E.twrReal(k)` da el TWR desde la primera valuación diaria (export y modal ⓘ).
+- **TS ↔ TEN**: la tabla BYMA tenía Tenaris como TEN sin `us`; ahora `us: "TS"` (1:1). `cedears.json` actualizado al 2026-09-28 para que pise la copia guardada.
+
 ### Alertas cortas (28-sep, build 202609281907)
 - Siempre visibles: en zona (roja o amarilla) o a ≤5 % de mirala. El resto, detrás de "Ver todas (N más)" (`ui.alTodas`, acción `al-todas`; "Ver menos" vuelve arriba de la card).
 
