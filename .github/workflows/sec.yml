@@ -1,0 +1,34 @@
+name: Balances SEC
+# Todos los dias baja los balances oficiales (SEC companyfacts) de las empresas con CEDEAR y los deja en sec/.
+# La app los lee desde el mismo sitio (GitHub Pages), porque el telefono no puede consultar la SEC directo.
+on:
+  schedule:
+    - cron: '17 10 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/sec.mjs'
+      - '.github/workflows/sec.yml'
+permissions:
+  contents: write
+concurrency:
+  group: sec
+  cancel-in-progress: false
+jobs:
+  sec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node tools/sec.mjs
+      - name: Guardar cambios
+        run: |
+          git config user.name "flujo-bot"
+          git config user.email "flujo-bot@users.noreply.github.com"
+          git add sec
+          if git diff --cached --quiet; then echo "sin cambios"; exit 0; fi
+          git commit -m "Balances SEC $(date -u +%F)"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
