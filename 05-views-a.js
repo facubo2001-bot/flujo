@@ -55,7 +55,7 @@ function aplicarInfo(root) {
     const tmp = document.createElement('span'); tmp.innerHTML = infoBtn(txt); b.after(tmp.firstChild); sub.remove();
   });
 }
-const kpi = ({ label, value, sub = '', cls = '', spark = '', stats = null, foot = '' }) => `<div class="card kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div>${stats ? `<div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>` : ''}${sub ? `<div class="delta">${sub}</div>` : ''}${foot ? `<div class="foot">${foot}</div>` : ''}${spark}</div>`;
+const kpi = ({ label, value, sub = '', cls = '', spark = '', stats = null, foot = '', act = '' }) => `<div class="card kpi ${cls}${act ? ' tap' : ''}"${act ? ` data-act="${act}"` : ''}><div class="label">${label}</div><div class="value">${value}</div>${stats ? `<div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>` : ''}${sub ? `<div class="delta">${sub}</div>` : ''}${foot ? `<div class="foot">${foot}</div>` : ''}${spark}</div>`;
 
 /* ---------- RESUMEN ---------- */
 /** Día de cobro: la app pregunta cuánto cobraste (hasta registrar el mes; "Después" lo posterga hasta mañana) */

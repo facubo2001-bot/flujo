@@ -232,7 +232,7 @@ function viewCartera() {
   if (!k.posiciones.length && !k.ops.length) return `<div class="card">${empty({ kind: 'setup', icon: 'chart', head: 'Todavía no hay operaciones', sub: 'Cargá tu primera compra y la cartera se arma sola.', btn: 'Cargar operación', action: 'new-op' })}</div>`;
   let html = '';
   // precios: una sola linea, sin tarjeta. La hora manda; CCL y SPY al lado; actualizar es un icono
-  html += `<div class="px-strip"><span class="px-txt">${hayKey ? `${k.conPrecio ? `<b>Precios ${fechaTxt}</b>` : '<b>Sin precios todav\u00eda</b>'}${k.conPrecio && k.conPrecio < k.posiciones.length ? ` \u00b7 <span class="warn-text">${k.posiciones.length - k.conPrecio} sin precio</span>` : ''}${(() => { const pg = Motor.progreso(); return (pg.faltan ? ` \u00b7 Fundamentales ${pg.alDia}/${pg.total} \u00b7 faltan ~${pg.min} min` : '') + (pg.sinFuente.length ? ` \u00b7 <span class="soft" title="${esc(pg.sinFuente.join(', '))}">${pg.sinFuente.length} sin fuente</span>` : ''); })()}${s.ccl ? ' \u00b7 CCL ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' \u00b7 SPY ' + MENOS(k.spyHoy.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}` : '<b>Falta tu clave de Finnhub</b>'}</span>${hayKey ? `<button class="icon-btn" data-act="precios-update" aria-label="Actualizar precios" title="Actualizar precios">${ICONS.repeat}</button>` : '<button class="btn sm" data-act="go-config">Configurar</button>'}</div>`;
+  html += `<div class="px-strip"><span class="px-txt">${hayKey ? `${k.conPrecio ? `<b>Precios ${fechaTxt}</b>` : '<b>Sin precios todav\u00eda</b>'}${k.conPrecio && k.conPrecio < k.posiciones.length ? ` \u00b7 <span class="warn-text">${k.posiciones.length - k.conPrecio} sin precio</span>` : ''}${(() => { const pg = Motor.progreso(); return (pg.faltan ? ` \u00b7 Fundamentales ${pg.alDia}/${pg.total} \u00b7 faltan ~${pg.min} min` : '') + (pg.sinFuente.length ? ` \u00b7 <span class="soft" title="${esc(pg.sinFuente.join(', '))}">${pg.sinFuente.length} sin fuente</span>` : ''); })()}${s.ccl ? ' \u00b7 CCL ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' \u00b7 SPY ' + MENOS(k.spyHoy.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}` : '<b>Falta tu clave de Finnhub</b>'}</span><button class="icon-btn" data-act="claude-menu" aria-label="Claude" title="Claude: exportar o cargar">${ICONS.spark}</button>${hayKey ? `<button class="icon-btn" data-act="precios-update" aria-label="Actualizar precios" title="Actualizar precios">${ICONS.repeat}</button>` : '<button class="btn sm" data-act="go-config">Configurar</button>'}</div>`;
   const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0); const valorTotTxt = k.valorTotal != null ? fmtU(k.valorTotal, 0) : valorTxt;
   const n0 = x => Math.abs(x).toLocaleString('es-AR', { maximumFractionDigits: 0 }); const sg = x => x >= 0 ? '+' : '−';
   const va = k.ventanas.anio, vi = k.ventanas.inicio; const vAlfa = va.disponible ? va : vi.disponible ? vi : null;
@@ -253,7 +253,7 @@ function viewCartera() {
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
-    ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero',
+    ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero', act: hayActivos ? 'pat-dist' : '',
       stats: (hayActivos
         ? pt.grupos.slice(0, 3).map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'Reserva' : g.id === 'renta' ? 'Bonos' : g.nombre, v: fmtARS.format(Math.round(g.valor)), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
         : [{ k: 'CEDEARs', v: fmtARS.format(Math.round(k.valor != null ? k.valor : k.costo)) }, { k: 'Otros', v: '<span class="soft">abajo</span>' }]
@@ -312,12 +312,6 @@ function viewCartera() {
   html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><button class="icon-btn" data-act="balances" aria-label="Calendario de balances" title="Calendario de balances">${ICONS.cuotas}</button><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
     ${ordenAl.length ? ordenAl.map(alRow).join('') : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
   </div>`;
-  // operaciones
-  const ops = k.ops.slice().reverse().slice(0, 25);
-  const opMonto = o => o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0);
-  html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} · tocá para editar${k.legados ? ` · <span class="tag" style="color:var(--warn-text)">${k.legados} con fecha estimada</span>` : ''}</span></div>
-    ${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}${o.verif && o.verif.nivel !== 'ok' ? ` <span class="tag ${o.verif.nivel === 'block' ? 'verif-block' : 'verif-warn'}">${o.verif.nivel === 'block' ? G.no : G.warn} revisar</span>` : ''}${(o.deCaja || o.deDividendos) > 0 ? ` <span class="tag">con caja ${fmtU(o.deCaja || o.deDividendos, 0)}</span>` : ''}${o.aCaja ? ' <span class="tag">a caja</span>' : ''}${k.dupIds.has(o.id) ? ' <span class="tag verif-warn">¿duplicada?</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${o.modo === 'cedear' ? `${fmtAcc(o.cedears)} CEDEARs a $ ${fmtARS.format(o.precioCedear)} · ` : ''}${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px;flex:none;flex-wrap:nowrap"><span class="mono op-amt ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'up' : ''}">${o.tipo === 'compra' ? '−' : '+'}${fmtU(opMonto(o), 2)}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || emptyInline('Sin operaciones', 'Cargar', 'new-op')}
-  </div>`;
   // control de calidad: conciliación con Balanz + operaciones con advertencias
   const conAviso = k.ops.filter(o => o.verif && o.verif.nivel !== 'ok').length; const concDias = conc ? D.daysBetween(conc.fecha, D.today()) : null;
   html += `<div class="card section"><div class="card-head"><h2>Control</h2><button class="btn sm ${!conc || concDias > 35 ? 'primary' : ''}" data-act="conciliar">Conciliar con Balanz</button></div>
@@ -325,10 +319,12 @@ function viewCartera() {
     ${k.duplicadas.length ? `<div class="list-item"><div><b style="font-weight:500">Posibles duplicadas</b><span class="sub small muted">${k.duplicadas.slice(0, 3).map(([a, b]) => `${a.tipo} ${esc(a.ticker)} ${D.fmt(a.fecha)} / ${D.fmt(b.fecha)}`).join(' · ')}${k.duplicadas.length > 3 ? ' …' : ''} — marcadas en la lista</span></div><span class="pill warn">${k.duplicadas.length}</span></div>` : ''}
     <div class="list-item"><div><b style="font-weight:500">Operaciones con advertencias</b><span class="sub small muted">${conAviso ? `marcadas ${G.warn} en la lista: tocá para revisar` : 'cada operación se verifica contra NY, CCL, ratio y SPY al guardarla'}</span></div>${conAviso ? `<span class="pill warn">${conAviso}</span>` : `<span class="pill good">0</span>`}</div>
   </div>`;
-  // trabajar con Claude
   html += renderPatrimonio(k);
-  html += `<div class="card section"><div class="card-head"><h2>Trabajar con Claude</h2><span class="hint">análisis y niveles</span></div>
-    <div class="row" style="gap:8px"><button class="btn primary" data-act="export-claude">Exportar para Claude</button><button class="btn" data-act="import-claude">Cargar actualizaciones</button></div>
+  // operaciones
+  const ops = k.ops.slice().reverse().slice(0, 25);
+  const opMonto = o => o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0);
+  html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} · tocá para editar${k.legados ? ` · <span class="tag" style="color:var(--warn-text)">${k.legados} con fecha estimada</span>` : ''}</span></div>
+    ${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}${o.verif && o.verif.nivel !== 'ok' ? ` <span class="tag ${o.verif.nivel === 'block' ? 'verif-block' : 'verif-warn'}">${o.verif.nivel === 'block' ? G.no : G.warn} revisar</span>` : ''}${(o.deCaja || o.deDividendos) > 0 ? ` <span class="tag">con caja ${fmtU(o.deCaja || o.deDividendos, 0)}</span>` : ''}${o.aCaja ? ' <span class="tag">a caja</span>' : ''}${k.dupIds.has(o.id) ? ' <span class="tag verif-warn">¿duplicada?</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${o.modo === 'cedear' ? `${fmtAcc(o.cedears)} CEDEARs a $ ${fmtARS.format(o.precioCedear)} · ` : ''}${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px;flex:none;flex-wrap:nowrap"><span class="mono op-amt ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'up' : ''}">${o.tipo === 'compra' ? '−' : '+'}${fmtU(opMonto(o), 2)}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || emptyInline('Sin operaciones', 'Cargar', 'new-op')}
   </div>`;
   return html;
 }
@@ -495,20 +491,29 @@ function infoEvolucion(modo) {
 }
 
 
+/** tocar la card Portfolio: dona con la distribucion (antes estaba fija en la card de abajo) */
+function verDistribucion() {
+  const pt = E.patrimonio(E.cartera()); if (!pt.activos.length) return;
+  const leyenda = pt.grupos.map(g => `<div class="pat-g"><i style="background:${g.color}"></i><span>${esc(g.nombre)}</span><b>${M.pct(g.valor / pt.total, 1)}</b><span class="sub">${fmtU(g.valor, 0)}</span></div>`).join('');
+  const reservaCls = pt.reservaPct == null ? '' : pt.reservaPct >= pt.reservaObjetivo ? 'ok' : pt.reservaPct >= pt.reservaObjetivo * 0.6 ? 'mid' : 'bad';
+  Modal.open({ title: 'D\u00f3nde est\u00e1 tu plata', submit: '', body: `<div class="pat-top">
+      <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
+      <div class="pat-leg">${leyenda}</div>
+    </div>
+    <div class="pat-res"><span>Reserva (efectivo + fondos) vs CEDEARs</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>` });
+}
+/** boton chiquito de arriba: exportar o cargar */
+function menuClaude() {
+  Modal.open({ title: 'Claude', submit: '', body: `<div class="stack" style="gap:8px"><button class="btn primary" data-act="export-claude" style="width:100%">Exportar para Claude</button><button class="btn" data-act="import-claude" style="width:100%">Cargar actualizaciones</button></div>` });
+}
+
 /* ---------- Toda tu plata: CEDEARs + efectivo, fondos, letras, bonos y bitcoin ---------- */
 function renderPatrimonio(k) {
   const pt = E.patrimonio(k); const hay = pt.activos.length > 0;
   const fmtM = (v, moneda) => moneda === 'ARS' ? `$ ${fmtARS.format(Math.round(v))}` : fmtU(v, 0);
   const fila = a => `<div class="act-r" data-act="activo" data-id="${a.id}"><div class="act-l"><b>${esc(a.nombre)}</b><span class="sub">${esc(E.TIPOS_ACTIVO[a.tipo] || '')}${a.detalle ? ' \u00b7 ' + esc(a.detalle) : ''}</span></div><div class="act-v"><b>${a.valorUSD != null ? fmtU(a.valorUSD, 0) : '\u2014'}</b><span class="sub">${a.valorMoneda != null && a.moneda === 'ARS' ? fmtM(a.valorMoneda, 'ARS') : (pt.total && a.valorUSD != null ? M.pct(a.valorUSD / pt.total, 1) : '')}</span></div></div>`;
-  const leyenda = pt.grupos.map(g => `<div class="pat-g"><i style="background:${g.color}"></i><span>${esc(g.nombre)}</span><b>${M.pct(g.valor / pt.total, 1)}</b><span class="sub">${fmtU(g.valor, 0)}</span></div>`).join('');
-  const reservaCls = pt.reservaPct == null ? '' : pt.reservaPct >= pt.reservaObjetivo ? 'ok' : pt.reservaPct >= pt.reservaObjetivo * 0.6 ? 'mid' : 'bad';
-  return `<div class="card section"><div class="card-head"><h2>Toda tu plata ${pt.mep ? infoBtn(`Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.`) : ''}</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
+  return `<div class="card section"><div class="card-head"><h2>Otros activos ${pt.mep ? infoBtn(`Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.`) : ''}</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
     ${hay ? `
-    <div class="pat-top">
-      <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
-      <div class="pat-leg">${leyenda}</div>
-    </div>
-    <div class="pat-res"><span>Reserva (efectivo + fondos) vs CEDEARs</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
     ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}

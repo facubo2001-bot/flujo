@@ -32,6 +32,11 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Cartera más corta (28-sep, build 202609281904)
+- Orden: tira de precios · KPIs · Composición/Posiciones · Alertas · Control · Otros activos · **Operaciones al final** (Facu: "scrolleo hasta el fondo y es muy largo").
+- Card "Trabajar con Claude" eliminada: ahora es un botón chiquito (`ICONS.spark`, `claude-menu`) en la tira de arriba que abre Exportar / Cargar (`menuClaude`).
+- "Toda tu plata" → **"Otros activos"** (solo la lista y "+ Activo"). La dona, la leyenda y la reserva vs objetivo pasan a un modal al tocar la card Portfolio (`pat-dist` → `verDistribucion`). `kpi()` acepta `act`.
+
 ### Finnhub escala a ~330 tickers: cola con prioridad (28-sep, build 202609281651)
 - **`Finnhub`** (01-core): toda llamada pasa por acá. Ventana deslizante de 55 por minuto (la key gratis da 60 y se comparte); un 429 pausa todo `Retry-After` (o 60 s) y reintenta hasta 3 veces, así la tanda no se pierde.
 - **`Precios.plan()`**: prioridad cerca de zona (<5 % de mirala) → tenencias/SPY → A → B → C/Cíclica → Especulativa. Cada cuánto: cerca de zona, tenencias y A 15 min; B 1 h; resto 4 h; con NY cerrado, máx. 12 h. Tier F no se sigue (solo si la tenés).
