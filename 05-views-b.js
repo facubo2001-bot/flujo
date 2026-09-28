@@ -251,6 +251,8 @@ function viewCartera() {
   const balLineas = balSemana.length ? `<div class="nov-l nov-z"><span class="nov-chips">${balSemana.map(x => `<span class="nov-chip bal" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)} ${ddmm(x.b.fecha)}${x.b.hora === 'bmo' ? '<i>am</i>' : x.b.hora === 'amc' ? '<i>pm</i>' : ''}</span>`).join('')}</span></div>` : '';
   const zona = [...k.posiciones, ...k.watch].filter(x => x.estado).sort((x, y) => (x.estado === 'urgente' ? 0 : 1) - (y.estado === 'urgente' ? 0 : 1) || ((k.posiciones.some(p => p.ticker === y.ticker) ? 1 : 0) - (k.posiciones.some(p => p.ticker === x.ticker) ? 1 : 0)));
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
+  const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 8);
+  const barLinea = baratas.length ? `<div class="nov-l nov-z"><span class="nov-chips">${baratas.map(x => `<span class="nov-chip val" data-act="pos" data-id="${esc(x.t)}" title="P/E ${x.b.pe.toFixed(1)} vs mediana 10 a\u00f1os ${x.b.med.toFixed(1)}">${esc(x.t)}<i>P/E \u2212${Math.round(x.b.desc * 100)}%</i></span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
     ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero', act: hayActivos ? 'pat-dist' : '',
@@ -266,7 +268,7 @@ function viewCartera() {
       ] })}
     ${renderReservaCard(pt)}
     <div class="card kpi nov ${balLineas || zonaLinea ? 'tap' : ''}" ${balLineas || zonaLinea ? 'data-act="ir-alertas"' : ''}><div class="label">Novedades</div>
-      ${balLineas || zonaLinea ? balLineas + zonaLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
+      ${balLineas || zonaLinea || barLinea ? balLineas + zonaLinea + barLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
     </div>
   </div>`;
   const conc = state.cartera.conciliacion || null;

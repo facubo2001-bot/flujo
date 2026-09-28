@@ -32,6 +32,11 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### "Baratas contra su historia" (28-sep, build 202609282249)
+- Facu: "GOOGL con P/E 17 contra su historia, ¿cómo no lo vimos?". `Fund.barata(t)`: P/E ≥20 % bajo su mediana de 10 años, ≥7 años de historia (`peN`), empresa de calidad (ROIC ≥12 % o ROE ≥15 %) y confirmación con P/S o P/FCF ≥15 % bajo su mediana cuando hay dato (descarta AMZN, cuyo P/E baja por ganancias de inversiones).
+- Chips con borde celeste en Novedades ("GOOGL P/E −41%") y línea en "Datos que faltan" del export.
+- Finnhub `revenueGrowth5Y` coincide exacto con el CAGR propio de la SEC (HD, MCD, NVDA, PEP, UNH, MU, AMZN): dato confiable.
+
 ### Chequeo completo contra TradingView: se corrige lo corregible, se saca lo que no (28-sep, build 202609282232)
 Facu cargó las 16 tenencias (90 OK / 24 no). Regla de Facu: "lo que no se pueda corregir no lo ponemos en la app".
 - **ROIC**: capital = patrimonio + deuda LP + **porción corriente de la deuda LP** + leases LP (sin deuda de corto). Error medio contra TV: 0,17 pp en 12 empresas (HD 21,77 = 21,77; AMZN 15,84 = 15,84; MCD 17,15 = 17,15; MSFT 27,8 vs 27 por leases financieros fuera del balance).

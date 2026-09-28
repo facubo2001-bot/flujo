@@ -934,6 +934,7 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
       if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
       if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
       if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
+      { const bz = Fund.baratas(todas.map(p => p.ticker)); if (bz.length) l.push(`- **Baratas contra su propia historia** (P/E de hoy \u2265 20 % por debajo de su mediana de 10 a\u00f1os, con ROIC \u2265 12 % o ROE \u2265 15 %): ${bz.map(x => `${x.t} ${x.b.pe.toFixed(1)} vs ${x.b.med.toFixed(1)} (\u2212${Math.round(x.b.desc * 100)} %)`).join(' \u00b7 ')}. Revis\u00e1 si es una oportunidad o si el mercado ve algo que la historia no.`); }
       { const av = todas.map(p => [p.ticker, (Fund.de(p.ticker) || {}).avisos || []]).filter(([, a]) => a.length); if (av.length) l.push(`- **Avisos del control autom\u00e1tico** (tomalos con pinzas): ${av.map(([t, a]) => `${t}: ${a.join('; ')}`).join(' \u00b7 ')}`); }
       return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
   };

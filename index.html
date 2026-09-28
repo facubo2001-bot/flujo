@@ -792,6 +792,7 @@ table.metricas td small{display:block;color:var(--ink-3);font-size:10.5px;font-w
 .nov-chip.urgente{background:var(--crit-soft);color:var(--crit-text)}
 .nov-chip.mirala{background:var(--warn-soft);color:var(--warn-text)}
 .nov-chip.bal{background:rgba(45,226,240,.14);color:var(--accent)}
+.nov-chip.val{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px rgba(45,226,240,.55)}
 .nov-chip i{font-style:normal;font-weight:600;font-size:10px;opacity:.75;margin-left:3px}
 .ver-r{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .ver-r:last-child{border-bottom:0}
@@ -1449,7 +1450,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609282232';
+const BUILD = '202609282249';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2167,7 +2168,7 @@ const Fund = {
       capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
       perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
       max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
-      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)),
+      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)), peN: peHist.slice(-10).length,
       pb: Number(m.pbQuarterly ?? m.pbAnnual) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
       roe: Number(m.roeTTM ?? m.roeRfy) / 100 || null, roa: Number(m.roaTTM ?? m.roaRfy) / 100 || null,
       margenNeto: Number(m.netProfitMarginTTM) / 100 || null, margenNeto5: Number(m.netProfitMargin5Y) / 100 || null,
@@ -2271,6 +2272,21 @@ const Fund = {
     const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
     return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
   },
+  /** Barata contra su propia historia (Facu: "GOOGL con P/E 17 contra su historia, como no lo vimos"):
+   *  P/E de hoy al menos 20 % por debajo de su mediana de 10 anios, en una empresa de calidad (ROIC >= 12 % o ROE >= 15 %). */
+  barata(t, d = Fund.de(t)) {
+    if (!d || !(d.pe > 0) || !(d.peMediana > 0)) return null;
+    const desc = 1 - d.pe / d.peMediana; if (desc < 0.2) return null;
+    if (d.peN != null && d.peN < 7) return null;  // poca historia (GEV): la mediana no dice nada
+    // confirmacion con ventas o caja libre: si el P/E baja por una ganancia extraordinaria (AMZN, inversiones) y P/S o P/FCF
+    // no estan baratos contra su historia, no cuenta
+    const otros = [[d.ps, d.psMed], [d.pfcf, d.pfcfMed]].filter(([v, m]) => v > 0 && m > 0).map(([v, m]) => 1 - v / m);
+    if (otros.length && !otros.some(x => x >= 0.15)) return null;
+    const calidad = (d.roicAct != null && d.roicAct >= 0.12) || (d.roe != null && d.roe >= 0.15);
+    if (!calidad) return null;
+    return { pe: d.pe, med: d.peMediana, desc };
+  },
+  baratas(tickers) { return tickers.map(t => ({ t, b: Fund.barata(t) })).filter(x => x.b).sort((a, b) => b.b.desc - a.b.desc); },
   /** dividend yield con el precio de hoy */
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
@@ -4139,6 +4155,8 @@ function viewCartera() {
   const balLineas = balSemana.length ? `<div class="nov-l nov-z"><span class="nov-chips">${balSemana.map(x => `<span class="nov-chip bal" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)} ${ddmm(x.b.fecha)}${x.b.hora === 'bmo' ? '<i>am</i>' : x.b.hora === 'amc' ? '<i>pm</i>' : ''}</span>`).join('')}</span></div>` : '';
   const zona = [...k.posiciones, ...k.watch].filter(x => x.estado).sort((x, y) => (x.estado === 'urgente' ? 0 : 1) - (y.estado === 'urgente' ? 0 : 1) || ((k.posiciones.some(p => p.ticker === y.ticker) ? 1 : 0) - (k.posiciones.some(p => p.ticker === x.ticker) ? 1 : 0)));
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
+  const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 8);
+  const barLinea = baratas.length ? `<div class="nov-l nov-z"><span class="nov-chips">${baratas.map(x => `<span class="nov-chip val" data-act="pos" data-id="${esc(x.t)}" title="P/E ${x.b.pe.toFixed(1)} vs mediana 10 a\u00f1os ${x.b.med.toFixed(1)}">${esc(x.t)}<i>P/E \u2212${Math.round(x.b.desc * 100)}%</i></span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
     ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero', act: hayActivos ? 'pat-dist' : '',
@@ -4154,7 +4172,7 @@ function viewCartera() {
       ] })}
     ${renderReservaCard(pt)}
     <div class="card kpi nov ${balLineas || zonaLinea ? 'tap' : ''}" ${balLineas || zonaLinea ? 'data-act="ir-alertas"' : ''}><div class="label">Novedades</div>
-      ${balLineas || zonaLinea ? balLineas + zonaLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
+      ${balLineas || zonaLinea || barLinea ? balLineas + zonaLinea + barLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
     </div>
   </div>`;
   const conc = state.cartera.conciliacion || null;
@@ -5406,6 +5424,7 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
       if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
       if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
       if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
+      { const bz = Fund.baratas(todas.map(p => p.ticker)); if (bz.length) l.push(`- **Baratas contra su propia historia** (P/E de hoy \u2265 20 % por debajo de su mediana de 10 a\u00f1os, con ROIC \u2265 12 % o ROE \u2265 15 %): ${bz.map(x => `${x.t} ${x.b.pe.toFixed(1)} vs ${x.b.med.toFixed(1)} (\u2212${Math.round(x.b.desc * 100)} %)`).join(' \u00b7 ')}. Revis\u00e1 si es una oportunidad o si el mercado ve algo que la historia no.`); }
       { const av = todas.map(p => [p.ticker, (Fund.de(p.ticker) || {}).avisos || []]).filter(([, a]) => a.length); if (av.length) l.push(`- **Avisos del control autom\u00e1tico** (tomalos con pinzas): ${av.map(([t, a]) => `${t}: ${a.join('; ')}`).join(' \u00b7 ')}`); }
       return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
   };

@@ -1016,7 +1016,7 @@ const Fund = {
       capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
       perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
       max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
-      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)),
+      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)), peN: peHist.slice(-10).length,
       pb: Number(m.pbQuarterly ?? m.pbAnnual) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
       roe: Number(m.roeTTM ?? m.roeRfy) / 100 || null, roa: Number(m.roaTTM ?? m.roaRfy) / 100 || null,
       margenNeto: Number(m.netProfitMarginTTM) / 100 || null, margenNeto5: Number(m.netProfitMargin5Y) / 100 || null,
@@ -1120,6 +1120,21 @@ const Fund = {
     const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
     return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
   },
+  /** Barata contra su propia historia (Facu: "GOOGL con P/E 17 contra su historia, como no lo vimos"):
+   *  P/E de hoy al menos 20 % por debajo de su mediana de 10 anios, en una empresa de calidad (ROIC >= 12 % o ROE >= 15 %). */
+  barata(t, d = Fund.de(t)) {
+    if (!d || !(d.pe > 0) || !(d.peMediana > 0)) return null;
+    const desc = 1 - d.pe / d.peMediana; if (desc < 0.2) return null;
+    if (d.peN != null && d.peN < 7) return null;  // poca historia (GEV): la mediana no dice nada
+    // confirmacion con ventas o caja libre: si el P/E baja por una ganancia extraordinaria (AMZN, inversiones) y P/S o P/FCF
+    // no estan baratos contra su historia, no cuenta
+    const otros = [[d.ps, d.psMed], [d.pfcf, d.pfcfMed]].filter(([v, m]) => v > 0 && m > 0).map(([v, m]) => 1 - v / m);
+    if (otros.length && !otros.some(x => x >= 0.15)) return null;
+    const calidad = (d.roicAct != null && d.roicAct >= 0.12) || (d.roe != null && d.roe >= 0.15);
+    if (!calidad) return null;
+    return { pe: d.pe, med: d.peMediana, desc };
+  },
+  baratas(tickers) { return tickers.map(t => ({ t, b: Fund.barata(t) })).filter(x => x.b).sort((a, b) => b.b.desc - a.b.desc); },
   /** dividend yield con el precio de hoy */
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
