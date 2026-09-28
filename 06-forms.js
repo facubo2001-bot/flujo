@@ -605,7 +605,7 @@ function formPosicion(ticker) {
   const body = `${fundHTML(ticker, p)}<div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
-    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null };
+    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else { const prev = state.cartera.alertas[ticker] || {}; state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}) }; }
     Persist.save(); toast('Guardado'); render();
   } });
   $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
@@ -719,7 +719,8 @@ function formWatch() {
 
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
 const Intercambio = {
-  FORMATO: 'gestor-gastos-cambios', VERSION: 2,
+  FORMATO: 'gestor-gastos-cambios', VERSION: 3,
+  /** v3 (28-sep): `tier` (A, B, C, Cíclica, Especulativa, F) y `tipo` (sector, p. ej. Tecnología) como campos propios. Tier F saca el ticker. */
   /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
   DESC_MAX: 120, NOTA_MAX: 300,
   partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
@@ -765,7 +766,7 @@ ${tesis || '\u2014'}
 ${c.tablaF}
 
 ${(() => { const pt = E.patrimonio(k); if (!pt.activos.length) return ''; return `## Toda mi plata (patrimonio)
-Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al CCL $ ${fmtARS.format(pt.mep || 0)}.
+Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) contra los CEDEARs ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al CCL $ ${fmtARS.format(pt.mep || 0)}.
 | Activo | Tipo | Valor USD | Detalle |
 |---|---|---|---|
 ${pt.activos.map(a => `| ${a.nombre} | ${E.TIPOS_ACTIVO[a.tipo] || a.tipo} | ${a.valorUSD != null ? n(a.valorUSD) : '\u2014'} | ${a.detalle.replace(/\|/g, '/')} |`).join('\n')}
@@ -802,12 +803,12 @@ Sos mi asesor de inversiones (perfil: largo plazo, calidad a buen precio, Buffet
 \`\`\`json
 { "tipo": "${Intercambio.FORMATO}", "version": ${Intercambio.VERSION}, "fecha": "${hoy}",
   "alertas": {
-    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "desc": "E-commerce + fintech (Mercado Pago) líder de Latinoamérica.", "nota": "A- · próxima compra solo ≤1750" },
+    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "tier": "A", "tipo": "Tecnología", "desc": "E-commerce + fintech (Mercado Pago) líder de Latinoamérica.", "nota": "próxima compra solo ≤1750" },
     "TSM": null
   },
   "comentario": "resumen en una línea de lo que cambiaste y por qué" }
 \`\`\`
-Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es tier + tesis (máx. 300); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
 `;
     return md;
   },
@@ -837,11 +838,13 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
       if (v === null) { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; }
       if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
       const num = x => x == null || x === '' ? null : (Number(x) || null);
-      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) };
+      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) , tier: 'tier' in v ? (Tier.norm(v.tier) || null) : (antes ? antes.tier || null : null), tipo: 'tipo' in v ? (v.tipo ? String(v.tipo).slice(0, 40) : null) : (antes ? antes.tipo || null : null) };
       // nota vieja con " | " (qué hace | tesis): se parte; el desc explícito manda
       if ('nota' in v && despues.nota && despues.nota.includes(' | ')) { const pt = Intercambio.partirNota(despues.nota); despues.nota = pt.nota; if (!('desc' in v)) despues.desc = pt.desc || despues.desc; }
       if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
-      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota'].every(f => (antes[f] || null) === (despues[f] || null));
+      // tier F = no invertible: chau de la watchlist (Facu). Si la tenes en cartera, solo se avisa
+      if (despues.tier === 'F') { if (tengo.has(ticker)) avisos.push(`${ticker}: tier F pero est\u00e1 en tu cartera; queda.`); else { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; } }
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null));
       if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
     }
     return { cambios, avisos, comentario: obj.comentario || '' };
@@ -868,30 +871,15 @@ function mercadoNY() {
 /** un precio traido hace menos de esto cuenta como de hoy: si el auto-refresco corrio segundos antes del toque, no es viejo */
 const CTX_FRESCO = 10 * 60000;
 async function ctxActualizar(paso) {
-  paso('Actualizando d\u00f3lar y precios\u2026');
+  paso('Actualizando dólar y precios…');
   const t0 = Date.now(); ui.ctxT0 = t0;
-  const okPrecios = await Precios.actualizar(true);
-  // un 429 de Finnhub saltea el ticker y le deja el precio viejo: se reintenta una vez, de a uno
-  const viejos = () => Precios.tickers().filter(t => { const q = state.cartera.precios[t]; return !q || !(q.t >= t0 - CTX_FRESCO); });
-  const fallaron = viejos();
-  if (fallaron.length) {
-    paso(`Reintentando ${fallaron.length} precio${fallaron.length === 1 ? '' : 's'}\u2026`);
-    await new Promise(r => setTimeout(r, 2000));
-    for (const t of fallaron) { await Precios.quote(t); await new Promise(r => setTimeout(r, 400)); }
-  }
-  const k = E.cartera();
-  const tickers = [...k.posiciones.map(p => p.ticker), ...k.watch.map(p => p.ticker)];
-  const corte = Date.now() - 30 * 86400000;
-  const faltan = tickers.filter(t => { const d = Fund.de(t); return !d || d.parcial || !(d.at > corte); });
-  // si la precarga del arranque esta corriendo, las fichas quedan para ella: juntas se pasan de 60 por minuto
-  const ahora = Fund._calentando ? [] : faltan.slice(0, 6);
-  for (let i = 0; i < ahora.length; i++) {
-    paso(`Fundamentales ${i + 1} de ${ahora.length}: ${ahora[i]}\u2026`);
-    try { await Fund.traer(ahora[i]); } catch (e) {}
-    await new Promise(r => setTimeout(r, 250));
-  }
+  // tenencias, tier A y lo cerca de zona se traen si o si; el resto solo si esta vencido (todo pasa por la cola de Finnhub)
+  const okPrecios = await Precios.actualizar(true, 'rapidos');
+  const viejos = () => Precios.plan().filter(x => x.edad >= x.cada).map(x => x.t);
+  // las fichas las completa el motor en segundo plano; el texto se rehace solo a medida que llegan
+  Motor.arrancar();
   Persist.save();
-  return { okPrecios, pendientes: faltan.slice(ahora.length), preciosViejos: viejos() };
+  return { okPrecios, pendientes: Fund.pendientes(), preciosViejos: viejos() };
 }
 
 /** piezas del texto de mercado que usa Exportar para Claude */
@@ -937,14 +925,21 @@ ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
 | Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (\u00faltimos 12 m; prom 5 a\u00f1os) | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-${filasF}${pendientes.length ? `\n\nSin fundamentales en esta foto (Finnhub da 60 consultas por minuto; se est\u00e1n completando): ${pendientes.join(', ')}. Si necesit\u00e1s alguno, ped\u00edmelo.` : ''}`,
+${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
+      const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));
+      const l = [];
+      if (pend.length) l.push(`- **Sin fundamentales todav\u00eda** (se est\u00e1n completando, Finnhub da 60 consultas por minuto): ${pend.join(', ')}`);
+      if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
+      if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
+      if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
+      return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
   };
 }
 
 /** cuantas fichas utiles hay (las parciales no cuentan) y cuales faltan */
 function ctxCobertura() {
   const k = E.cartera(); const ts = [...k.posiciones, ...k.watch].map(p => p.ticker);
-  const faltan = ts.filter(t => { const d = Fund.de(t); return !d || d.parcial; });
+  const pend = new Set(Fund.pendientes()); const faltan = ts.filter(t => pend.has(t) || (!Fund.de(t) && !Fund.sinDatos(t)));
   return { total: ts.length, con: ts.length - faltan.length, faltan };
 }
 function ctxResumenFund() {
@@ -962,7 +957,7 @@ function formExportar() {
   const listo = () => { if (!(Precios.tickers().length && (state.settings.finnhubKey || '').trim())) return Promise.resolve({ okPrecios: false, preciosViejos: [], sinClave: true }); return ctxActualizar(paso); };
   listo().then(({ okPrecios, preciosViejos, sinClave }) => {
     const box = $('#ctx-box'); if (!box) return;
-    const md = Intercambio.exportar(ctxCobertura().faltan); const k = E.cartera();
+    const md = Intercambio.exportar(Fund.pendientes()); const k = E.cartera();
     const pf = k.preciosFecha ? new Date(k.preciosFecha) : null;
     const minutos = pf ? Math.max(0, Math.round((Date.now() - pf.getTime()) / 60000)) : null;
     const puedeCompartir = !!navigator.share;
@@ -976,12 +971,12 @@ function formExportar() {
       <p class="ob-nota aclara" style="margin-top:0">Pegalo o adjuntalo al empezar un chat del proyecto Inversiones: sirve para preguntar por una acci\u00f3n o para la revisi\u00f3n completa. Si Claude cambia niveles, us\u00e1 "Cargar actualizaciones".</p>
       <textarea class="input textarea" id="export-md" readonly style="min-height:180px">${esc(md)}</textarea>`;
     // lo que falte se completa en segundo plano y el texto se rehace solo
-    if (ctxResumenFund().faltan.length && !sinClave) Fund.calentar(30, 65000);
+    if (ctxResumenFund().faltan.length && !sinClave) Motor.arrancar();
   });
 }
 window.addEventListener('fund-listo', () => {
   const t = $('#export-md'); if (!t) return;
-  const c = ctxResumenFund(); t.value = Intercambio.exportar(c.faltan);
+  ctxResumenFund(); t.value = Intercambio.exportar(Fund.pendientes());
 });
 
 /* Calendario de balances: proximos earnings de todo lo que se sigue (cartera + watchlist), por fecha.

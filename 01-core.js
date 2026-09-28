@@ -406,6 +406,13 @@ const Persist = {
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
   },
+  /** al reemplazar el estado por el del gist, se conservan las fichas de este dispositivo (el gist no las trae) */
+  conCache(nuevo, viejo) {
+    const c = viejo && viejo.cartera, n = nuevo && nuevo.cartera; if (!c || !n) return nuevo;
+    n.fund = { ...(n.fund || {}), ...(c.fund || {}) };
+    for (const k of ['fundSinDatos', 'calendario']) if (c[k] && !n[k]) n[k] = c[k];
+    return nuevo;
+  },
   setStatus(st, msg) {
     Persist.status = st;
     const map = { idle: ['', 'Sin datos guardados'], busy: ['busy', 'Guardando…'], ok: ['ok', Gist.cfg() && !Persist.artifact ? 'Sincronizado con tu GitHub' : 'Guardado en la nube'], local: ['local', 'Guardado en este dispositivo'], err: ['err', msg || 'No se pudo guardar'] };
@@ -486,11 +493,13 @@ const Gist = {
   },
   async push() {
     const c = Gist.cfg(); if (!c) return false;
-    const files = { [Gist.FILE]: { content: JSON.stringify(state) } };
+    // las fichas de fundamentales, el calendario y los "sin datos" son cache que se vuelve a bajar: no viajan al gist
+    const liviano = JSON.stringify(state, (k, v) => (k === 'fund' || k === 'fundSinDatos' || k === 'calendario') ? undefined : v);
+    const files = { [Gist.FILE]: { content: liviano } };
     // copia mensual aparte, que no se pisa: respaldo-AAAA-MM.json (una por mes, en el mismo gist)
     const mes = D.thisMonth(); const marca = 'flujo.gist.mes';
     let ultimo = null; try { ultimo = localStorage.getItem(marca); } catch (e) {}
-    if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: JSON.stringify(state) };
+    if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: liviano };
     const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
     try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
@@ -520,7 +529,7 @@ const Gist = {
     Gist.lastPull = Date.now();
     try {
       const remote = await Gist.pull();
-      if (remote && remote.v && (remote.updatedAt || 0) > (state.updatedAt || 0)) { state = Persist.migrate(remote); if (Persist.applyPreset()) { state.updatedAt = Date.now(); Persist.schedule(1500); } Persist.local(); Persist.setStatus('ok'); return true; }
+      if (remote && remote.v && (remote.updatedAt || 0) > (state.updatedAt || 0)) { state = Persist.conCache(Persist.migrate(remote), state); if (Persist.applyPreset()) { state.updatedAt = Date.now(); Persist.schedule(1500); } Persist.local(); Persist.setStatus('ok'); return true; }
       if (remote && (state.updatedAt || 0) > (remote.updatedAt || 0)) Persist.schedule(800);
       Persist.setStatus('ok');
     } catch (e) { if (e && e.status === 401) Persist.setStatus('err', 'Token de GitHub inválido'); }
@@ -677,48 +686,120 @@ const Spy = {
 };
 
 /* ---------- precios de acciones (Finnhub, clave gratuita en Ajustes) ---------- */
+/* ---------- Finnhub: una sola puerta con limite (plan gratis: 60 por minuto; usamos 55) ----------
+ * Toda llamada pasa por aca: precios, fundamentales y calendario comparten el cupo. Un 429 pausa a todos
+ * 60 s (o lo que diga Retry-After) y la misma llamada se reintenta: no se pierde el ticker. */
+const Finnhub = {
+  LIMITE: 55, _hits: [], _pausa: 0,
+  async turno() {
+    for (;;) {
+      const now = Date.now();
+      if (now < Finnhub._pausa) { await new Promise(r => setTimeout(r, Finnhub._pausa - now + 50)); continue; }
+      Finnhub._hits = Finnhub._hits.filter(x => now - x < 60000);
+      if (Finnhub._hits.length < Finnhub.LIMITE) { Finnhub._hits.push(now); return; }
+      await new Promise(r => setTimeout(r, 60000 - (now - Finnhub._hits[0]) + 50));
+    }
+  },
+  /** GET: { ok, status, json }. status 429 solo si fallo 3 veces seguidas por limite */
+  async get(path) {
+    const key = (state.settings.finnhubKey || '').trim(); if (!key) return { ok: false, status: 401 };
+    for (let i = 0; i < 3; i++) {
+      await Finnhub.turno();
+      try {
+        const r = await fetch(`https://finnhub.io/api/v1/${path}${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(key)}`, { cache: 'no-store' });
+        if (r.status === 429) { const ra = Number(r.headers.get('Retry-After')) || 60; Finnhub._pausa = Date.now() + Math.min(120, ra) * 1000; continue; }
+        if (!r.ok) return { ok: false, status: r.status };
+        return { ok: true, status: 200, json: await r.json() };
+      } catch (e) { return { ok: false, status: 0 }; }
+    }
+    return { ok: false, status: 429 };
+  },
+  /** consultas usadas en el ultimo minuto (para el indicador) */
+  usadas() { const now = Date.now(); return Finnhub._hits.filter(x => now - x < 60000).length; },
+};
+
+/* ---------- Tier y tipo de cada ticker (A, B, C, Ciclica, Especulativa, F) ----------
+ * Campo propio en la alerta (formato de cambios v3). Si no esta, se deduce de la nota ("A def", "B+ ciclica"). */
+const TIERS = ['A', 'B', 'C', 'Cíclica', 'Especulativa', 'F'];
+const Tier = {
+  norm(x) {
+    const t = normTxt(String(x || '').split('·')[0]); if (!t) return null;
+    if (/^f\b/.test(t)) return 'F';
+    if (/especul/.test(t)) return 'Especulativa';
+    if (/cicl/.test(t)) return 'Cíclica';
+    const m = t.match(/^([abc])(?:[+\-]|\b)/); return m ? m[1].toUpperCase() : null;
+  },
+  de(t) { const a = state.cartera.alertas[t]; if (!a) return null; return (a.tier && Tier.norm(a.tier)) || Tier.norm(a.nota); },
+};
+
 const Precios = {
   simbolo(t) { return t.replace('-', '.'); },
   /** una cotización puntual (para el form de operación); devuelve el precio o null */
+  /** una cotizacion puntual; devuelve el precio o null. Sin precio en Finnhub (OTC, Brasil) -> "sin fuente" */
   async quote(t) {
-    const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
-    try { const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); if (!j || !Number(j.c)) return null; state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; return Number(j.c); } catch (e) { return null; }
+    if (!t) return null;
+    const r = await Finnhub.get(`quote?symbol=${encodeURIComponent(Precios.simbolo(t))}`);
+    if (!r.ok) return null;
+    const j = r.json || {}; const prev = state.cartera.precios[t] || {};
+    if (!Number(j.c)) { state.cartera.precios[t] = { ...prev, sinFuente: Date.now() }; return null; }
+    state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() };
+    return Number(j.c);
   },
-  tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) set.add(t); set.add('SPY'); return [...set]; },
-  /** una sola corrida a la vez: si el auto-refresco y un toque se pisan, Finnhub da 429 y los dos pierden tickers */
-  actualizar(silencioso = false) {
-    if (Precios._run) { if (!silencioso) toast('Ya se est\u00e1n actualizando los precios\u2026'); return Precios._run; }
-    Precios._run = Precios._actualizar(silencioso).finally(() => { Precios._run = null; });
+  tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) if (Tier.de(t) !== 'F') set.add(t); set.add('SPY'); return [...set]; },
+  /** "sin fuente": Finnhub no tiene precio; se reintenta una vez por mes */
+  sinFuente(t) { const q = state.cartera.precios[t]; return !!(q && q.sinFuente && Date.now() - q.sinFuente < 30 * 86400000); },
+  /** prioridad y cada cuanto: cerca de zona (a <5 % de mirala) y tenencias y tier A cada 15 min, B cada hora, el resto cada 4 h.
+   *  Con el mercado de NY cerrado alcanza con un precio cada 12 h. */
+  plan() {
+    const k = E.cartera(); const tengo = new Set(k.posiciones.map(p => p.ticker)); const ny = typeof mercadoNY === 'function' ? mercadoNY() : { abierto: true };
+    const MIN = 60000; const RANGO = { A: 2, B: 3, C: 4, 'Cíclica': 4, Especulativa: 5 };
+    return Precios.tickers().map(t => {
+      const q = state.cartera.precios[t]; const al = state.cartera.alertas[t]; const tier = Tier.de(t);
+      const cerca = !!(al && al.mirala && q && q.c && q.c <= al.mirala * 1.05);
+      const rapido = cerca || tengo.has(t) || tier === 'A' || t === 'SPY';
+      let cada = rapido ? 15 * MIN : tier === 'B' ? 60 * MIN : 240 * MIN;
+      if (!ny.abierto) cada = Math.max(cada, 12 * 60 * MIN);
+      const rango = cerca ? 0 : (tengo.has(t) || t === 'SPY') ? 1 : (RANGO[tier] ?? 4);
+      return { t, rango, cada, rapido, edad: q && q.t ? Date.now() - q.t : Infinity, sinFuente: Precios.sinFuente(t) };
+    }).filter(x => !x.sinFuente).sort((a, b) => a.rango - b.rango || b.edad - a.edad);
+  },
+  vencidos() { return Precios.plan().filter(x => x.edad >= x.cada); },
+  /** una sola corrida a la vez */
+  actualizar(silencioso = false, modo = 'todos') {
+    if (Precios._run) { if (!silencioso) toast('Ya se están actualizando los precios…'); return Precios._run; }
+    Precios._run = Precios._actualizar(silencioso, modo).finally(() => { Precios._run = null; });
     return Precios._run;
   },
-  async _actualizar(silencioso = false) {
+  /** modo: 'todos' (boton), 'rapidos' (tenencias, A, cerca de zona + lo vencido; lo usa el export) o 'vencidos' (el motor) */
+  async _actualizar(silencioso = false, modo = 'todos') {
     try { await TC.actualizar(true); } catch (e) {}
     if ((state.cartera.activos || []).some(a => a.tipo === 'btc')) { try { await Btc.actualizar(); } catch (e) {} }
     try { await AD.actualizar(); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }
-    const tickers = Precios.tickers(); if (!tickers.length) return false;
+    const plan = Precios.plan(); const lista = modo === 'todos' ? plan : modo === 'rapidos' ? plan.filter(x => x.rapido || x.edad >= x.cada) : plan.filter(x => x.edad >= x.cada);
+    if (!lista.length) return true;
     let ok = 0;
-    for (const t of tickers) {
-      try {
-        const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' });
-        if (r.status === 429) { await new Promise(res => setTimeout(res, 1200)); continue; }
-        if (!r.ok) continue;
-        const j = await r.json(); if (!j || !Number(j.c)) continue;
-        state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; ok++;
-      } catch (e) {}
-    }
-    if (ok) {
-      state.cartera.preciosFecha = new Date().toISOString();
-      const hoy = D.today(); const spy = state.cartera.precios.SPY;
-      if (spy && spy.c && D.habil(hoy) === hoy) state.cartera.spy[hoy] = spy.c;
-      if (spy && spy.pc && D.habil(hoy) === hoy) { const ayer = D.habil(D.addDays(hoy, -1)); const m = Spy.tabla(); if (!m[ayer] && Math.abs(spy.c / spy.pc - 1) < 0.07) state.cartera.spy[ayer] = spy.pc; }
-      // valuación del día solo si el refresco fue (casi) completo y trajo SPY: un snapshot con precios viejos ensuciaría la serie y el TWR
-      try { const k = E.cartera(); if (k.valor != null && spy && spy.c && ok >= Math.ceil(tickers.length * 0.85)) { const h = state.cartera.historial; const vi = k.ventanas.inicio, va = k.ventanas.anio; h[hoy] = { v: Math.round(k.valor * 100) / 100, c: Math.round(k.costo * 100) / 100, s: vi.disponible ? Math.round(vi.sombraValor * 100) / 100 : null, sa: va.disponible ? Math.round(va.sombraValor * 100) / 100 : null, spy: k.spyHoy, mep: k.mep, ccl: k.ccl }; const ks = Object.keys(h).sort(); if (ks.length > 1500) for (const old of ks.slice(0, ks.length - 1500)) delete h[old]; } } catch (e) {}
-      Persist.save();
-    }
-    if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${tickers.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
+    for (const x of lista) { if (await Precios.quote(x.t) != null) ok++; }
+    if (ok) Precios._despues(ok, lista.length);
+    if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${lista.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
     return ok > 0;
+  },
+  /** despues de traer precios: fecha, SPY del dia y la valuacion diaria */
+  _despues(ok, n) {
+    state.cartera.preciosFecha = new Date().toISOString();
+    const hoy = D.today(); const spy = state.cartera.precios.SPY;
+    if (spy && spy.c && D.habil(hoy) === hoy) state.cartera.spy[hoy] = spy.c;
+    if (spy && spy.pc && D.habil(hoy) === hoy) { const ayer = D.habil(D.addDays(hoy, -1)); const m = Spy.tabla(); if (!m[ayer] && Math.abs(spy.c / spy.pc - 1) < 0.07) state.cartera.spy[ayer] = spy.pc; }
+    // valuacion del dia solo si todas las tenencias tienen precio de las ultimas 2 h (un snapshot con precios viejos ensucia el TWR)
+    try { const k = E.cartera(); const fresco = k.posiciones.every(p => { const q = state.cartera.precios[p.ticker]; return q && q.t && Date.now() - q.t < 2 * 3600000; });
+      if (k.valor != null && spy && spy.c && fresco) Precios._foto(k, hoy); } catch (e) {}
+    Persist.save();
+  },
+  _foto(k, hoy) {
+    const h = state.cartera.historial; const vi = k.ventanas.inicio, va = k.ventanas.anio;
+    h[hoy] = { v: Math.round(k.valor * 100) / 100, c: Math.round(k.costo * 100) / 100, s: vi.disponible ? Math.round(vi.sombraValor * 100) / 100 : null, sa: va.disponible ? Math.round(va.sombraValor * 100) / 100 : null, spy: k.spyHoy, mep: k.mep, ccl: k.ccl };
+    const ks = Object.keys(h).sort(); if (ks.length > 1500) for (const old of ks.slice(0, ks.length - 1500)) delete h[old];
   },
 };
 
@@ -856,16 +937,27 @@ const Fund = {
   async traer(t) {
     const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
     const s = encodeURIComponent(Precios.simbolo(t));
-    const get = async q => { try { const r = await fetch(`https://finnhub.io/api/v1/${q}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; return await r.json(); } catch (e) { return null; } };
+    // todo pasa por la cola de Finnhub; si alguna llamada choca con el limite, la ficha NO se guarda a medias
+    let limite = false;
+    const get = async q => { const r = await Finnhub.get(q); if (r.status === 429) limite = true; return r.ok ? r.json : null; };
     const hoy = D.today(); const hasta = D.iso(new Date(D.parse(hoy).getTime() + 200 * 86400000));
     const desdeQ = D.addDays(hoy, -800);
-    const [perfil, met, fin, cal, finQ] = await Promise.all([
-      get(`stock/profile2?symbol=${s}`),
+    const previa0 = Fund.de(t);
+    // perfil: una vez cada 90 dias (nombre, sector, mercado no cambian); calendario: una consulta al dia para todos
+    const perfilViejo = !(previa0 && previa0.nombre && previa0.perfilAt && Date.now() - previa0.perfilAt < 90 * 86400000);
+    const calGlobal = Fund.calendarioFresco();
+    const [perfil0, met, fin, cal, finQ] = await Promise.all([
+      perfilViejo ? get(`stock/profile2?symbol=${s}`) : null,
       get(`stock/metric?symbol=${s}&metric=all`),
       get(`stock/financials-reported?symbol=${s}&freq=annual&from=2008-01-01&to=${hoy}`),
-      get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
+      calGlobal ? null : get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
       get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${desdeQ}&to=${hoy}`),
     ]);
+    if (limite) return null;
+    const perfil = perfil0 || (previa0 && previa0.nombre ? { name: previa0.nombre, finnhubIndustry: previa0.sector, exchange: previa0.mercado, marketCapitalization: null, _viejo: true } : null);
+    const vacio = x => !x || (typeof x === 'object' && !Object.keys(x).length) || (x.metric && !Object.keys(x.metric).length && !(x.series && Object.keys(x.series).length));
+    // Finnhub no tiene nada de este ticker (OTC, Brasil): se marca y no se reintenta por 30 dias
+    if (vacio(perfil0) && !(previa0 && previa0.nombre) && vacio(met) && !(fin && fin.data && fin.data.length)) { state.cartera.fundSinDatos = state.cartera.fundSinDatos || {}; state.cartera.fundSinDatos[t] = Date.now(); return null; }
     if (!perfil && !met && !fin) return null;
     // Si Finnhub corto por limite (la llamada falla, no viene vacia), la ficha nueva esta incompleta.
     // Metricas es el nucleo: sin ellas se conserva la anterior o se guarda marcada vieja para reintentar.
@@ -881,11 +973,12 @@ const Fund = {
     const prom5 = k => { const xs = hist(k).slice(-5); return xs.length >= 3 ? sum(xs) / xs.length : null; };
     const med10 = k => { const xs = hist(k).slice(-10); return xs.length >= 3 ? Fund.mediana(xs) : null; };
     const peHist = hist('pe');
-    const bal = cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
+    const bal = calGlobal ? Fund.calDe(t) : cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
     const d = {
       at: Date.now(), ticker: t,
       nombre: perfil && perfil.name || null, sector: perfil && perfil.finnhubIndustry || null,
-      capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : null,
+      capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
+      perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
       max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
       pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)),
       pb: Number(m.pbAnnual ?? m.pbQuarterly) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
@@ -946,7 +1039,7 @@ const Fund = {
     if (!met) { d.parcial = true; d.at = Date.now() - 31 * 86400000; }
     state.cartera.fund[t] = d;
     try { window.dispatchEvent(new CustomEvent('fund-listo', { detail: t })); } catch (e) {}
-    const ks = Object.keys(state.cartera.fund); if (ks.length > 60) delete state.cartera.fund[ks[0]];
+    if (state.cartera.fundSinDatos) delete state.cartera.fundSinDatos[t];
     Persist.save();
     return d;
   },
@@ -959,36 +1052,82 @@ const Fund = {
     const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
     return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
   },
-  /** refresca en segundo plano los tickers de la cartera con datos viejos (para los avisos de balance) */
-  async actualizarCartera(max = 8, diasFrescura = 6) {
-    if (!(state.settings.finnhubKey || '').trim()) return 0;
-    const f = state.cartera.fund || {}; const corte = Date.now() - diasFrescura * 86400000;
-    const ts = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).slice(0, max);
-    let n = 0; for (const t of ts) { try { if (await Fund.traer(t)) n++; } catch (e) {} await new Promise(r => setTimeout(r, 300)); }
-    return n;
+  /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
+  ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
+  sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
+  /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
+   *  o porque ya paso su balance (los numeros nuevos llegan ahi). */
+  pendientes() {
+    const tengo = new Set(E.cartera().posiciones.map(p => p.ticker)); const hoy = D.today();
+    const plan = Precios.plan().filter(x => x.t !== 'SPY'); const orden = new Map(plan.map((x, i) => [x.t, i]));
+    // los "sin fuente" de precio tambien se intentan (algunos OTC tienen fundamentales)
+    const todos = [...new Set([...plan.map(x => x.t), ...Precios.tickers().filter(t => t !== 'SPY')])];
+    return todos.filter(t => {
+      if (Fund.sinDatos(t)) return false;
+      const d = Fund.de(t); if (!d || d.parcial) return true;
+      if (Date.now() - d.at > Fund.ttl(t, tengo.has(t))) return true;
+      const b = Fund.calDe(t) || d.balance; if (b && b.fecha && b.fecha < hoy && d.at < D.parse(b.fecha).getTime() + 3 * 86400000 && Date.now() - D.parse(b.fecha).getTime() > 3 * 86400000) return true;
+      return false;
+    }).sort((a, b) => (orden.has(a) ? orden.get(a) : 1e6) - (orden.has(b) ? orden.get(b) : 1e6));
   },
-  /** Mantiene tibias las fichas de toda la cartera y la watchlist: tandas de 8 cada 65 s hasta que no
-   *  quede ninguna vieja. Finnhub gratis corta a las 60 llamadas por minuto y cada ficha son cinco (perfil, metricas, anual, calendario, trimestral).
-   *  Una sola corrida a la vez; cada ficha que llega avisa con el evento 'fund-listo'. */
-  _calentando: null,
-  calentar(diasFrescura = 6, pausaInicial = 0) {
-    if (Fund._calentando) return Fund._calentando;
-    Fund._calentando = (async () => {
-      for (let ronda = 0; ronda < 8; ronda++) {
-        const espera = ronda ? 65000 : pausaInicial;
-        if (espera) await new Promise(r => setTimeout(r, espera));
-        const n = await Fund.actualizarCartera(8, diasFrescura);
-        const f = state.cartera.fund || {}; const corte = Date.now() - diasFrescura * 86400000;
-        const quedan = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).length;
-        if (!quedan || (!n && ronda)) break;
-      }
-    })().finally(() => { Fund._calentando = null; });
-    return Fund._calentando;
+  /** calendario de balances de TODO el mercado: una consulta por dia; se guardan solo los tickers que seguis */
+  calendarioFresco() { const c = state.cartera.calendario; return !!(c && c.ok && Date.now() - c.at < 26 * 3600000); },
+  calDe(t) { const c = state.cartera.calendario; if (!c || !c.ok) return null; const x = c.map[Precios.simbolo(t)] || c.map[t]; return x || null; },
+  async calendario() {
+    const c = state.cartera.calendario; if (c && Date.now() - c.at < 24 * 3600000) return;
+    const hoy = D.today(); const hasta = D.addDays(hoy, 75);
+    const r = await Finnhub.get(`calendar/earnings?from=${hoy}&to=${hasta}`);
+    if (r.status === 429) return;
+    const lista = r.ok && r.json && Array.isArray(r.json.earningsCalendar) ? r.json.earningsCalendar : [];
+    const seguir = new Set(Precios.tickers().map(Precios.simbolo)); const map = {};
+    for (const e of lista) if (e && e.symbol && seguir.has(e.symbol) && e.date >= hoy && (!map[e.symbol] || e.date < map[e.symbol].date)) map[e.symbol] = { fecha: e.date, date: e.date, hour: e.hour || '', hora: e.hour || '', epsEstimate: e.epsEstimate ?? null, epsEst: e.epsEstimate ?? null, quarter: e.quarter ?? null, trimestre: e.quarter ?? null };
+    // si vino vacio (plan que no lo permite), cada ficha pide el suyo como antes
+    state.cartera.calendario = { at: Date.now(), ok: lista.length > 20, map };
   },
+  /** compat: el export y la precarga vieja la llaman */
+  async actualizarCartera(max = 8) { let n = 0; for (const t of Fund.pendientes().slice(0, max)) { try { if (await Fund.traer(t)) n++; } catch (e) {} } return n; },
+  calentar() { return Motor.arrancar(); },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
   /** balance "cerca": 14 dias antes si la tenes en cartera, 7 si solo la vigilas (Facu) */
   balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= (tengo ? 14 : 7) ? b : null; },
-  balance(t) { const d = Fund.de(t); if (!d || !d.balance) return null; const dias = D.daysBetween(D.today(), d.balance.fecha); return dias >= 0 ? { ...d.balance, dias } : null; },
+  balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
+};
+
+/* ---------- Motor: mantiene al dia precios y fichas mientras la app esta abierta ----------
+ * No guarda una cola aparte: en cada vuelta mira que esta vencido (por la fecha de lo ultimo que se bajo),
+ * asi que si iOS frena la app, al volver sigue donde quedo. Primero precios vencidos, despues el
+ * calendario del dia, despues una ficha; se repite. Con todo al dia, revisa cada minuto. */
+const Motor = {
+  _run: null, _ultimoRender: 0,
+  arrancar() {
+    if (Motor._run) return Motor._run;
+    Motor._run = (async () => {
+      for (;;) {
+        if (document.hidden || !(state.settings.finnhubKey || '').trim() || window.claude) break;
+        const venc = Precios.vencidos();
+        if (venc.length) { let ok = 0; for (const x of venc.slice(0, 20)) { if (document.hidden) break; if (await Precios.quote(x.t) != null) ok++; } if (ok) Precios._despues(ok, venc.length); Motor.pintar(); continue; }
+        await Fund.calendario();
+        const pend = Fund.pendientes();
+        if (pend.length) { try { await Fund.traer(pend[0]); } catch (e) {} Motor.pintar(); continue; }
+        await new Promise(r => setTimeout(r, 60000));
+      }
+    })().finally(() => { Motor._run = null; });
+    return Motor._run;
+  },
+  /** repinta Cartera como mucho cada 8 s (y nunca con una ficha o un form abierto) */
+  pintar() {
+    if (Date.now() - Motor._ultimoRender < 8000) return; Motor._ultimoRender = Date.now();
+    try { if (ui.view === 'cartera' && !$('#overlay').classList.contains('open')) render(); } catch (e) {}
+  },
+  /** para el indicador: cuantas fichas al dia y cuanto falta */
+  progreso() {
+    const ts = Precios.tickers().filter(t => t !== 'SPY'); const pend = new Set(Fund.pendientes());
+    const sinDatos = ts.filter(t => Fund.sinDatos(t)); const total = ts.length - sinDatos.length;
+    const faltan = ts.filter(t => pend.has(t)).length; const min = Math.ceil(faltan * 3 / 45);
+    const sinFuente = ts.filter(t => Precios.sinFuente(t));
+    const conPrecio = ts.filter(t => { const q = state.cartera.precios[t]; return q && q.c && !Precios.sinFuente(t); }).length;
+    return { total, alDia: total - faltan, faltan, min, sinDatos, sinFuente, conPrecio, totalPrecio: ts.length - sinFuente.length };
+  },
 };
 
 /* ---------- toast ---------- */

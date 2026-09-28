@@ -28,7 +28,7 @@ function render() {
   const onb = ui.view === 'resumen' && sinDatos();
   document.body.classList.toggle('onboarding', onb);
   $('#view').innerHTML = (onb ? '' : renderTopbar()) + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
-  if (window.innerWidth > 900) $('#btn-new-desktop').style.display = '';
+  { const bd = $('#btn-new-desktop'); if (bd && window.innerWidth > 900) bd.style.display = ''; }
   ChartQ.mount(); aplicarInfo($('.main'));
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
@@ -157,7 +157,7 @@ const Actions = {
   'rs-vincular'() { ReservaUI.vincular(); },
   'activo'(id) { formActivo(id); },
   'del-activo'(id) { state.cartera.activos = (state.cartera.activos || []).filter(a => a.id !== id); Persist.save(); Modal.close(); render(); },
-  'reserva-objetivo'() { const cur = Number(state.settings.reservaObjetivo) || 10; const v = prompt('Objetivo de reserva (% de toda tu plata en efectivo + fondos)', String(cur)); if (v == null) return; const n = M.parse(v); if (n > 0 && n < 100) { state.settings.reservaObjetivo = n; Persist.save(); render(); } },
+  'reserva-objetivo'() { const cur = Number(state.settings.reservaObjetivo) || 10; const v = prompt('Objetivo de reserva: efectivo + fondos como % de tus CEDEARs', String(cur)); if (v == null) return; const n = M.parse(v); if (n > 0 && n < 100) { state.settings.reservaObjetivo = n; Persist.save(); render(); } },
   'cmap-todas'() { ui.cmapTodas = !ui.cmapTodas; render(); },
   'fund-cuenta'(t) { ui.fundCuenta = ui.fundCuenta === t ? null : t; const box = $('#fund-box'); if (box) { const p = E.cartera().posiciones.find(x => x.ticker === t) || null; box.outerHTML = fundHTML(t, p); } },
   async 'fund-crudo'(t) { toast('Trayendo datos crudos de Finnhub\u2026'); const j = await Fund.crudo(t); if (!j) { toast('Falta la clave de Finnhub'); return; } const txt = JSON.stringify(j); try { await navigator.clipboard.writeText(txt); toast(`Copiado: ${Math.round(txt.length / 1024)} KB para pegar en el chat`); } catch (e) { Modal.open({ title: `Datos crudos ${t}`, submit: '', body: `<textarea class="input textarea" readonly style="min-height:240px">${esc(txt)}</textarea>` }); } },
@@ -262,7 +262,7 @@ document.addEventListener('keydown', e => {
 let rzT, lastW = window.innerWidth; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (!$('#overlay').classList.contains('open')) render(); }, 250); });
 $('.main').addEventListener('scroll', headLine, { passive: true });
 window.addEventListener('beforeunload', () => { if (Persist.dirty) { Persist.local(); } });
-document.addEventListener('visibilitychange', () => { if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } else if (!document.hidden && Gist.cfg() && !Persist.dirty) { Gist.refrescar().then(ch => { if (ch && !$('#overlay').classList.contains('open')) { render(); toast('Datos actualizados'); } }); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => Motor.arrancar(), 1500); if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } else if (!document.hidden && Gist.cfg() && !Persist.dirty) { Gist.refrescar().then(ch => { if (ch && !$('#overlay').classList.contains('open')) { render(); toast('Datos actualizados'); } }); } });
 
 function importarCSV(txt) {
   const lines = txt.split(/\r?\n/).filter(l => l.trim()); if (lines.length < 2) { toast('CSV vacío'); return; }
@@ -297,7 +297,7 @@ function importarCSV(txt) {
   }
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
   if (!window.claude) Cedears.actualizar().then(ch => { if (ch) console.log('Tabla de CEDEARs actualizada:', Cedears.actualizado()); });
-  if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
-  if (!window.claude) setTimeout(() => Fund.calentar().then(() => { if (ui.view === 'cartera' && !$('#overlay').classList.contains('open')) render(); }), 4000);
+  // precios y fichas: el motor revisa que esta vencido (por tier) y lo trae por la cola de Finnhub
+  if (!window.claude) setTimeout(() => Motor.arrancar(), 2500);
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();

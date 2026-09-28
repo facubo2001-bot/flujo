@@ -1447,7 +1447,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280203';
+const BUILD = '202609281651';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1555,6 +1555,13 @@ const Persist = {
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
   },
+  /** al reemplazar el estado por el del gist, se conservan las fichas de este dispositivo (el gist no las trae) */
+  conCache(nuevo, viejo) {
+    const c = viejo && viejo.cartera, n = nuevo && nuevo.cartera; if (!c || !n) return nuevo;
+    n.fund = { ...(n.fund || {}), ...(c.fund || {}) };
+    for (const k of ['fundSinDatos', 'calendario']) if (c[k] && !n[k]) n[k] = c[k];
+    return nuevo;
+  },
   setStatus(st, msg) {
     Persist.status = st;
     const map = { idle: ['', 'Sin datos guardados'], busy: ['busy', 'Guardando…'], ok: ['ok', Gist.cfg() && !Persist.artifact ? 'Sincronizado con tu GitHub' : 'Guardado en la nube'], local: ['local', 'Guardado en este dispositivo'], err: ['err', msg || 'No se pudo guardar'] };
@@ -1635,11 +1642,13 @@ const Gist = {
   },
   async push() {
     const c = Gist.cfg(); if (!c) return false;
-    const files = { [Gist.FILE]: { content: JSON.stringify(state) } };
+    // las fichas de fundamentales, el calendario y los "sin datos" son cache que se vuelve a bajar: no viajan al gist
+    const liviano = JSON.stringify(state, (k, v) => (k === 'fund' || k === 'fundSinDatos' || k === 'calendario') ? undefined : v);
+    const files = { [Gist.FILE]: { content: liviano } };
     // copia mensual aparte, que no se pisa: respaldo-AAAA-MM.json (una por mes, en el mismo gist)
     const mes = D.thisMonth(); const marca = 'flujo.gist.mes';
     let ultimo = null; try { ultimo = localStorage.getItem(marca); } catch (e) {}
-    if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: JSON.stringify(state) };
+    if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: liviano };
     const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
     try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
@@ -1669,7 +1678,7 @@ const Gist = {
     Gist.lastPull = Date.now();
     try {
       const remote = await Gist.pull();
-      if (remote && remote.v && (remote.updatedAt || 0) > (state.updatedAt || 0)) { state = Persist.migrate(remote); if (Persist.applyPreset()) { state.updatedAt = Date.now(); Persist.schedule(1500); } Persist.local(); Persist.setStatus('ok'); return true; }
+      if (remote && remote.v && (remote.updatedAt || 0) > (state.updatedAt || 0)) { state = Persist.conCache(Persist.migrate(remote), state); if (Persist.applyPreset()) { state.updatedAt = Date.now(); Persist.schedule(1500); } Persist.local(); Persist.setStatus('ok'); return true; }
       if (remote && (state.updatedAt || 0) > (remote.updatedAt || 0)) Persist.schedule(800);
       Persist.setStatus('ok');
     } catch (e) { if (e && e.status === 401) Persist.setStatus('err', 'Token de GitHub inválido'); }
@@ -1826,48 +1835,120 @@ const Spy = {
 };
 
 /* ---------- precios de acciones (Finnhub, clave gratuita en Ajustes) ---------- */
+/* ---------- Finnhub: una sola puerta con limite (plan gratis: 60 por minuto; usamos 55) ----------
+ * Toda llamada pasa por aca: precios, fundamentales y calendario comparten el cupo. Un 429 pausa a todos
+ * 60 s (o lo que diga Retry-After) y la misma llamada se reintenta: no se pierde el ticker. */
+const Finnhub = {
+  LIMITE: 55, _hits: [], _pausa: 0,
+  async turno() {
+    for (;;) {
+      const now = Date.now();
+      if (now < Finnhub._pausa) { await new Promise(r => setTimeout(r, Finnhub._pausa - now + 50)); continue; }
+      Finnhub._hits = Finnhub._hits.filter(x => now - x < 60000);
+      if (Finnhub._hits.length < Finnhub.LIMITE) { Finnhub._hits.push(now); return; }
+      await new Promise(r => setTimeout(r, 60000 - (now - Finnhub._hits[0]) + 50));
+    }
+  },
+  /** GET: { ok, status, json }. status 429 solo si fallo 3 veces seguidas por limite */
+  async get(path) {
+    const key = (state.settings.finnhubKey || '').trim(); if (!key) return { ok: false, status: 401 };
+    for (let i = 0; i < 3; i++) {
+      await Finnhub.turno();
+      try {
+        const r = await fetch(`https://finnhub.io/api/v1/${path}${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(key)}`, { cache: 'no-store' });
+        if (r.status === 429) { const ra = Number(r.headers.get('Retry-After')) || 60; Finnhub._pausa = Date.now() + Math.min(120, ra) * 1000; continue; }
+        if (!r.ok) return { ok: false, status: r.status };
+        return { ok: true, status: 200, json: await r.json() };
+      } catch (e) { return { ok: false, status: 0 }; }
+    }
+    return { ok: false, status: 429 };
+  },
+  /** consultas usadas en el ultimo minuto (para el indicador) */
+  usadas() { const now = Date.now(); return Finnhub._hits.filter(x => now - x < 60000).length; },
+};
+
+/* ---------- Tier y tipo de cada ticker (A, B, C, Ciclica, Especulativa, F) ----------
+ * Campo propio en la alerta (formato de cambios v3). Si no esta, se deduce de la nota ("A def", "B+ ciclica"). */
+const TIERS = ['A', 'B', 'C', 'Cíclica', 'Especulativa', 'F'];
+const Tier = {
+  norm(x) {
+    const t = normTxt(String(x || '').split('·')[0]); if (!t) return null;
+    if (/^f\b/.test(t)) return 'F';
+    if (/especul/.test(t)) return 'Especulativa';
+    if (/cicl/.test(t)) return 'Cíclica';
+    const m = t.match(/^([abc])(?:[+\-]|\b)/); return m ? m[1].toUpperCase() : null;
+  },
+  de(t) { const a = state.cartera.alertas[t]; if (!a) return null; return (a.tier && Tier.norm(a.tier)) || Tier.norm(a.nota); },
+};
+
 const Precios = {
   simbolo(t) { return t.replace('-', '.'); },
   /** una cotización puntual (para el form de operación); devuelve el precio o null */
+  /** una cotizacion puntual; devuelve el precio o null. Sin precio en Finnhub (OTC, Brasil) -> "sin fuente" */
   async quote(t) {
-    const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
-    try { const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); if (!j || !Number(j.c)) return null; state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; return Number(j.c); } catch (e) { return null; }
+    if (!t) return null;
+    const r = await Finnhub.get(`quote?symbol=${encodeURIComponent(Precios.simbolo(t))}`);
+    if (!r.ok) return null;
+    const j = r.json || {}; const prev = state.cartera.precios[t] || {};
+    if (!Number(j.c)) { state.cartera.precios[t] = { ...prev, sinFuente: Date.now() }; return null; }
+    state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() };
+    return Number(j.c);
   },
-  tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) set.add(t); set.add('SPY'); return [...set]; },
-  /** una sola corrida a la vez: si el auto-refresco y un toque se pisan, Finnhub da 429 y los dos pierden tickers */
-  actualizar(silencioso = false) {
-    if (Precios._run) { if (!silencioso) toast('Ya se est\u00e1n actualizando los precios\u2026'); return Precios._run; }
-    Precios._run = Precios._actualizar(silencioso).finally(() => { Precios._run = null; });
+  tickers() { const k = E.cartera(); const set = new Set(); for (const p of k.posiciones) set.add(p.ticker); for (const t of Object.keys(state.cartera.alertas)) if (Tier.de(t) !== 'F') set.add(t); set.add('SPY'); return [...set]; },
+  /** "sin fuente": Finnhub no tiene precio; se reintenta una vez por mes */
+  sinFuente(t) { const q = state.cartera.precios[t]; return !!(q && q.sinFuente && Date.now() - q.sinFuente < 30 * 86400000); },
+  /** prioridad y cada cuanto: cerca de zona (a <5 % de mirala) y tenencias y tier A cada 15 min, B cada hora, el resto cada 4 h.
+   *  Con el mercado de NY cerrado alcanza con un precio cada 12 h. */
+  plan() {
+    const k = E.cartera(); const tengo = new Set(k.posiciones.map(p => p.ticker)); const ny = typeof mercadoNY === 'function' ? mercadoNY() : { abierto: true };
+    const MIN = 60000; const RANGO = { A: 2, B: 3, C: 4, 'Cíclica': 4, Especulativa: 5 };
+    return Precios.tickers().map(t => {
+      const q = state.cartera.precios[t]; const al = state.cartera.alertas[t]; const tier = Tier.de(t);
+      const cerca = !!(al && al.mirala && q && q.c && q.c <= al.mirala * 1.05);
+      const rapido = cerca || tengo.has(t) || tier === 'A' || t === 'SPY';
+      let cada = rapido ? 15 * MIN : tier === 'B' ? 60 * MIN : 240 * MIN;
+      if (!ny.abierto) cada = Math.max(cada, 12 * 60 * MIN);
+      const rango = cerca ? 0 : (tengo.has(t) || t === 'SPY') ? 1 : (RANGO[tier] ?? 4);
+      return { t, rango, cada, rapido, edad: q && q.t ? Date.now() - q.t : Infinity, sinFuente: Precios.sinFuente(t) };
+    }).filter(x => !x.sinFuente).sort((a, b) => a.rango - b.rango || b.edad - a.edad);
+  },
+  vencidos() { return Precios.plan().filter(x => x.edad >= x.cada); },
+  /** una sola corrida a la vez */
+  actualizar(silencioso = false, modo = 'todos') {
+    if (Precios._run) { if (!silencioso) toast('Ya se están actualizando los precios…'); return Precios._run; }
+    Precios._run = Precios._actualizar(silencioso, modo).finally(() => { Precios._run = null; });
     return Precios._run;
   },
-  async _actualizar(silencioso = false) {
+  /** modo: 'todos' (boton), 'rapidos' (tenencias, A, cerca de zona + lo vencido; lo usa el export) o 'vencidos' (el motor) */
+  async _actualizar(silencioso = false, modo = 'todos') {
     try { await TC.actualizar(true); } catch (e) {}
     if ((state.cartera.activos || []).some(a => a.tipo === 'btc')) { try { await Btc.actualizar(); } catch (e) {} }
     try { await AD.actualizar(); } catch (e) {}
     const key = (state.settings.finnhubKey || '').trim();
     if (!key) { if (!silencioso) toast('Cargá tu clave gratuita de Finnhub en Ajustes, sección Cartera, para traer precios.', 5000); return false; }
-    const tickers = Precios.tickers(); if (!tickers.length) return false;
+    const plan = Precios.plan(); const lista = modo === 'todos' ? plan : modo === 'rapidos' ? plan.filter(x => x.rapido || x.edad >= x.cada) : plan.filter(x => x.edad >= x.cada);
+    if (!lista.length) return true;
     let ok = 0;
-    for (const t of tickers) {
-      try {
-        const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(Precios.simbolo(t))}&token=${encodeURIComponent(key)}`, { cache: 'no-store' });
-        if (r.status === 429) { await new Promise(res => setTimeout(res, 1200)); continue; }
-        if (!r.ok) continue;
-        const j = await r.json(); if (!j || !Number(j.c)) continue;
-        state.cartera.precios[t] = { c: Number(j.c), dp: Number(j.dp) || 0, pc: Number(j.pc) || null, t: Date.now() }; ok++;
-      } catch (e) {}
-    }
-    if (ok) {
-      state.cartera.preciosFecha = new Date().toISOString();
-      const hoy = D.today(); const spy = state.cartera.precios.SPY;
-      if (spy && spy.c && D.habil(hoy) === hoy) state.cartera.spy[hoy] = spy.c;
-      if (spy && spy.pc && D.habil(hoy) === hoy) { const ayer = D.habil(D.addDays(hoy, -1)); const m = Spy.tabla(); if (!m[ayer] && Math.abs(spy.c / spy.pc - 1) < 0.07) state.cartera.spy[ayer] = spy.pc; }
-      // valuación del día solo si el refresco fue (casi) completo y trajo SPY: un snapshot con precios viejos ensuciaría la serie y el TWR
-      try { const k = E.cartera(); if (k.valor != null && spy && spy.c && ok >= Math.ceil(tickers.length * 0.85)) { const h = state.cartera.historial; const vi = k.ventanas.inicio, va = k.ventanas.anio; h[hoy] = { v: Math.round(k.valor * 100) / 100, c: Math.round(k.costo * 100) / 100, s: vi.disponible ? Math.round(vi.sombraValor * 100) / 100 : null, sa: va.disponible ? Math.round(va.sombraValor * 100) / 100 : null, spy: k.spyHoy, mep: k.mep, ccl: k.ccl }; const ks = Object.keys(h).sort(); if (ks.length > 1500) for (const old of ks.slice(0, ks.length - 1500)) delete h[old]; } } catch (e) {}
-      Persist.save();
-    }
-    if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${tickers.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
+    for (const x of lista) { if (await Precios.quote(x.t) != null) ok++; }
+    if (ok) Precios._despues(ok, lista.length);
+    if (!silencioso) { toast(ok ? `Precios actualizados (${ok}/${lista.length})` : 'No pude traer precios. Revisá la clave de Finnhub o la conexión.', 3500); render(); }
     return ok > 0;
+  },
+  /** despues de traer precios: fecha, SPY del dia y la valuacion diaria */
+  _despues(ok, n) {
+    state.cartera.preciosFecha = new Date().toISOString();
+    const hoy = D.today(); const spy = state.cartera.precios.SPY;
+    if (spy && spy.c && D.habil(hoy) === hoy) state.cartera.spy[hoy] = spy.c;
+    if (spy && spy.pc && D.habil(hoy) === hoy) { const ayer = D.habil(D.addDays(hoy, -1)); const m = Spy.tabla(); if (!m[ayer] && Math.abs(spy.c / spy.pc - 1) < 0.07) state.cartera.spy[ayer] = spy.pc; }
+    // valuacion del dia solo si todas las tenencias tienen precio de las ultimas 2 h (un snapshot con precios viejos ensucia el TWR)
+    try { const k = E.cartera(); const fresco = k.posiciones.every(p => { const q = state.cartera.precios[p.ticker]; return q && q.t && Date.now() - q.t < 2 * 3600000; });
+      if (k.valor != null && spy && spy.c && fresco) Precios._foto(k, hoy); } catch (e) {}
+    Persist.save();
+  },
+  _foto(k, hoy) {
+    const h = state.cartera.historial; const vi = k.ventanas.inicio, va = k.ventanas.anio;
+    h[hoy] = { v: Math.round(k.valor * 100) / 100, c: Math.round(k.costo * 100) / 100, s: vi.disponible ? Math.round(vi.sombraValor * 100) / 100 : null, sa: va.disponible ? Math.round(va.sombraValor * 100) / 100 : null, spy: k.spyHoy, mep: k.mep, ccl: k.ccl };
+    const ks = Object.keys(h).sort(); if (ks.length > 1500) for (const old of ks.slice(0, ks.length - 1500)) delete h[old];
   },
 };
 
@@ -2005,16 +2086,27 @@ const Fund = {
   async traer(t) {
     const key = (state.settings.finnhubKey || '').trim(); if (!key || !t) return null;
     const s = encodeURIComponent(Precios.simbolo(t));
-    const get = async q => { try { const r = await fetch(`https://finnhub.io/api/v1/${q}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return null; return await r.json(); } catch (e) { return null; } };
+    // todo pasa por la cola de Finnhub; si alguna llamada choca con el limite, la ficha NO se guarda a medias
+    let limite = false;
+    const get = async q => { const r = await Finnhub.get(q); if (r.status === 429) limite = true; return r.ok ? r.json : null; };
     const hoy = D.today(); const hasta = D.iso(new Date(D.parse(hoy).getTime() + 200 * 86400000));
     const desdeQ = D.addDays(hoy, -800);
-    const [perfil, met, fin, cal, finQ] = await Promise.all([
-      get(`stock/profile2?symbol=${s}`),
+    const previa0 = Fund.de(t);
+    // perfil: una vez cada 90 dias (nombre, sector, mercado no cambian); calendario: una consulta al dia para todos
+    const perfilViejo = !(previa0 && previa0.nombre && previa0.perfilAt && Date.now() - previa0.perfilAt < 90 * 86400000);
+    const calGlobal = Fund.calendarioFresco();
+    const [perfil0, met, fin, cal, finQ] = await Promise.all([
+      perfilViejo ? get(`stock/profile2?symbol=${s}`) : null,
       get(`stock/metric?symbol=${s}&metric=all`),
       get(`stock/financials-reported?symbol=${s}&freq=annual&from=2008-01-01&to=${hoy}`),
-      get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
+      calGlobal ? null : get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
       get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${desdeQ}&to=${hoy}`),
     ]);
+    if (limite) return null;
+    const perfil = perfil0 || (previa0 && previa0.nombre ? { name: previa0.nombre, finnhubIndustry: previa0.sector, exchange: previa0.mercado, marketCapitalization: null, _viejo: true } : null);
+    const vacio = x => !x || (typeof x === 'object' && !Object.keys(x).length) || (x.metric && !Object.keys(x.metric).length && !(x.series && Object.keys(x.series).length));
+    // Finnhub no tiene nada de este ticker (OTC, Brasil): se marca y no se reintenta por 30 dias
+    if (vacio(perfil0) && !(previa0 && previa0.nombre) && vacio(met) && !(fin && fin.data && fin.data.length)) { state.cartera.fundSinDatos = state.cartera.fundSinDatos || {}; state.cartera.fundSinDatos[t] = Date.now(); return null; }
     if (!perfil && !met && !fin) return null;
     // Si Finnhub corto por limite (la llamada falla, no viene vacia), la ficha nueva esta incompleta.
     // Metricas es el nucleo: sin ellas se conserva la anterior o se guarda marcada vieja para reintentar.
@@ -2030,11 +2122,12 @@ const Fund = {
     const prom5 = k => { const xs = hist(k).slice(-5); return xs.length >= 3 ? sum(xs) / xs.length : null; };
     const med10 = k => { const xs = hist(k).slice(-10); return xs.length >= 3 ? Fund.mediana(xs) : null; };
     const peHist = hist('pe');
-    const bal = cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
+    const bal = calGlobal ? Fund.calDe(t) : cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
     const d = {
       at: Date.now(), ticker: t,
       nombre: perfil && perfil.name || null, sector: perfil && perfil.finnhubIndustry || null,
-      capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : null,
+      capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
+      perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
       max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
       pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)),
       pb: Number(m.pbAnnual ?? m.pbQuarterly) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
@@ -2095,7 +2188,7 @@ const Fund = {
     if (!met) { d.parcial = true; d.at = Date.now() - 31 * 86400000; }
     state.cartera.fund[t] = d;
     try { window.dispatchEvent(new CustomEvent('fund-listo', { detail: t })); } catch (e) {}
-    const ks = Object.keys(state.cartera.fund); if (ks.length > 60) delete state.cartera.fund[ks[0]];
+    if (state.cartera.fundSinDatos) delete state.cartera.fundSinDatos[t];
     Persist.save();
     return d;
   },
@@ -2108,36 +2201,82 @@ const Fund = {
     const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
     return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
   },
-  /** refresca en segundo plano los tickers de la cartera con datos viejos (para los avisos de balance) */
-  async actualizarCartera(max = 8, diasFrescura = 6) {
-    if (!(state.settings.finnhubKey || '').trim()) return 0;
-    const f = state.cartera.fund || {}; const corte = Date.now() - diasFrescura * 86400000;
-    const ts = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).slice(0, max);
-    let n = 0; for (const t of ts) { try { if (await Fund.traer(t)) n++; } catch (e) {} await new Promise(r => setTimeout(r, 300)); }
-    return n;
+  /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
+  ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
+  sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
+  /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
+   *  o porque ya paso su balance (los numeros nuevos llegan ahi). */
+  pendientes() {
+    const tengo = new Set(E.cartera().posiciones.map(p => p.ticker)); const hoy = D.today();
+    const plan = Precios.plan().filter(x => x.t !== 'SPY'); const orden = new Map(plan.map((x, i) => [x.t, i]));
+    // los "sin fuente" de precio tambien se intentan (algunos OTC tienen fundamentales)
+    const todos = [...new Set([...plan.map(x => x.t), ...Precios.tickers().filter(t => t !== 'SPY')])];
+    return todos.filter(t => {
+      if (Fund.sinDatos(t)) return false;
+      const d = Fund.de(t); if (!d || d.parcial) return true;
+      if (Date.now() - d.at > Fund.ttl(t, tengo.has(t))) return true;
+      const b = Fund.calDe(t) || d.balance; if (b && b.fecha && b.fecha < hoy && d.at < D.parse(b.fecha).getTime() + 3 * 86400000 && Date.now() - D.parse(b.fecha).getTime() > 3 * 86400000) return true;
+      return false;
+    }).sort((a, b) => (orden.has(a) ? orden.get(a) : 1e6) - (orden.has(b) ? orden.get(b) : 1e6));
   },
-  /** Mantiene tibias las fichas de toda la cartera y la watchlist: tandas de 8 cada 65 s hasta que no
-   *  quede ninguna vieja. Finnhub gratis corta a las 60 llamadas por minuto y cada ficha son cinco (perfil, metricas, anual, calendario, trimestral).
-   *  Una sola corrida a la vez; cada ficha que llega avisa con el evento 'fund-listo'. */
-  _calentando: null,
-  calentar(diasFrescura = 6, pausaInicial = 0) {
-    if (Fund._calentando) return Fund._calentando;
-    Fund._calentando = (async () => {
-      for (let ronda = 0; ronda < 8; ronda++) {
-        const espera = ronda ? 65000 : pausaInicial;
-        if (espera) await new Promise(r => setTimeout(r, espera));
-        const n = await Fund.actualizarCartera(8, diasFrescura);
-        const f = state.cartera.fund || {}; const corte = Date.now() - diasFrescura * 86400000;
-        const quedan = Precios.tickers().filter(t => t !== 'SPY' && (!f[t] || f[t].at < corte)).length;
-        if (!quedan || (!n && ronda)) break;
-      }
-    })().finally(() => { Fund._calentando = null; });
-    return Fund._calentando;
+  /** calendario de balances de TODO el mercado: una consulta por dia; se guardan solo los tickers que seguis */
+  calendarioFresco() { const c = state.cartera.calendario; return !!(c && c.ok && Date.now() - c.at < 26 * 3600000); },
+  calDe(t) { const c = state.cartera.calendario; if (!c || !c.ok) return null; const x = c.map[Precios.simbolo(t)] || c.map[t]; return x || null; },
+  async calendario() {
+    const c = state.cartera.calendario; if (c && Date.now() - c.at < 24 * 3600000) return;
+    const hoy = D.today(); const hasta = D.addDays(hoy, 75);
+    const r = await Finnhub.get(`calendar/earnings?from=${hoy}&to=${hasta}`);
+    if (r.status === 429) return;
+    const lista = r.ok && r.json && Array.isArray(r.json.earningsCalendar) ? r.json.earningsCalendar : [];
+    const seguir = new Set(Precios.tickers().map(Precios.simbolo)); const map = {};
+    for (const e of lista) if (e && e.symbol && seguir.has(e.symbol) && e.date >= hoy && (!map[e.symbol] || e.date < map[e.symbol].date)) map[e.symbol] = { fecha: e.date, date: e.date, hour: e.hour || '', hora: e.hour || '', epsEstimate: e.epsEstimate ?? null, epsEst: e.epsEstimate ?? null, quarter: e.quarter ?? null, trimestre: e.quarter ?? null };
+    // si vino vacio (plan que no lo permite), cada ficha pide el suyo como antes
+    state.cartera.calendario = { at: Date.now(), ok: lista.length > 20, map };
   },
+  /** compat: el export y la precarga vieja la llaman */
+  async actualizarCartera(max = 8) { let n = 0; for (const t of Fund.pendientes().slice(0, max)) { try { if (await Fund.traer(t)) n++; } catch (e) {} } return n; },
+  calentar() { return Motor.arrancar(); },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
   /** balance "cerca": 14 dias antes si la tenes en cartera, 7 si solo la vigilas (Facu) */
   balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= (tengo ? 14 : 7) ? b : null; },
-  balance(t) { const d = Fund.de(t); if (!d || !d.balance) return null; const dias = D.daysBetween(D.today(), d.balance.fecha); return dias >= 0 ? { ...d.balance, dias } : null; },
+  balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
+};
+
+/* ---------- Motor: mantiene al dia precios y fichas mientras la app esta abierta ----------
+ * No guarda una cola aparte: en cada vuelta mira que esta vencido (por la fecha de lo ultimo que se bajo),
+ * asi que si iOS frena la app, al volver sigue donde quedo. Primero precios vencidos, despues el
+ * calendario del dia, despues una ficha; se repite. Con todo al dia, revisa cada minuto. */
+const Motor = {
+  _run: null, _ultimoRender: 0,
+  arrancar() {
+    if (Motor._run) return Motor._run;
+    Motor._run = (async () => {
+      for (;;) {
+        if (document.hidden || !(state.settings.finnhubKey || '').trim() || window.claude) break;
+        const venc = Precios.vencidos();
+        if (venc.length) { let ok = 0; for (const x of venc.slice(0, 20)) { if (document.hidden) break; if (await Precios.quote(x.t) != null) ok++; } if (ok) Precios._despues(ok, venc.length); Motor.pintar(); continue; }
+        await Fund.calendario();
+        const pend = Fund.pendientes();
+        if (pend.length) { try { await Fund.traer(pend[0]); } catch (e) {} Motor.pintar(); continue; }
+        await new Promise(r => setTimeout(r, 60000));
+      }
+    })().finally(() => { Motor._run = null; });
+    return Motor._run;
+  },
+  /** repinta Cartera como mucho cada 8 s (y nunca con una ficha o un form abierto) */
+  pintar() {
+    if (Date.now() - Motor._ultimoRender < 8000) return; Motor._ultimoRender = Date.now();
+    try { if (ui.view === 'cartera' && !$('#overlay').classList.contains('open')) render(); } catch (e) {}
+  },
+  /** para el indicador: cuantas fichas al dia y cuanto falta */
+  progreso() {
+    const ts = Precios.tickers().filter(t => t !== 'SPY'); const pend = new Set(Fund.pendientes());
+    const sinDatos = ts.filter(t => Fund.sinDatos(t)); const total = ts.length - sinDatos.length;
+    const faltan = ts.filter(t => pend.has(t)).length; const min = Math.ceil(faltan * 3 / 45);
+    const sinFuente = ts.filter(t => Precios.sinFuente(t));
+    const conPrecio = ts.filter(t => { const q = state.cartera.precios[t]; return q && q.c && !Precios.sinFuente(t); }).length;
+    return { total, alDia: total - faltan, faltan, min, sinDatos, sinFuente, conPrecio, totalPrecio: ts.length - sinFuente.length };
+  },
 };
 
 /* ---------- toast ---------- */
@@ -2685,7 +2824,9 @@ const E = {
     const total = sum(grupos.map(g => g.valor));
     const reserva = (grupos.find(g => g.id === 'reserva') || {}).valor || 0;
     const objetivo = Number(state.settings.reservaObjetivo) || 10;
-    return { activos, grupos, total, mep, reserva, reservaPct: total ? reserva / total : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
+    // la reserva se mide contra la tenencia de CEDEARs (Facu), no contra todo el patrimonio (con bitcoin daba de menos)
+    const ced = (grupos.find(g => g.id === 'cedears') || {}).valor || 0;
+    return { activos, grupos, total, mep, reserva, reservaPct: ced ? reserva / ced : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
   },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
   /** Valuación conocida más reciente ≤ fecha: seed (c.inicio, 31-dic) o snapshot diario. Devuelve {fecha, V, spy, tipo} o null */
@@ -3889,7 +4030,7 @@ function viewCartera() {
   if (!k.posiciones.length && !k.ops.length) return `<div class="card">${empty({ kind: 'setup', icon: 'chart', head: 'Todavía no hay operaciones', sub: 'Cargá tu primera compra y la cartera se arma sola.', btn: 'Cargar operación', action: 'new-op' })}</div>`;
   let html = '';
   // precios: una sola linea, sin tarjeta. La hora manda; CCL y SPY al lado; actualizar es un icono
-  html += `<div class="px-strip"><span class="px-txt">${hayKey ? `${k.conPrecio ? `<b>Precios ${fechaTxt}</b>` : '<b>Sin precios todav\u00eda</b>'}${k.conPrecio && k.conPrecio < k.posiciones.length ? ` \u00b7 <span class="warn-text">${k.posiciones.length - k.conPrecio} sin precio</span>` : ''}${s.ccl ? ' \u00b7 CCL ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' \u00b7 SPY ' + MENOS(k.spyHoy.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}` : '<b>Falta tu clave de Finnhub</b>'}</span>${hayKey ? `<button class="icon-btn" data-act="precios-update" aria-label="Actualizar precios" title="Actualizar precios">${ICONS.repeat}</button>` : '<button class="btn sm" data-act="go-config">Configurar</button>'}</div>`;
+  html += `<div class="px-strip"><span class="px-txt">${hayKey ? `${k.conPrecio ? `<b>Precios ${fechaTxt}</b>` : '<b>Sin precios todav\u00eda</b>'}${k.conPrecio && k.conPrecio < k.posiciones.length ? ` \u00b7 <span class="warn-text">${k.posiciones.length - k.conPrecio} sin precio</span>` : ''}${(() => { const pg = Motor.progreso(); return (pg.faltan ? ` \u00b7 Fundamentales ${pg.alDia}/${pg.total} \u00b7 faltan ~${pg.min} min` : '') + (pg.sinFuente.length ? ` \u00b7 <span class="soft" title="${esc(pg.sinFuente.join(', '))}">${pg.sinFuente.length} sin fuente</span>` : ''); })()}${s.ccl ? ' \u00b7 CCL ' + fmtARS.format(k.ccl) : ''}${k.spyHoy ? ' \u00b7 SPY ' + MENOS(k.spyHoy.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}` : '<b>Falta tu clave de Finnhub</b>'}</span>${hayKey ? `<button class="icon-btn" data-act="precios-update" aria-label="Actualizar precios" title="Actualizar precios">${ICONS.repeat}</button>` : '<button class="btn sm" data-act="go-config">Configurar</button>'}</div>`;
   const valorTxt = k.valor != null ? fmtU(k.valor, 0) : fmtU(k.costo, 0); const valorTotTxt = k.valorTotal != null ? fmtU(k.valorTotal, 0) : valorTxt;
   const n0 = x => Math.abs(x).toLocaleString('es-AR', { maximumFractionDigits: 0 }); const sg = x => x >= 0 ? '+' : '−';
   const va = k.ventanas.anio, vi = k.ventanas.inicio; const vAlfa = va.disponible ? va : vi.disponible ? vi : null;
@@ -3943,7 +4084,7 @@ function viewCartera() {
       return k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balanceCerca(p.ticker, true);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
         <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<i class="pz-dot ${p.estado}" title="${p.estado}"></i>` : ''}${bal ? `<i class="pz-dot bal" title="balance en ${bal.dias} d"></i>` : ''}</div><span class="pz-s">${(Math.round(p.acciones * 100) / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 })} acc \u00b7 PPC ${MENOS(Number(p.ppc).toLocaleString('es-AR', { maximumFractionDigits: p.ppc < 100 ? 2 : 0 }))}</span></div>
-        <div class="pz-m">${p.precio != null ? `<span class="pz-px">${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '\u2014'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div>
+        <div class="pz-m">${p.precio != null ? `<span class="pz-px">${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '\u2014'}</span>` : `<span class="pz-px muted">${Precios.sinFuente(p.ticker) ? 'sin fuente' : 'sin precio'}</span>`}</div>
         <div class="pz-r"><b>${esc(valTxt(p))}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}</div>
         ${avisos.length ? `<div class="pz-f warn-text">${avisos.join(' · ')}</div>` : ''}
       </div>`; }).join(''); })()}
@@ -3959,7 +4100,7 @@ function viewCartera() {
     const cerca = dM != null ? clamp(1 - Math.max(0, dM) / 0.25, 0, 1) : 0;
     const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>comprá urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : dM != null ? `<span class="pill neutral">a ${M.pct(dM, 1)}</span>` : '<span class="pill neutral">sin precio</span>';
     return `<div class="al-row" data-alerta="${esc(p.ticker)}">
-      <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : 'sin precio'}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
+      <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : Precios.sinFuente(p.ticker) ? 'sin fuente de precio' : 'sin precio'}${Tier.de(p.ticker) ? ` \u00b7 tier ${Tier.de(p.ticker)}` : ''}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
       ${al.desc ? `<div class="al-desc">${esc(al.desc)}</div>` : ''}
       <div class="al-bar"><i class="${p.estado === 'urgente' ? 'glow-fill crit' : p.estado === 'mirala' ? 'glow-fill warn' : ''}" style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
       <div class="al-lv"><span><span class="dot warn"></span>${G.le} ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>${G.le} ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
@@ -4165,7 +4306,7 @@ function renderPatrimonio(k) {
       <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
       <div class="pat-leg">${leyenda}</div>
     </div>
-    <div class="pat-res"><span>Reserva (efectivo + fondos)</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
+    <div class="pat-res"><span>Reserva (efectivo + fondos) vs CEDEARs</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>
     ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
     <div class="act-list">${pt.activos.map(fila).join('')}</div>`
     : `<p class="ob-nota" style="margin:0">Ac\u00e1 van el efectivo, el fondo de Lecaps, letras, bonos y bitcoin, para ver d\u00f3nde est\u00e1 toda tu plata y qu\u00e9 parte es reserva. Los CEDEARs ya est\u00e1n. Toc\u00e1 "Activo" para cargar el primero.</p>`}
@@ -4195,10 +4336,10 @@ function renderReservaCard(pt) {
   const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
   const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
   const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
-  const pesoPct = pt.total ? a.valorUSD / pt.total : null;
+  const ced = (pt.grupos.find(g => g.id === 'cedears') || {}).valor || 0; const pesoPct = ced ? a.valorUSD / ced : null;  // contra los CEDEARs
   return `<div class="card kpi rsv tap" data-act="activo" data-id="${a.id}">
     <div class="label">Reserva en pesos <span class="soft">\u00b7 ${esc(a.nombre)}</span></div>
-    <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de ${M.pct(pt.reservaObjetivo, 0)}</span>` : ''}</div></div>
+    <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de tus CEDEARs (objetivo ${M.pct(pt.reservaObjetivo, 0)})</span>` : ''}</div></div>
     <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
     <div class="rsv-sem">${chips}</div>
     ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : alerta}
@@ -4814,7 +4955,7 @@ function formPosicion(ticker) {
   const body = `${fundHTML(ticker, p)}<div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
-    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null };
+    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else { const prev = state.cartera.alertas[ticker] || {}; state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}) }; }
     Persist.save(); toast('Guardado'); render();
   } });
   $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
@@ -4928,7 +5069,8 @@ function formWatch() {
 
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
 const Intercambio = {
-  FORMATO: 'gestor-gastos-cambios', VERSION: 2,
+  FORMATO: 'gestor-gastos-cambios', VERSION: 3,
+  /** v3 (28-sep): `tier` (A, B, C, Cíclica, Especulativa, F) y `tipo` (sector, p. ej. Tecnología) como campos propios. Tier F saca el ticker. */
   /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
   DESC_MAX: 120, NOTA_MAX: 300,
   partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
@@ -4974,7 +5116,7 @@ ${tesis || '\u2014'}
 ${c.tablaF}
 
 ${(() => { const pt = E.patrimonio(k); if (!pt.activos.length) return ''; return `## Toda mi plata (patrimonio)
-Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al CCL $ ${fmtARS.format(pt.mep || 0)}.
+Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) contra los CEDEARs ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al CCL $ ${fmtARS.format(pt.mep || 0)}.
 | Activo | Tipo | Valor USD | Detalle |
 |---|---|---|---|
 ${pt.activos.map(a => `| ${a.nombre} | ${E.TIPOS_ACTIVO[a.tipo] || a.tipo} | ${a.valorUSD != null ? n(a.valorUSD) : '\u2014'} | ${a.detalle.replace(/\|/g, '/')} |`).join('\n')}
@@ -5011,12 +5153,12 @@ Sos mi asesor de inversiones (perfil: largo plazo, calidad a buen precio, Buffet
 \`\`\`json
 { "tipo": "${Intercambio.FORMATO}", "version": ${Intercambio.VERSION}, "fecha": "${hoy}",
   "alertas": {
-    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "desc": "E-commerce + fintech (Mercado Pago) líder de Latinoamérica.", "nota": "A- · próxima compra solo ≤1750" },
+    "MELI": { "mirala": 1750, "urgente": 1600, "objetivo": 2300, "tier": "A", "tipo": "Tecnología", "desc": "E-commerce + fintech (Mercado Pago) líder de Latinoamérica.", "nota": "próxima compra solo ≤1750" },
     "TSM": null
   },
   "comentario": "resumen en una línea de lo que cambiaste y por qué" }
 \`\`\`
-Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es tier + tesis (máx. 300); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
 `;
     return md;
   },
@@ -5046,11 +5188,13 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
       if (v === null) { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; }
       if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
       const num = x => x == null || x === '' ? null : (Number(x) || null);
-      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) };
+      const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) , tier: 'tier' in v ? (Tier.norm(v.tier) || null) : (antes ? antes.tier || null : null), tipo: 'tipo' in v ? (v.tipo ? String(v.tipo).slice(0, 40) : null) : (antes ? antes.tipo || null : null) };
       // nota vieja con " | " (qué hace | tesis): se parte; el desc explícito manda
       if ('nota' in v && despues.nota && despues.nota.includes(' | ')) { const pt = Intercambio.partirNota(despues.nota); despues.nota = pt.nota; if (!('desc' in v)) despues.desc = pt.desc || despues.desc; }
       if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
-      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota'].every(f => (antes[f] || null) === (despues[f] || null));
+      // tier F = no invertible: chau de la watchlist (Facu). Si la tenes en cartera, solo se avisa
+      if (despues.tier === 'F') { if (tengo.has(ticker)) avisos.push(`${ticker}: tier F pero est\u00e1 en tu cartera; queda.`); else { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; } }
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null));
       if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
     }
     return { cambios, avisos, comentario: obj.comentario || '' };
@@ -5077,30 +5221,15 @@ function mercadoNY() {
 /** un precio traido hace menos de esto cuenta como de hoy: si el auto-refresco corrio segundos antes del toque, no es viejo */
 const CTX_FRESCO = 10 * 60000;
 async function ctxActualizar(paso) {
-  paso('Actualizando d\u00f3lar y precios\u2026');
+  paso('Actualizando dólar y precios…');
   const t0 = Date.now(); ui.ctxT0 = t0;
-  const okPrecios = await Precios.actualizar(true);
-  // un 429 de Finnhub saltea el ticker y le deja el precio viejo: se reintenta una vez, de a uno
-  const viejos = () => Precios.tickers().filter(t => { const q = state.cartera.precios[t]; return !q || !(q.t >= t0 - CTX_FRESCO); });
-  const fallaron = viejos();
-  if (fallaron.length) {
-    paso(`Reintentando ${fallaron.length} precio${fallaron.length === 1 ? '' : 's'}\u2026`);
-    await new Promise(r => setTimeout(r, 2000));
-    for (const t of fallaron) { await Precios.quote(t); await new Promise(r => setTimeout(r, 400)); }
-  }
-  const k = E.cartera();
-  const tickers = [...k.posiciones.map(p => p.ticker), ...k.watch.map(p => p.ticker)];
-  const corte = Date.now() - 30 * 86400000;
-  const faltan = tickers.filter(t => { const d = Fund.de(t); return !d || d.parcial || !(d.at > corte); });
-  // si la precarga del arranque esta corriendo, las fichas quedan para ella: juntas se pasan de 60 por minuto
-  const ahora = Fund._calentando ? [] : faltan.slice(0, 6);
-  for (let i = 0; i < ahora.length; i++) {
-    paso(`Fundamentales ${i + 1} de ${ahora.length}: ${ahora[i]}\u2026`);
-    try { await Fund.traer(ahora[i]); } catch (e) {}
-    await new Promise(r => setTimeout(r, 250));
-  }
+  // tenencias, tier A y lo cerca de zona se traen si o si; el resto solo si esta vencido (todo pasa por la cola de Finnhub)
+  const okPrecios = await Precios.actualizar(true, 'rapidos');
+  const viejos = () => Precios.plan().filter(x => x.edad >= x.cada).map(x => x.t);
+  // las fichas las completa el motor en segundo plano; el texto se rehace solo a medida que llegan
+  Motor.arrancar();
   Persist.save();
-  return { okPrecios, pendientes: faltan.slice(ahora.length), preciosViejos: viejos() };
+  return { okPrecios, pendientes: Fund.pendientes(), preciosViejos: viejos() };
 }
 
 /** piezas del texto de mercado que usa Exportar para Claude */
@@ -5146,14 +5275,21 @@ ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
 | Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (\u00faltimos 12 m; prom 5 a\u00f1os) | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-${filasF}${pendientes.length ? `\n\nSin fundamentales en esta foto (Finnhub da 60 consultas por minuto; se est\u00e1n completando): ${pendientes.join(', ')}. Si necesit\u00e1s alguno, ped\u00edmelo.` : ''}`,
+${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
+      const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));
+      const l = [];
+      if (pend.length) l.push(`- **Sin fundamentales todav\u00eda** (se est\u00e1n completando, Finnhub da 60 consultas por minuto): ${pend.join(', ')}`);
+      if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
+      if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
+      if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
+      return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
   };
 }
 
 /** cuantas fichas utiles hay (las parciales no cuentan) y cuales faltan */
 function ctxCobertura() {
   const k = E.cartera(); const ts = [...k.posiciones, ...k.watch].map(p => p.ticker);
-  const faltan = ts.filter(t => { const d = Fund.de(t); return !d || d.parcial; });
+  const pend = new Set(Fund.pendientes()); const faltan = ts.filter(t => pend.has(t) || (!Fund.de(t) && !Fund.sinDatos(t)));
   return { total: ts.length, con: ts.length - faltan.length, faltan };
 }
 function ctxResumenFund() {
@@ -5171,7 +5307,7 @@ function formExportar() {
   const listo = () => { if (!(Precios.tickers().length && (state.settings.finnhubKey || '').trim())) return Promise.resolve({ okPrecios: false, preciosViejos: [], sinClave: true }); return ctxActualizar(paso); };
   listo().then(({ okPrecios, preciosViejos, sinClave }) => {
     const box = $('#ctx-box'); if (!box) return;
-    const md = Intercambio.exportar(ctxCobertura().faltan); const k = E.cartera();
+    const md = Intercambio.exportar(Fund.pendientes()); const k = E.cartera();
     const pf = k.preciosFecha ? new Date(k.preciosFecha) : null;
     const minutos = pf ? Math.max(0, Math.round((Date.now() - pf.getTime()) / 60000)) : null;
     const puedeCompartir = !!navigator.share;
@@ -5185,12 +5321,12 @@ function formExportar() {
       <p class="ob-nota aclara" style="margin-top:0">Pegalo o adjuntalo al empezar un chat del proyecto Inversiones: sirve para preguntar por una acci\u00f3n o para la revisi\u00f3n completa. Si Claude cambia niveles, us\u00e1 "Cargar actualizaciones".</p>
       <textarea class="input textarea" id="export-md" readonly style="min-height:180px">${esc(md)}</textarea>`;
     // lo que falte se completa en segundo plano y el texto se rehace solo
-    if (ctxResumenFund().faltan.length && !sinClave) Fund.calentar(30, 65000);
+    if (ctxResumenFund().faltan.length && !sinClave) Motor.arrancar();
   });
 }
 window.addEventListener('fund-listo', () => {
   const t = $('#export-md'); if (!t) return;
-  const c = ctxResumenFund(); t.value = Intercambio.exportar(c.faltan);
+  ctxResumenFund(); t.value = Intercambio.exportar(Fund.pendientes());
 });
 
 /* Calendario de balances: proximos earnings de todo lo que se sigue (cartera + watchlist), por fecha.
@@ -5502,7 +5638,7 @@ function render() {
   const onb = ui.view === 'resumen' && sinDatos();
   document.body.classList.toggle('onboarding', onb);
   $('#view').innerHTML = (onb ? '' : renderTopbar()) + `<div class="${viewChanged ? 'fade' : 'nofade'}">${body}</div>`;
-  if (window.innerWidth > 900) $('#btn-new-desktop').style.display = '';
+  { const bd = $('#btn-new-desktop'); if (bd && window.innerWidth > 900) bd.style.display = ''; }
   ChartQ.mount(); aplicarInfo($('.main'));
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
@@ -5631,7 +5767,7 @@ const Actions = {
   'rs-vincular'() { ReservaUI.vincular(); },
   'activo'(id) { formActivo(id); },
   'del-activo'(id) { state.cartera.activos = (state.cartera.activos || []).filter(a => a.id !== id); Persist.save(); Modal.close(); render(); },
-  'reserva-objetivo'() { const cur = Number(state.settings.reservaObjetivo) || 10; const v = prompt('Objetivo de reserva (% de toda tu plata en efectivo + fondos)', String(cur)); if (v == null) return; const n = M.parse(v); if (n > 0 && n < 100) { state.settings.reservaObjetivo = n; Persist.save(); render(); } },
+  'reserva-objetivo'() { const cur = Number(state.settings.reservaObjetivo) || 10; const v = prompt('Objetivo de reserva: efectivo + fondos como % de tus CEDEARs', String(cur)); if (v == null) return; const n = M.parse(v); if (n > 0 && n < 100) { state.settings.reservaObjetivo = n; Persist.save(); render(); } },
   'cmap-todas'() { ui.cmapTodas = !ui.cmapTodas; render(); },
   'fund-cuenta'(t) { ui.fundCuenta = ui.fundCuenta === t ? null : t; const box = $('#fund-box'); if (box) { const p = E.cartera().posiciones.find(x => x.ticker === t) || null; box.outerHTML = fundHTML(t, p); } },
   async 'fund-crudo'(t) { toast('Trayendo datos crudos de Finnhub\u2026'); const j = await Fund.crudo(t); if (!j) { toast('Falta la clave de Finnhub'); return; } const txt = JSON.stringify(j); try { await navigator.clipboard.writeText(txt); toast(`Copiado: ${Math.round(txt.length / 1024)} KB para pegar en el chat`); } catch (e) { Modal.open({ title: `Datos crudos ${t}`, submit: '', body: `<textarea class="input textarea" readonly style="min-height:240px">${esc(txt)}</textarea>` }); } },
@@ -5736,7 +5872,7 @@ document.addEventListener('keydown', e => {
 let rzT, lastW = window.innerWidth; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (!$('#overlay').classList.contains('open')) render(); }, 250); });
 $('.main').addEventListener('scroll', headLine, { passive: true });
 window.addEventListener('beforeunload', () => { if (Persist.dirty) { Persist.local(); } });
-document.addEventListener('visibilitychange', () => { if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } else if (!document.hidden && Gist.cfg() && !Persist.dirty) { Gist.refrescar().then(ch => { if (ch && !$('#overlay').classList.contains('open')) { render(); toast('Datos actualizados'); } }); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => Motor.arrancar(), 1500); if (document.hidden && Persist.dirty) { clearTimeout(Persist.timer); Persist.flush(); } else if (!document.hidden && Gist.cfg() && !Persist.dirty) { Gist.refrescar().then(ch => { if (ch && !$('#overlay').classList.contains('open')) { render(); toast('Datos actualizados'); } }); } });
 
 function importarCSV(txt) {
   const lines = txt.split(/\r?\n/).filter(l => l.trim()); if (lines.length < 2) { toast('CSV vacío'); return; }
@@ -5771,8 +5907,8 @@ function importarCSV(txt) {
   }
   if (!window.claude && state.settings.tcFecha !== D.today()) TC.actualizar(true).then(ok => { if (ok) render(); });
   if (!window.claude) Cedears.actualizar().then(ch => { if (ch) console.log('Tabla de CEDEARs actualizada:', Cedears.actualizado()); });
-  if (!window.claude && (state.settings.finnhubKey || '').trim() && Precios.tickers().length) { const f = state.cartera.preciosFecha ? Date.now() - new Date(state.cartera.preciosFecha).getTime() : Infinity; if (f > 15 * 60 * 1000) Precios.actualizar(true).then(ok => { if (ok && ui.view === 'cartera') render(); }); }
-  if (!window.claude) setTimeout(() => Fund.calentar().then(() => { if (ui.view === 'cartera' && !$('#overlay').classList.contains('open')) render(); }), 4000);
+  // precios y fichas: el motor revisa que esta vencido (por tier) y lo trae por la cola de Finnhub
+  if (!window.claude) setTimeout(() => Motor.arrancar(), 2500);
   if (Gist.cfg()) Gist.refrescar(true).then(ch => { if (ch) { lastView = null; render(); toast('Datos actualizados desde tus otros dispositivos'); } });
 })();
 

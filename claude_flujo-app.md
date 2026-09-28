@@ -32,6 +32,19 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Finnhub escala a ~330 tickers: cola con prioridad (28-sep, build 202609281651)
+- **`Finnhub`** (01-core): toda llamada pasa por acá. Ventana deslizante de 55 por minuto (la key gratis da 60 y se comparte); un 429 pausa todo `Retry-After` (o 60 s) y reintenta hasta 3 veces, así la tanda no se pierde.
+- **`Precios.plan()`**: prioridad cerca de zona (<5 % de mirala) → tenencias/SPY → A → B → C/Cíclica → Especulativa. Cada cuánto: cerca de zona, tenencias y A 15 min; B 1 h; resto 4 h; con NY cerrado, máx. 12 h. Tier F no se sigue (solo si la tenés).
+- **Sin fuente**: `quote` con `c:0` (DANOY, DTEGY, SIEGY) marca `precios[t].sinFuente` y no se reintenta por 30 días. Fundamentales vacíos → `fundSinDatos[t]`, idem 30 días.
+- **Fundamentales**: caché por tier (`Fund.ttl`): tenencias y A 7 d, B 30 d, resto 90 d; también vencen 3 días después de su balance. Cada ficha = metric + balances anual + trimestral (3 llamadas); el perfil solo si falta o tiene >90 d. El calendario de balances es **una** llamada global por día (`Fund.calendario`, hoy→+75 d, filtrado a lo que seguís). Sin tope de 60 fichas.
+- **`Motor`**: loop mientras la app está visible (arranca a los 2,5 s y al volver a primer plano, así sigue donde quedó): primero precios vencidos (de a 20), después el calendario, después una ficha por vuelta; si no hay nada, duerme 60 s. Repinta Cartera como mucho cada 8 s.
+- **Costo**: primera carga de 150 tickers ≈ 3 min de precios + ~8 min de fichas. En régimen, ~200 llamadas/h con el mercado abierto (330 tickers), muy lejos del tope de 3.300/h.
+- **Tira de precios**: "Fundamentales 87/145 · faltan ~6 min · 3 sin fuente". Export para Claude: sección "## Datos que faltan" (sin fundamentales, viejos, Finnhub sin datos, sin precio).
+- **Intercambio v3**: campos `tier` (A, B, C, Cíclica, Especulativa, F; `Tier.norm` acepta "B · calidad") y `tipo` (sector). **Tier F saca el ticker de la watchlist** (si lo tenés en cartera, solo avisa).
+- **Gist**: `fund`, `fundSinDatos` y `calendario` no se suben (son caché, se rehacen solos); `Persist.conCache` los conserva al bajar. Así el gist no crece con 330 fichas.
+- **Reserva**: el % es contra la tenencia de CEDEARs, no contra el patrimonio total (Facu).
+- Fix: en escritorio con la app vacía, `render` rompía por `#btn-new-desktop` nulo.
+
 ### Form de gasto: un solo selector y mejores predicciones (27-sep, build 202609280203)
 - Salieron los chips de categorías del form de gasto (había dos formas de elegir): queda solo el desplegable agrupado (`F.catSelect`).
 - Predicción al escribir la descripción (`Smart.suggest`: historial → aprendido → `CAT_REGLAS`), se aplica sola mientras no toques la categoría. Reglas ampliadas: "comida pae / almuerzo oficina" → Comida del trabajo; "vacaciones / escapada / finde / hotel / pasaje" → Viajes (va primero: "comida vacaciones" es Viajes); "comida perro / shampoo perro / juguete perro / veterinaria" → Mascotas; remedios comunes (ibuprofeno, tafirol, paracetamol, amoxicilina, vitaminas…) → Farmacia; más antojos (facturas, gaseosa, caramelos), súper (carne, fruta, verdura, chino), gimnasio (colágeno, fútbol 5). Probado con 31 frases.

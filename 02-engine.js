@@ -471,7 +471,9 @@ const E = {
     const total = sum(grupos.map(g => g.valor));
     const reserva = (grupos.find(g => g.id === 'reserva') || {}).valor || 0;
     const objetivo = Number(state.settings.reservaObjetivo) || 10;
-    return { activos, grupos, total, mep, reserva, reservaPct: total ? reserva / total : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
+    // la reserva se mide contra la tenencia de CEDEARs (Facu), no contra todo el patrimonio (con bitcoin daba de menos)
+    const ced = (grupos.find(g => g.id === 'cedears') || {}).valor || 0;
+    return { activos, grupos, total, mep, reserva, reservaPct: ced ? reserva / ced : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
   },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
   /** Valuación conocida más reciente ≤ fecha: seed (c.inicio, 31-dic) o snapshot diario. Devuelve {fecha, V, spy, tipo} o null */
