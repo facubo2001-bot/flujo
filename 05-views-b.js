@@ -367,6 +367,14 @@ function squarify(vals, x, y, w, h) {
 /** Mapa anidado para "Donde se fue": los grupos son marcos y adentro cada categoria es un bloque del tamaño
  *  de lo que gastaste. Esencial en gris, elegible (lo que se puede recortar) en celeste: de un vistazo se ve
  *  cuanta plata se fue en cosas evitables y en cuales. grupos: [{ id, label, v, items: [{ id, label, v, eleg }] }] */
+/** nombre corto para los bloques: "Seguro y mantenimiento del auto" no entra en un bloque de 70 px */
+const NOM_CORTO = { 'Comida del trabajo': 'Laburo', 'Salidas a comer': 'Salidas', 'Seguro y mantenimiento del auto': 'Auto', 'Peajes y estacionamiento': 'Peajes', 'Transporte público': 'Transporte', 'Médicos y estudios': 'Médicos', 'Cuidado personal': 'Cuidado', 'Gimnasio y suplementos': 'Gimnasio', 'Comida de Odi': 'Comida', 'Baño e higiene de Odi': 'Baño', 'Juguetes y accesorios': 'Juguetes', 'Otros de Odi': 'Otros', 'Cine y entretenimiento': 'Cine', 'Otras compras': 'Otras', 'Teléfono y servicios': 'Servicios', 'Claude y suscripciones': 'Suscripciones', 'Impuestos y percepciones': 'Impuestos' };
+function nomCorto(label) {
+  const t = String(label).replace(/\s*\(.*\)\s*$/, '').trim();
+  if (NOM_CORTO[t]) return NOM_CORTO[t];
+  if (/^\+\d/.test(t)) return t;
+  return t.length <= 12 ? t : t.split(/ y | e | de | del /)[0];
+}
 function mapaAnidado(grupos, alto = 300) {
   const W = 358, H = alto; const gs = grupos.filter(g => g.v > 0).sort((a, b) => b.v - a.v); if (!gs.length) return '';
   const tot = sum(gs.map(g => g.v)); const maxCat = Math.max(...gs.flatMap(g => g.items.map(it => it.v)), 1);
@@ -378,23 +386,36 @@ function mapaAnidado(grupos, alto = 300) {
   gs.forEach((g, i) => {
     const [x, y, w, h] = outer[i];
     const cab = w >= 56 && h >= 58; const hh = cab ? 20 : 0; const pad = 3;
-    const nombre = w < 130 ? g.label.split(' ')[0] : g.label;
-    html += `<div class="nm-g" style="left:${pct(x, W)}%;top:${pct(y, H)}%;width:${pct(w, W)}%;height:${pct(h, H)}%">${cab ? `<div class="nm-gh"><span>${esc(nombre)}</span>${w >= 96 ? `<b>${M.c(g.v)}</b>` : ''}</div>` : ''}</div>`;
-    // categorias dentro del marco: las que quedarian en un bloque ilegible (< ~48x48) se juntan en "+N"
+    const nombre = g.label.length * 8.2 + (w >= 96 ? 56 : 0) > w - 12 ? g.label.split(' ')[0] : g.label;
+    html += `<div class="nm-g" style="left:${pct(x, W)}%;top:${pct(y, H)}%;width:${pct(w, W)}%;height:${pct(h, H)}%">${cab ? `<div class="nm-gh" style="font-size:${Math.max(8.5, Math.min(10.5, (w - (w >= 96 ? 70 : 16)) / (nombre.length * 0.92))).toFixed(1)}px"><span>${esc(nombre)}</span>${w >= 96 ? `<b>${M.c(g.v)}</b>` : ''}</div>` : ''}</div>`;
+    // categorias dentro del marco. Regla: todo bloque dibujado tiene que poder leerse (nombre + monto).
+    // Las que no entran se juntan en "+N"; si ese "+N" tampoco entra y pesa poco (<12 % del grupo), no se dibuja
+    // (quedan en el total del grupo y al tocar el grupo en Gastos).
     const ix = x + pad, iy = y + hh + pad, iw = Math.max(1, w - 2 * pad), ih = Math.max(1, h - hh - 2 * pad);
+    const MINW = 62, MINH = 46;
     const its = g.items.filter(it => it.v > 0).sort((a, b) => b.v - a.v);
-    const area = it => it.v / g.v * iw * ih;
-    const chicos = its.filter(it => area(it) < 2300);
-    const juntar = chicos.length > 1 || (chicos.length === 1 && area(chicos[0]) < 1200 && its.length > 1);
-    const grandes = juntar ? its.filter(it => !chicos.includes(it)) : its;
-    const lista = juntar ? [...grandes, { id: null, label: `+${chicos.length} m\u00e1s`, v: sum(chicos.map(c => c.v)), eleg: chicos.every(c => c.eleg), resto: chicos.map(c => `${c.label} ${M.c(c.v)}`).join(' \u00b7 ') }] : grandes;
-    const inner = squarify(lista.map(it => it.v / g.v * iw * ih), ix, iy, iw, ih);
-    const corto = t => String(t).replace(/\s*\(.*\)\s*$/, '').split(',')[0];
+    const entra = (r, chico) => chico ? r[2] >= 44 && r[3] >= 40 : r[2] >= MINW && r[3] >= MINH;
+    let n = its.length, lista = its, inner = null;
+    for (; n >= 1; n--) {
+      const grandes = its.slice(0, n), chicos = its.slice(n);
+      const resto = chicos.length ? { id: null, label: chicos.length === 1 ? chicos[0].label : `+${chicos.length} más`, v: sum(chicos.map(c => c.v)), eleg: chicos.every(c => c.eleg), resto: chicos.map(c => `${c.label} ${M.c(c.v)}`).join(' · '), id1: chicos.length === 1 ? chicos[0].id : null } : null;
+      let L = resto ? [...grandes, resto] : grandes, tot = sum(L.map(it => it.v));
+      let r = squarify(L.map(it => it.v / tot * iw * ih), ix, iy, iw, ih);
+      if (resto && !entra(r[r.length - 1], true) && resto.v / g.v < 0.12) { L = grandes; tot = sum(L.map(it => it.v)); r = squarify(L.map(it => it.v / tot * iw * ih), ix, iy, iw, ih); }
+      if (r.every((q, k) => entra(q, L[k] === resto))) { lista = L; inner = r; break; }
+    }
+    // ni una sola categoria entra legible junto al resto: un bloque con el grupo entero (el detalle esta al tocar el grupo en Gastos)
+    if (!inner) { lista = [its.length === 1 ? its[0] : { id: null, label: `${its.length} categor\u00edas`, v: g.v, resto: its.map(c => `${c.label} ${M.c(c.v)}`).join(' \u00b7 ') }]; inner = [[ix, iy, iw, ih]]; }
     lista.forEach((it, j) => {
       const [cx, cy, cw, ch] = inner[j];
-      const t = ch < 34 || cw < 46 ? 'xs' : ch < 50 || cw < 84 ? 's' : ch < 72 ? 'm' : '';
-      const act = it.id ? ` data-act="ver-cat" data-id="${esc(it.id)}"` : '';
-      html += `<div class="nm-c ${t}" style="left:${pct(cx, W)}%;top:${pct(cy, H)}%;width:${pct(cw, W)}%;height:${pct(ch, H)}%"${act} title="${esc(it.resto || it.label)}"><div style="background:rgba(255,255,255,${tono(it.v)})">${t === 'xs' ? '' : `<span>${esc(corto(it.label))}</span>`}${t === 'xs' && (cw < 40 || ch < 24) ? '' : `<b>${M.c(it.v)}</b>`}</div></div>`;
+      const id = it.id || it.id1; const act = id ? ` data-act="ver-cat" data-id="${esc(id)}"` : '';
+      const esResto = !it.id && !it.id1 && /^\+\d/.test(it.label); const monto = M.c(it.v); const nom = esResto && cw < 80 ? it.label.split(' ')[0] : nomCorto(it.label);
+      // letra que entra en el ancho (sin "..."): monto de 20 a 12 px, nombre de 13 a 11 px
+      const fsV = Math.max(12, Math.min(ch >= 90 && cw >= 120 ? 22 : ch >= 64 ? 18 : 15, Math.floor((cw - 16) / (monto.length * 0.6))));
+      const pal = nom.split(' '); const lineas = pal.length > 1 && ch >= 68 && nom.length * 7 > cw - 16 ? 2 : 1;
+      const fsN = Math.max(10, Math.min(13, Math.floor((cw - 14) / ((lineas === 2 ? Math.max(...pal.map(p => p.length)) : nom.length) * 0.55))));
+      const soloMonto = !esResto && (cw < MINW || ch < MINH);
+      html += `<div class="nm-c${it.eleg ? '' : ''}" style="left:${pct(cx, W)}%;top:${pct(cy, H)}%;width:${pct(cw, W)}%;height:${pct(ch, H)}%"${act} title="${esc(it.resto || it.label)}"><div style="background:rgba(255,255,255,${tono(it.v)})">${soloMonto ? '' : `<span style="font-size:${fsN}px;-webkit-line-clamp:${lineas}">${esc(nom)}</span>`}<b style="font-size:${soloMonto ? 11 : Math.max(11, Math.min(fsV, Math.floor((cw - 12) / (monto.length * 0.6))))}px">${monto}</b></div></div>`;
     });
     if (!cab) html += `<div class="nm-tag" style="left:${pct(x, W)}%;top:${pct(y, H)}%">${esc(g.label.split(' ')[0])}</div>`;
   });

@@ -875,7 +875,10 @@ const Fund = {
     const V = Fund._v, C = Fund.C;
     let pat = V(bs, C.patrimonioTotal);
     if (pat == null) { const p = V(bs, C.patrimonio); if (p == null) return null; pat = p + (Fund._sum(bs, C.minoritarios) || 0); }
-    const lp = V(bs, C.deuda) || 0, cor = V(bs, C.deudaCorriente) || 0, corto = Fund._sum(bs, C.deudaCorto) || 0, leases = Fund._sum(bs, C.leases) || 0;
+    const lp = V(bs, C.deuda) || 0, cor = V(bs, C.deudaCorriente) || 0, leases = Fund._sum(bs, C.leases) || 0;
+    // "DebtCurrent" y "ShortTermDebtAndCurrentPortionOfLongTermDebt" ya incluyen papeles comerciales y prestamos de corto: no se suman dos veces
+    const corTotal = Array.isArray(bs) && bs.some(x => ['DebtCurrent', 'ShortTermDebtAndCurrentPortionOfLongTermDebt'].includes(Fund._c(x))) && !bs.some(x => ['LongTermDebtCurrent', 'LongTermDebtAndCapitalLeaseObligationsCurrent', 'LongTermDebtAndFinanceLeaseObligationsCurrent'].includes(Fund._c(x)));
+    const corto = corTotal ? 0 : (Fund._sum(bs, C.deudaCorto) || 0);
     // si el filer informa "LongTermDebt" total (sin Noncurrent) ya incluye la porcion corriente
     const h = Array.isArray(bs) && bs.find(x => ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermLoansPayable', 'LongTermNotesPayable'].includes(Fund._c(x)));
     const deuda = (h ? lp + cor : Math.max(lp, cor)) + corto + leases;

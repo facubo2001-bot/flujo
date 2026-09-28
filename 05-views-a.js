@@ -153,7 +153,7 @@ function viewResumen() {
   let dondeHTML = '';
   if (grupos.length && tot > 0) {
     const gdat = grupos.map(g => ({ id: g.id, label: g.name, v: g.value, items: Object.entries(c.byCat).filter(([id]) => L.cat(id).grupo === g.id).map(([id, v]) => ({ id, label: L.cat(id).nombre, v, eleg: !L.cat(id).esencial })) }));
-    dondeHTML = mapaAnidado(gdat, 360);
+    dondeHTML = mapaAnidado(gdat, gdat.filter(g => g.v > 0).length > 5 ? 440 : 380);
   } else dondeHTML = empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ym)}`, sub: 'Cuando cargues gastos, acá ves en qué se fue la plata.' });
   html += `<div class="grid g-21 section">
     <div class="card"><div class="card-head"><h2>Lectura del mes</h2><span class="hint">Alertas y patrones calculados sobre tus datos</span></div>${renderInsights(ins)}</div>

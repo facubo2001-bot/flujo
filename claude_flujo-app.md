@@ -32,6 +32,12 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### "Dónde se fue" legible (28-sep, build 202609282050)
+- Regla: todo bloque dibujado se lee (nombre + monto). Mínimo 62×46 (el "+N" 44×40); lo que no entra se junta en "+N"; si el "+N" no entra y pesa <12 % del grupo no se dibuja; si nada entra, un solo bloque con el grupo.
+- Nombres cortos para bloques (`nomCorto`, `NOM_CORTO`: Auto, Laburo, Suscripciones, Óptica…; en Mascotas solo "Comida", "Otros"). Letra del nombre, del monto y del encabezado del grupo calculada por ancho (sin "...").
+- Mapa de 440 px de alto con más de 5 grupos.
+- Deuda: si el balance trae `DebtCurrent`/`ShortTermDebtAndCurrentPortionOfLongTermDebt` (total) sin porción corriente separada, no se suman papeles comerciales ni préstamos de corto (evita doble conteo).
+
 ### Causa real de los fundamentales viejos + ROIC como TradingView (28-sep, build 202609282029)
 - **Causa real**: Finnhub manda los conceptos de los 10-K nuevos con prefijo (`us-gaap_Revenues`) y los viejos sin prefijo. `Fund._v` comparaba exacto, así que solo matcheaban los años viejos (2011-2013 según la empresa) y los nuevos se descartaban. `Fund._c` saca el prefijo. (La teoría del "corte de Finnhub" era incorrecta; igual quedan dos pedidos: últimos 1150 días + historia desde 2008 hasta hace 1100 días.)
 - **Deuda de fintech**: `LoansPayableCurrent`, `LongTermLoansPayable`, `NotesPayableCurrent`, `LongTermNotesPayable` (MELI).
