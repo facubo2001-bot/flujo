@@ -929,7 +929,7 @@ const Fund = {
     const xs = filas.filter(f => Number.isFinite(f[campo]) && f[campo] > 0).slice(-(n + 1));
     if (xs.length < 2) return null;
     const a = xs[0][campo], b = xs[xs.length - 1][campo], t = xs[xs.length - 1].anio - xs[0].anio;
-    return t > 0 ? Math.pow(b / a, 1 / t) - 1 : null;
+    return t > 0 && t >= n - 1 ? Math.pow(b / a, 1 / t) - 1 : null;
   },
   prom(filas, campo, n) { const xs = filas.slice(-n).map(f => f[campo]).filter(Number.isFinite); return xs.length ? sum(xs) / xs.length : null; },
   mediana(xs) { const s = xs.filter(Number.isFinite).slice().sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; },
@@ -949,7 +949,10 @@ const Fund = {
     const [perfil0, met, fin, cal, finQ] = await Promise.all([
       perfilViejo ? get(`stock/profile2?symbol=${s}`) : null,
       get(`stock/metric?symbol=${s}&metric=all`),
-      get(`stock/financials-reported?symbol=${s}&freq=annual&from=2008-01-01&to=${hoy}`),
+      // Finnhub corta la respuesta y se queda con los balances MAS VIEJOS: pedido desde 2008 devolvia 2011-2013 y el ROIC salia de 2012 (MELI 39,8 %).
+      // Dos ventanas chicas: los dos ultimos 10-K (ROIC y TTM) y el 10-K de hace ~5 anios (CAGR a 5 anios).
+      Promise.all([get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -800)}&to=${hoy}`), get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -2250)}&to=${D.addDays(hoy, -1600)}`)])
+        .then(([a, b]) => a || b ? { data: [...((a && a.data) || []), ...((b && b.data) || [])] } : null),
       calGlobal ? null : get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
       get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${desdeQ}&to=${hoy}`),
     ]);
@@ -967,7 +970,9 @@ const Fund = {
     if (!met && previa) return previa;
     if (!fin && previa && !previa.parcial) return previa;
     const m = (met && met.metric) || {}; const serie = (met && met.series && met.series.annual) || {};
-    const filas = Fund.anios(fin);
+    let filas = Fund.anios(fin);
+    // sin un 10-K de los ultimos 2 anios, los balances no representan a la empresa de hoy: se descartan (manda Finnhub)
+    if (filas.length && filas[filas.length - 1].anio < Number(hoy.slice(0, 4)) - 2) filas = [];
     // las series de Finnhub vienen de la mas nueva a la mas vieja: se ordenan antes de cortar los ultimos N años
     const hist = k => (Array.isArray(serie[k]) ? serie[k] : []).filter(x => x && x.period && Number.isFinite(Number(x.v))).sort((a, b) => String(a.period).localeCompare(String(b.period))).map(x => Number(x.v));
     const prom5 = k => { const xs = hist(k).slice(-5); return xs.length >= 3 ? sum(xs) / xs.length : null; };
@@ -975,7 +980,7 @@ const Fund = {
     const peHist = hist('pe');
     const bal = calGlobal ? Fund.calDe(t) : cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
     const d = {
-      at: Date.now(), ticker: t,
+      at: Date.now(), ticker: t, v: Fund.VERSION,
       nombre: perfil && perfil.name || null, sector: perfil && perfil.finnhubIndustry || null,
       capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
       perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
@@ -1053,6 +1058,8 @@ const Fund = {
     return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
   },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
+  /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
+  VERSION: 2,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -1064,7 +1071,7 @@ const Fund = {
     const todos = [...new Set([...plan.map(x => x.t), ...Precios.tickers().filter(t => t !== 'SPY')])];
     return todos.filter(t => {
       if (Fund.sinDatos(t)) return false;
-      const d = Fund.de(t); if (!d || d.parcial) return true;
+      const d = Fund.de(t); if (!d || d.parcial || (d.v || 1) < Fund.VERSION) return true;
       if (Date.now() - d.at > Fund.ttl(t, tengo.has(t))) return true;
       const b = Fund.calDe(t) || d.balance; if (b && b.fecha && b.fecha < hoy && d.at < D.parse(b.fecha).getTime() + 3 * 86400000 && Date.now() - D.parse(b.fecha).getTime() > 3 * 86400000) return true;
       return false;
@@ -1123,7 +1130,7 @@ const Motor = {
   progreso() {
     const ts = Precios.tickers().filter(t => t !== 'SPY'); const pend = new Set(Fund.pendientes());
     const sinDatos = ts.filter(t => Fund.sinDatos(t)); const total = ts.length - sinDatos.length;
-    const faltan = ts.filter(t => pend.has(t)).length; const min = Math.ceil(faltan * 3 / 45);
+    const faltan = ts.filter(t => pend.has(t)).length; const min = Math.ceil(faltan * 4 / 45);
     const sinFuente = ts.filter(t => Precios.sinFuente(t));
     const conPrecio = ts.filter(t => { const q = state.cartera.precios[t]; return q && q.c && !Precios.sinFuente(t); }).length;
     return { total, alDia: total - faltan, faltan, min, sinDatos, sinFuente, conPrecio, totalPrecio: ts.length - sinFuente.length };

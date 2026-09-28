@@ -32,6 +32,12 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### ROIC con balances de 2012 (28-sep, build 202609282015)
+- **Bug grave**: `financials-reported` anual pedido desde 2008 devolvía solo los 10-K más viejos (Finnhub corta la respuesta): MELI tenía 2011-2012 y mostraba ROIC 39,8 % (el de 2012) contra ~15 % de TradingView. Afectaba a casi todas las fichas (ROIC "anual", CAGR, FCF/ganancia, TTM).
+- Ahora dos ventanas chicas: últimos 800 días (dos 10-K: ROIC y base del TTM) y hace 1600–2250 días (10-K de hace ~5 años para CAGR 5 a). 4 llamadas por ficha.
+- Si el último 10-K tiene más de 2 años, los balances se descartan y manda Finnhub. `Fund.cagr` exige que el período cubra el plazo (el "10 años" queda vacío en vez de mentir).
+- `Fund.VERSION = 2`: las fichas viejas se rehacen solas.
+
 ### Correcciones del export (28-sep, build 202609281920)
 - **Realizado**: US$ 141,96 = cerradas 105,08 + ventas parciales de posiciones abiertas 36,88 (UNH, 11-may-26, 0,4242 acc a 378,10). El export lo parte y lista las parciales (tabla + `ventasParciales` en el JSON).
 - **Valor total** del export = acciones + otros activos (lo mismo que la card Portfolio); ya no suma la caja contable.
