@@ -520,7 +520,7 @@ function fundHTML(t, pos) {
     const q = grupo('Quality', 'Contra su propio promedio de 5 a\u00f1os: verde si hoy est\u00e1 mejor, amarillo si est\u00e1 parecido, rojo si est\u00e1 peor. ROIC al estilo TradingView (ganancia neta / patrimonio + deuda). FCF / NI: cu\u00e1nto de la ganancia se convierte en caja.', [
       tile('ROIC', pct1(d.roicAct), d.roicProm5 ? vsH(d.roicAct, d.roicProm5) : abs(d.roicAct, 0.15, 0.10), d.roicProm5 ? `5Y avg ${pct1(d.roicProm5)}` : (d.roicFuente === 'ttm' ? 'TTM' : ''), `data-act="fund-cuenta" data-id="${esc(t)}"`),
       tile('ROE', d.roe != null && d.roe > 1 ? '>100 %' : pct1(d.roe), d.roe5 ? vsH(d.roe, d.roe5) : abs(d.roe, 0.15, 0.10), d.roe5 ? `5Y avg ${pct1(d.roe5)}` : ''),
-      tile('Net margin', pct1(d.margenNeto), vsH(d.margenNeto, d.margenNeto5), d.margenNeto5 ? `5Y avg ${pct1(d.margenNeto5)}` : ''),
+      tile('Net margin', pct1(d.margenNeto), vsH(d.margenNeto, d.margenNeto5), d.margenNetoAnio ? `FY${String(d.margenNetoAnio).slice(2)}${d.margenNeto5 ? ` \u00b7 5Y ${pct1(d.margenNeto5)}` : ''}` : (d.margenNeto5 ? `5Y avg ${pct1(d.margenNeto5)}` : '')),
       tile('Gross margin', pct1(d.margenBruto), vsH(d.margenBruto, d.margenBruto5), d.margenBruto5 ? `5Y avg ${pct1(d.margenBruto5)}` : ''),
       tile('Op. margin', pct1(d.margenOper), vsH(d.margenOper, d.margenOper5), d.margenOper5 ? `5Y avg ${pct1(d.margenOper5)}` : ''),
       tile('FCF / NI', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', d.fcfSobreNeto5 ? vsH(d.fcfSobreNeto, d.fcfSobreNeto5) : abs(d.fcfSobreNeto, 0.9, 0.6), d.fcfSobreNeto5 ? `5Y avg ${num(d.fcfSobreNeto5, 2)}\u00d7` : ''),
@@ -539,14 +539,12 @@ function fundHTML(t, pos) {
       tile('P/S', num(d.ps, 1), vsH(d.ps, d.psMed, false), d.psMed ? `10Y med ${num(d.psMed, 1)}` : ''),
       tile('P/FCF', num(d.pfcf, 1), vsH(d.pfcf, d.pfcfMed, false), d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : ''),
       tile('P/B', num(d.pb, 1), vsH(d.pb, d.pbMed, false), d.pbMed ? `10Y med ${num(d.pbMed, 1)}` : ''),
-      tile('Div. yield', d.yieldDiv ? pct1(d.yieldDiv) : '\u2014', '', d.payout ? `payout ${pct1(d.payout)}` : ''),
+      tile('Div. yield', Fund.yieldDe(t, d) ? pct1(Fund.yieldDe(t, d)) : '\u2014', '', d.payout ? `payout ${pct1(d.payout)}` : ''),
     ]);
-    const bs = grupo('Balance sheet', 'Debt / Equity con la deuda total (incluye leases). Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana. Net cash: caja e inversiones de corto plazo menos la deuda total.', [
-      tile('Debt / Equity', d.deudaPat != null ? num(d.deudaPat, 2) : '\u2014', d.deudaPat == null ? '' : d.deudaPat < 0 ? 'mid' : d.deudaPat5 ? vsH(d.deudaPat, d.deudaPat5, false) : abs(d.deudaPat, 0.6, 1.5, true), d.deudaPat < 0 ? 'patrimonio neg.' : d.deudaPat5 ? `5Y avg ${num(d.deudaPat5, 2)}` : ''),
+    const bs = grupo('Balance sheet', 'Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana.', [
       tile('Current ratio', num(d.currentRatio, 2), abs(d.currentRatio, 1.2, 0.9), d.currentRatio5 ? `5Y avg ${num(d.currentRatio5, 2)}` : ''),
       tile('Quick ratio', num(d.quickRatio, 2), abs(d.quickRatio, 1, 0.7), d.quickRatio5 ? `5Y avg ${num(d.quickRatio5, 2)}` : ''),
       tile('Interest cov.', d.interesCob != null ? num(d.interesCob, 0) + '\u00d7' : '\u2014', abs(d.interesCob, 8, 3), 'EBIT / inter\u00e9s'),
-      tile('Net cash', d.netCash != null && Math.abs(d.netCash) >= 5e5 ? bil(d.netCash) : '\u2014', d.netCash == null || Math.abs(d.netCash) < 5e5 ? '' : d.netCash >= 0 ? 'pos' : 'mid', 'caja \u2212 deuda'),
       tile('Beta', num(d.beta, 2), '', 'vs S&amp;P 500'),
     ]);
     // Revenue · Net income · FCF por año, con escala
@@ -626,7 +624,6 @@ const CMP_FILAS = [
   // arriba de 100 % o con patrimonio negativo se muestra, pero no compite
   { k: 'ROE', v: d => d.roe, f: cmpPct, mejor: 1, valido: (v, d) => v <= 1 && !(d.deudaPat < 0), ns: true },
   { k: 'Margen neto', v: d => d.margenNeto, f: cmpPct, mejor: 1 },
-  { k: 'Deuda / patrimonio', v: d => d.deudaPat, f: cmpNum(2), mejor: -1, valido: v => v >= 0, ns: true },
   { k: 'Caja libre / ganancia', v: d => d.fcfSobreNeto, f: v => v == null ? '\u2014' : cmpNum(2)(v) + '\u00d7', mejor: 1 },
   { sec: 'Crecimiento, CAGR 5 a\u00f1os' },
   { k: 'Ventas', v: d => d.cagrVentas5 ?? d.crecVentas5, f: cmpPct, mejor: 1 },
@@ -638,7 +635,7 @@ const CMP_FILAS = [
   { k: 'P/E vs su mediana', v: d => d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
-  { k: 'Dividendo', v: d => d.yieldDiv || null, f: cmpPct, mejor: 0 },
+  { k: 'Dividendo', v: d => d.divAnual && (state.cartera.precios[d.ticker] || {}).c ? d.divAnual / state.cartera.precios[d.ticker].c : ((d.v || 1) >= 5 ? null : d.yieldDiv || null), f: cmpPct, mejor: 0 },
   { k: 'Capitalizaci\u00f3n', v: d => d.capUSD || null, f: v => v == null ? '\u2014' : v >= 1e12 ? `${cmpNum(1)(v / 1e12)} bill.` : `${cmpNum(0)(v / 1e9)} mil M`, mejor: 0 },
 ];
 
@@ -913,8 +910,8 @@ function ctxPartes(pendientes = []) {
   }).join('\n');
 
   const filasF = todas.map(p => {
-    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${n2(d.deudaPat)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${d.yieldDiv ? pc(d.yieldDiv) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | |`;
+    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -928,8 +925,8 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | ROE | Margen neto del \u00faltimo a\u00f1o fiscal (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));
       const l = [];

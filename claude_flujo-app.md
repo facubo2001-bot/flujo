@@ -32,6 +32,14 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Chequeo completo contra TradingView: se corrige lo corregible, se saca lo que no (28-sep, build 202609282232)
+Facu cargó las 16 tenencias (90 OK / 24 no). Regla de Facu: "lo que no se pueda corregir no lo ponemos en la app".
+- **ROIC**: capital = patrimonio + deuda LP + **porción corriente de la deuda LP** + leases LP (sin deuda de corto). Error medio contra TV: 0,17 pp en 12 empresas (HD 21,77 = 21,77; AMZN 15,84 = 15,84; MCD 17,15 = 17,15; MSFT 27,8 vs 27 por leases financieros fuera del balance).
+- **Margen neto** = ganancia / ventas del último 10-K (coincide con la columna FY de TV; el "Current" de TV es el último trimestre y el TTM de Finnhub corta en otra fecha). Promedio 5 años con la misma cuenta.
+- **Dividend yield** = dividendo anual indicado (Finnhub `dividendIndicatedAnnual`) / precio de hoy (`Fund.yieldDe`). El yield de Finnhub venía con precio viejo (IBM 4,28 vs 2,27; PEP 2,99 vs 3,91; UNH 1,37 vs 2,64; CEG 0,91 vs 0,44).
+- **Fuera de la app**: deuda/patrimonio y caja neta (leases financieros de MSFT y deudas propias de MELI no vienen en el balance de Finnhub); ROE, márgenes y ROIC de empresas sin 10-K (ASML, NU, VIST: 20-F) y de CEG (Finnhub trae la subsidiaria LLC, se detecta por `MembersEquity`); ROE con patrimonio negativo (MCD).
+- Quedan: P/E (OK en las 16), ROE de Finnhub para empresas con 10-K (OK), ventas/ganancia/ROIC FY (OK). `Fund.VERSION = 5`.
+
 ### Chequeo de Facu contra TradingView, tanda 1 (28-sep, build 202609282215)
 - Coinciden: ventas y ganancia FY de MELI, MSFT, NVDA, MCD; ROIC FY de MELI 18,8/18,62, MSFT 28/27, NVDA 93,6/93,6, MCD 17,2/17,15; P/E y dividend yield de todas.
 - Diferencias: ASML/NU (20-F, sin balances SEC) → el ROI de Finnhub no sirve como ROIC (NU 6 % vs 25 %, ASML 35,6 vs 51,4): la app ya no muestra ROIC para ellas. ROE/margen de Finnhub difieren algo de TradingView por el corte de 12 meses (NVDA ROE 110 vs 117). D/E de MSFT 0,18 vs 0,29: los leases financieros de MSFT no están como renglón del balance en Finnhub.
