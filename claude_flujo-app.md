@@ -32,6 +32,9 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Alertas cortas (28-sep, build 202609281907)
+- Siempre visibles: en zona (roja o amarilla) o a ≤5 % de mirala. El resto, detrás de "Ver todas (N más)" (`ui.alTodas`, acción `al-todas`; "Ver menos" vuelve arriba de la card).
+
 ### Cartera más corta (28-sep, build 202609281904)
 - Orden: tira de precios · KPIs · Composición/Posiciones · Alertas · Control · Otros activos · **Operaciones al final** (Facu: "scrolleo hasta el fondo y es muy largo").
 - Card "Trabajar con Claude" eliminada: ahora es un botón chiquito (`ICONS.spark`, `claude-menu`) en la tira de arriba que abre Exportar / Cargar (`menuClaude`).

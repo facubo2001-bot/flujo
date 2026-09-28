@@ -310,7 +310,13 @@ function viewCartera() {
   };
   const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));
   html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><button class="icon-btn" data-act="balances" aria-label="Calendario de balances" title="Calendario de balances">${ICONS.cuotas}</button><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
-    ${ordenAl.length ? ordenAl.map(alRow).join('') : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
+    ${ordenAl.length ? (() => {
+      // vivas: en zona (roja o amarilla) o a menos de 5 % de mirala. El resto, detras de un boton (Facu)
+      const viva = p => p.estado || (p.precio && p.alerta && p.alerta.mirala && (p.precio - p.alerta.mirala) / p.precio <= 0.05);
+      const vivas = ordenAl.filter(viva), resto = ordenAl.filter(p => !viva(p));
+      return (vivas.length ? vivas.map(alRow).join('') : '<p class="small muted" style="margin:4px 0 8px">Nada en zona ni a menos de 5 % de mirala.</p>')
+        + (resto.length ? (ui.alTodas ? resto.map(alRow).join('') : '') + `<button class="btn ghost al-mas" data-act="al-todas">${ui.alTodas ? 'Ver menos' : `Ver todas (${resto.length} m\u00e1s)`}</button>` : '');
+    })() : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
   </div>`;
   // control de calidad: conciliación con Balanz + operaciones con advertencias
   const conAviso = k.ops.filter(o => o.verif && o.verif.nivel !== 'ok').length; const concDias = conc ? D.daysBetween(conc.fecha, D.today()) : null;

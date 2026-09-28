@@ -138,6 +138,7 @@ const Actions = {
   'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
   'export-claude'() { formExportar(); },
   'claude-menu'() { menuClaude(); },
+  'al-todas'() { ui.alTodas = !ui.alTodas; render(); if (!ui.alTodas) { const el = $('[data-act="balances"]'); if (el) el.closest('.card').scrollIntoView({ block: 'start' }); } },
   'pat-dist'() { verDistribucion(); },
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
