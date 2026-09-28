@@ -117,6 +117,7 @@ const main = async () => {
   const universo = [...new Set(ced.filter(c => !c.sinUS).map(c => c.us || c.code))];
   const mapa = await get('https://www.sec.gov/files/company_tickers.json');
   const cik = {}; for (const x of Object.values(mapa)) { const t = String(x.ticker).toUpperCase(); if (!cik[t]) cik[t] = x.cik_str; }
+  try { const ex = await get('https://www.sec.gov/files/company_tickers_exchange.json'); const iC = ex.fields.indexOf('cik'), iT = ex.fields.indexOf('ticker'); for (const r of ex.data) { const t = String(r[iT]).toUpperCase(); if (!cik[t]) cik[t] = r[iC]; } } catch (e) {}
   fs.mkdirSync(OUT, { recursive: true });
   const dbg = { corrida: new Date().toISOString(), universo: universo.length, ok: 0, sinCik: [], sinDatos: [], errores: [], ifrs: {} };
   const indice = {};
@@ -128,7 +129,7 @@ const main = async () => {
       const j = await get(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(c).padStart(10, '0')}.json`);
       if (!j) { dbg.sinDatos.push(t); continue; }
       const x = extraer(j);
-      if (!x.annual.length) { dbg.sinDatos.push(t); continue; }
+      if (!x.annual.length) { const formas = {}; for (const tx of Object.values(j.facts || {})) for (const o of Object.values(tx)) for (const arr of Object.values(o.units || {})) for (const it of arr) formas[it.form] = (formas[it.form] || 0) + 1; dbg.sinDatos.push(`${t} (${Object.entries(formas).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([f, n]) => f + ':' + n).join(' ')})`); continue; }
       if (j.facts && j.facts['ifrs-full']) dbg.ifrs[t] = Object.keys(j.facts['ifrs-full']).filter(k => /Revenue|Profit|Equity|Borrow|Lease|Cash|Share/.test(k)).slice(0, 80);
       const doc = { t, cik: c, nombre: j.entityName, moneda: x.moneda, annual: { data: x.annual }, quarterly: { data: x.quarterly } };
       const txt = JSON.stringify(doc);

@@ -32,6 +32,13 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Balances oficiales de la SEC (28-sep, build 202609282324)
+- **Tarea diaria** `.github/workflows/sec.yml` (10:17 UTC + al cambiar `tools/sec.mjs`): baja `companyfacts` de la SEC para todo el universo de CEDEARs (`cedears.json`, ~407; 323 con datos) y deja `sec/<TICKER>.json` en el MISMO formato que Finnhub `financials-reported` (año, trimestre, form, fechas, `report.ic`/`report.bs`; `cf` = `ic`). IFRS → nombres us-gaap. `sec/index.json` y `sec/_debug.json` (sin CIK, sin datos, conceptos IFRS). El teléfono no puede consultar la SEC (sin CORS): la app lee `sec/` del mismo GitHub Pages.
+- **App** (`Sec.de`, `Sec.mezclar`): pide igual los balances de Finnhub (son los del frente del balance, los contrastados con TradingView) y la SEC completa por cierre lo que falta: años nuevos (MSFT FY2026, MELI Q2-26), 20-F (ASML en EUR, NU, VIST), historia de 13 años. Si el reporte de Finnhub no trae patrimonio de la empresa que cotiza (CEG: subsidiaria LLC) manda el de la SEC.
+- **Capital del ROIC** (definición final): patrimonio + deuda LP **no corriente** por prioridad (`LongTermDebtNoncurrent` › `LongTermDebtAndCapitalLeaseObligations` (ya incluye leases financieros, es no corriente) › préstamos/notas LP › `LongTermDebt` − corriente) + leases operativos no corrientes por patrón. Sin sumar duplicados (la SEC trae el mismo monto con varios nombres), sin leases financieros de notas. Contra TV: MELI 18,82/18,62 (actual 15,18/15,02), NVDA 93,57/93,6, MCD 17,15/17,15, META 22,87/22,81, IBM 12,46/12,45, GOOGL 32,15/32,01, HD 21,77/21,77, AMZN 15,84/15,84, UNH 7,03/7,12, CEG 10,55/10,72, MU 13,52/13,39, PEP 13,94/13,3.
+- **Márgenes bruto y operativo** del último ejercicio (FY) cuando el balance los trae; **20-F** (`solo20F`): sin ROIC ni ROE (ASML 43 vs 51 en TV), sí ventas, ganancia, márgenes y crecimiento. NU y VIST: la SEC todavía no tiene su 20-F 2025 en datos (aviso).
+- `Fund.VERSION = 6`.
+
 ### Balances que no aparecían (28-sep, build 202609282250)
 - `calendar/earnings` global de 75 días: Finnhub corta en ~1.000 entradas y se queda con las fechas MÁS LEJANAS (devolvía 17-nov → 11-dic: nada cercano). Ahora `Fund.calendario()` pide día por día (60 consultas, una vez por día, sigue donde quedó; `c.hechos`, `c.cortados` si un día llega a 990+). Verificado: 29–30 sep trae MU 30/09 amc.
 

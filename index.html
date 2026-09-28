@@ -1450,7 +1450,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609282250';
+const BUILD = '202609282324';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1955,6 +1955,37 @@ const Precios = {
   },
 };
 
+/* ---------- balances oficiales de la SEC, bajados por la tarea diaria del repo (tools/sec.mjs -> sec/<T>.json) ---------- */
+const Sec = {
+  _cache: {},
+  async de(t) {
+    const sym = Precios.simbolo(t); const hoy = D.today();
+    const c = Sec._cache[sym]; if (c && c.dia === hoy) return c.doc;
+    let doc = null;
+    try {
+      if (location.protocol.startsWith('http')) {
+        const r = await fetch(`sec/${encodeURIComponent(sym)}.json?d=${hoy}`, { cache: 'no-store' });
+        if (r.ok) { const j = await r.json(); if (j && j.annual && Array.isArray(j.annual.data) && j.annual.data.length) doc = j; }
+      }
+    } catch (e) {}
+    if (doc) for (const blk of [doc.annual, doc.quarterly]) for (const d of (blk && blk.data) || []) if (d.report && !d.report.cf) d.report.cf = d.report.ic;
+    Sec._cache[sym] = { dia: hoy, doc }; return doc;
+  },
+  /** une los reportes de Finnhub con los de la SEC: por cada cierre manda el de Finnhub; la SEC agrega los que faltan */
+  mezclar(fh, sec) {
+    const a = (fh && Array.isArray(fh.data)) ? fh.data.filter(d => d && d.report && Fund.anios({ data: [d] }).length + Fund.trimestres({ data: [d] }).length) : [];
+    const b = (sec && Array.isArray(sec.data)) ? sec.data : [];
+    if (!b.length) return fh; if (!a.length) return sec;
+    const cierre = d => Date.parse(String(d.endDate).slice(0, 10));
+    const cerca = (x, y) => Math.abs(cierre(x) - cierre(y)) < 12 * 864e5;
+    // el de Finnhub sirve si trae patrimonio de la empresa que cotiza (CEG: Finnhub trae la subsidiaria LLC, sin StockholdersEquity)
+    const sirve = d => { const cs = ((d.report && d.report.bs) || []).map(x => Fund._c(x)); return cs.includes('StockholdersEquity') || cs.includes('StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'); };
+    const aOk = a.filter(y => sirve(y) || !b.some(x => cerca(x, y) && sirve(x)));
+    const extra = b.filter(x => !aOk.some(y => cerca(x, y)));
+    return { data: [...aOk, ...extra], mezcla: extra.length };
+  },
+};
+
 /* ---------- fundamentales de cada empresa (Finnhub: perfil, métricas, balances SEC, calendario) ---------- */
 const Fund = {
   /** datos guardados de un ticker (se muestran al instante mientras se refrescan) */
@@ -2009,6 +2040,7 @@ const Fund = {
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
         ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
+        bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); return v != null && cr != null ? v - cr : null; })(),
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
         acciones: V(ic, C.acciones) || V(bs, C.acciones),
@@ -2039,22 +2071,26 @@ const Fund = {
     const V = Fund._v, C = Fund.C; const tiene = n => Array.isArray(bs) && bs.some(x => Fund._c(x) === n);
     let pat = V(bs, C.patrimonioTotal);
     if (pat == null) { const p = V(bs, C.patrimonio); if (p == null) return null; pat = p + (Fund._sum(bs, C.minoritarios) || 0); }
-    const NC = ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermLoansPayable', 'LongTermNotesPayable'];
     const cor = V(bs, C.deudaCorriente) || 0;
-    const ncHay = NC.filter(tiene);
-    // largo plazo: el concepto "Noncurrent" si esta; si solo hay "LongTermDebt" (total), se le resta la porcion corriente
-    const lp = ncHay.length ? Fund._sum(bs, ncHay) : Math.max(0, (V(bs, ['LongTermDebt', 'LongTermDebtAndCapitalLeaseObligations']) || 0) - cor);
-    const incluyeFin = ncHay.some(n => /Lease/.test(n)) || (!ncHay.length && tiene('LongTermDebtAndCapitalLeaseObligations'));
+    // deuda de largo plazo NO corriente, por prioridad (la SEC trae el mismo monto con varios nombres; sumar duplicaba):
+    // 1) LongTermDebtNoncurrent (+ leases financieros aparte) 2) LongTermDebtAndCapitalLeaseObligations* (ya incluye leases financieros,
+    // es la porcion NO corriente: HD 46,34) 3) prestamos/notas de largo plazo (MELI) 4) LongTermDebt total menos la porcion corriente
+    const exacto = n => { const h = Array.isArray(bs) && bs.find(x => Fund._c(x) === n); const v = h ? Number(h.value) : NaN; return Number.isFinite(v) ? v : null; };
+    let lp = 0, incluyeFin = false; void incluyeFin;
+    if (exacto('LongTermDebtNoncurrent') != null) lp = exacto('LongTermDebtNoncurrent');
+    else { const cl = ['LongTermDebtAndCapitalLeaseObligations', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent'].map(exacto).find(v => v != null);
+      if (cl != null) { lp = cl; incluyeFin = true; }
+      else if (tiene('LongTermLoansPayable') || tiene('LongTermNotesPayable')) lp = Math.max(exacto('LongTermLoansPayable') || 0, 0) + Math.max(exacto('LongTermNotesPayable') || 0, 0);
+      else lp = Math.max(0, (exacto('LongTermDebt') || 0) - cor); }
     // leases: cada empresa los nombra distinto (us-gaap OperatingLeaseLiabilityNoncurrent, AMZN LeaseLiabilityNoncurrent,
     // MCD LongTermLeaseLiabilityNoncurrentNet / CurrentLeaseLiabilityNet): se suman por patron, una vez cada concepto
-    const leaseSum = re => { const vistos = new Set(); let t = 0; for (const x of (Array.isArray(bs) ? bs : [])) { const c = Fund._c(x); if (vistos.has(c) || /Debt|Payments|Expense|Cost|Asset|RightOfUse/.test(c) || !re.test(c)) continue; if (incluyeFin && /Finance|Capital/.test(c)) continue; const v = Number(x.value); if (Number.isFinite(v)) { vistos.add(c); t += v; } } return t; };
+    const leaseSum = re => { const vistos = new Set(); let t = 0; for (const x of (Array.isArray(bs) ? bs : [])) { const c = Fund._c(x); if (vistos.has(c) || /Debt|Payments|Expense|Cost|Asset|RightOfUse/.test(c) || !re.test(c)) continue; if (/Finance|Capital/.test(c)) continue; /* leases financieros: van dentro de la deuda o en notas (IBM, MCD matchean a TV sin sumarlos) */ const v = Number(x.value); if (Number.isFinite(v)) { vistos.add(c); t += v; } } return t; };
     const leasesLP = leaseSum(/Lease\w*Liabilit\w*Noncurrent|LongTermLease\w*Liabilit/);
     const corTotal = tiene('DebtCurrent') || tiene('ShortTermDebtAndCurrentPortionOfLongTermDebt');
     const corto = corTotal && !['LongTermDebtCurrent', 'LongTermDebtAndCapitalLeaseObligationsCurrent', 'LongTermDebtAndFinanceLeaseObligationsCurrent'].some(tiene) ? 0 : (Fund._sum(bs, C.deudaCorto) || 0);
     const leasesCP = leaseSum(/^(?!.*Noncurrent)(?:\w*Lease\w*Liabilit\w*Current|CurrentLease\w*Liabilit\w*)/);
-    // porcion corriente de la deuda de LARGO plazo: TradingView la cuenta (HD 21,77 %); la deuda de corto (papeles, prestamos, DebtCurrent) no
-    const curLP = Fund._sum(bs, ['LongTermDebtCurrent', 'LongTermDebtAndCapitalLeaseObligationsCurrent', 'LongTermDebtAndFinanceLeaseObligationsCurrent']) || 0;
-    const deuda = lp + curLP + leasesLP;
+    // capital invertido de TradingView: patrimonio + deuda y leases NO corrientes (sin porcion corriente ni deuda de corto)
+    const deuda = lp + leasesLP;
     return { patrimonio: pat, deuda, deudaTotal: lp + cor + corto + leasesLP + leasesCP, total: pat + deuda };
   },
   /** ganancia neta / promedio del capital total de dos periodos; vacio si el capital promedio no es positivo o el resultado es absurdo */
@@ -2126,7 +2162,10 @@ const Fund = {
     // perfil: una vez cada 90 dias (nombre, sector, mercado no cambian); calendario: una consulta al dia para todos
     const perfilViejo = !(previa0 && previa0.nombre && previa0.perfilAt && Date.now() - previa0.perfilAt < 90 * 86400000);
     const calGlobal = Fund.calendarioFresco();
-    const [perfil0, met, fin, cal, finQ] = await Promise.all([
+    // balances oficiales de la SEC (los baja una tarea diaria del repo a sec/<T>.json, mismo formato que Finnhub).
+    // Si estan, no se le piden balances a Finnhub (2 consultas menos por ficha y sin sus agujeros: 20-F, 10-K atrasados).
+    const sec = await Sec.de(t);
+    const [perfil0, met, fin0, cal, finQ0] = await Promise.all([
       perfilViejo ? get(`stock/profile2?symbol=${s}`) : null,
       get(`stock/metric?symbol=${s}&metric=all`),
       // Dos pedidos: los ultimos ~3 10-K (ROIC y base del TTM, siempre chico) y la historia desde 2008 (CAGR 5 y 10 anios).
@@ -2137,6 +2176,9 @@ const Fund = {
       get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${desdeQ}&to=${hoy}`),
     ]);
     if (limite) return null;
+    // Finnhub trae el balance tal cual se presenta (lo que contrastamos con TradingView); la SEC completa lo que a Finnhub le falta:
+    // anios nuevos que todavia no cargo (MSFT FY2026), empresas con 20-F (ASML, NU, VIST) e historia larga
+    const fin = Sec.mezclar(fin0, sec && sec.annual), finQ = Sec.mezclar(finQ0, sec && sec.quarterly);
     const perfil = perfil0 || (previa0 && previa0.nombre ? { name: previa0.nombre, finnhubIndustry: previa0.sector, exchange: previa0.mercado, marketCapitalization: null, _viejo: true } : null);
     const vacio = x => !x || (typeof x === 'object' && !Object.keys(x).length) || (x.metric && !Object.keys(x.metric).length && !(x.series && Object.keys(x.series).length));
     // Finnhub no tiene nada de este ticker (OTC, Brasil): se marca y no se reintenta por 30 dias
@@ -2163,7 +2205,7 @@ const Fund = {
     const peHist = hist('pe');
     const bal = calGlobal ? Fund.calDe(t) : cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
     const d = {
-      at: Date.now(), ticker: t, v: Fund.VERSION,
+      at: Date.now(), ticker: t, v: Fund.VERSION, fuenteBal: sec ? (fin0 && fin0.data && fin0.data.length ? 'finnhub+sec' : 'sec') : 'finnhub', moneda: sec && !(fin0 && fin0.data && fin0.data.length) ? sec.moneda || 'USD' : 'USD',
       nombre: perfil && perfil.name || null, sector: perfil && perfil.finnhubIndustry || null,
       capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
       perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
@@ -2242,6 +2284,18 @@ const Fund = {
     { const conM = filas.filter(f => f.ventas > 0 && f.neto != null); const uM = conM[conM.length - 1];
       d.margenNeto = uM && uM.anio === (u && u.anio) ? uM.neto / uM.ventas : null; d.margenNetoAnio = d.margenNeto != null ? uM.anio : null;
       const ult5 = conM.slice(-5).map(f => f.neto / f.ventas); d.margenNeto5 = ult5.length >= 3 ? sum(ult5) / ult5.length : null; }
+    // margen bruto y operativo del ultimo ejercicio, con la misma cuenta que TradingView (columna del anio). Si el balance no los trae, el TTM de Finnhub
+    { const pr = (campo) => { const xs = filas.filter(f => f.ventas > 0 && f[campo] != null); const uu = xs[xs.length - 1]; if (!uu || uu.anio !== (u && u.anio)) return null; const ult5 = xs.slice(-5).map(f => f[campo] / f.ventas); return { v: uu[campo] / uu.ventas, p5: ult5.length >= 3 ? sum(ult5) / ult5.length : null }; };
+      const mb = pr('bruto'); if (mb) { d.margenBruto = mb.v; d.margenBruto5 = mb.p5; d.margenBrutoFY = true; }
+      const mo = pr('operativo'); if (mo) { d.margenOper = mo.v; d.margenOper5 = mo.p5; d.margenOperFY = true; } }
+    // Empresas con 20-F (solo balances de la SEC, sin Finnhub ni 10-Q): TradingView calcula ROIC y ROE distinto (ASML 43 vs 51, ROE 50 vs 54)
+    // -> no se muestran; ventas, ganancia, margenes y crecimiento si (son cuentas directas del balance)
+    d.solo20F = !!(sec && !(fin0 && fin0.data && fin0.data.length) && !trims.length);
+    if (d.solo20F) d.avisos.push('Empresa extranjera (20-F): ventas, ganancia y m\u00e1rgenes salen de la SEC; ROIC y ROE no se muestran porque no se pueden igualar a TradingView');
+    if (d.solo20F) { d.roicAct = d.roicFY = d.roicTTM = d.roicProm5 = null; d.roicFuente = null; d.roicCuenta = null; d.roicSerie = []; }
+    // ROE: el TTM de Finnhub coincide con TradingView para las empresas con 10-Q. Las que presentan 20-F (sin trimestres) -> ROE del ejercicio propio
+    if (d.solo20F) { d.roe = d.roe5 = null; }
+    else if (d.sec && !trims.length && u && u.neto != null && u.patrimonio > 0) { const pv = filas[filas.length - 2]; const pp = pv && pv.anio === u.anio - 1 && pv.patrimonio > 0 ? (u.patrimonio + pv.patrimonio) / 2 : u.patrimonio; d.roe = u.neto / pp; d.roeFY = true; d.roe5 = null; }
     // sin balances de la SEC (20-F, subsidiaria): ROE y margenes de Finnhub no coinciden con TradingView (ASML ROE 41 vs 54) -> fuera
     if (!d.sec) { d.roe = null; d.roe5 = null; d.margenBruto = d.margenBruto5 = d.margenOper = d.margenOper5 = null; }
     // deuda / patrimonio y caja neta: los leases financieros (MSFT) y deudas propias (pagos con tarjeta de MELI) no vienen como renglon
@@ -2252,7 +2306,7 @@ const Fund = {
     // control automatico: que un numero raro se vea en la ficha y en el export en vez de pasar como bueno
     { const ult = filas[filas.length - 1]; const anioHoy = Number(hoy.slice(0, 4));
       if (!filas.length) { if (!llc) d.avisos.push('Sin balances de la SEC (empresa extranjera, presenta 20-F): Finnhub no trae datos verificables de ROIC, ROE ni m\u00e1rgenes, as\u00ed que no se muestran'); }
-      else { if (ult.fin && D.daysBetween(ult.fin, hoy) > 400) d.avisos.push(`Finnhub todav\u00eda no tiene el balance anual posterior a ${D.fmt(ult.fin, { year: true })}: el a\u00f1o fiscal que ves es ${ult.anio}${d.roicFuente === 'ttm' ? ` (el ROIC actual usa trimestres hasta ${D.fmt(d.roicCuenta.hasta, { year: true })})` : ''}`); if (ult.ventas == null) d.avisos.push(`Ventas ${ult.anio}: no se encontr\u00f3 el concepto en el balance`); }
+      else { if (ult.fin && D.daysBetween(ult.fin, hoy) > 400) d.avisos.push(`${d.solo20F ? 'La SEC todav\u00eda no public\u00f3 en datos el 20-F' : 'Todav\u00eda no est\u00e1 el balance anual'} posterior a ${D.fmt(ult.fin, { year: true })}: el a\u00f1o fiscal que ves es ${ult.anio}${d.roicFuente === 'ttm' ? ` (el ROIC actual usa trimestres hasta ${D.fmt(d.roicCuenta.hasta, { year: true })})` : ''}`); if (ult.ventas == null) d.avisos.push(`Ventas ${ult.anio}: no se encontr\u00f3 el concepto en el balance`); }
       const fh = Number(m.roiTTM) / 100;
       if (d.roicFuente !== 'finnhub' && d.roicAct != null && Number.isFinite(fh) && fh > 0.02 && d.roicAct > 0 && (d.roicAct / fh > 2.5 || fh / d.roicAct > 2.5)) d.avisos.push(`ROIC ${Math.round(d.roicAct * 1000) / 10} % vs ROI de Finnhub ${Math.round(fh * 1000) / 10} %: diferencia grande, revisar`); }
     if (!state.cartera.fund) state.cartera.fund = {};
@@ -2291,7 +2345,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 5,
+  VERSION: 6,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -5051,7 +5105,7 @@ function fundHTML(t, pos) {
     const fs = (d.filas || []).filter(f => Number.isFinite(f.ventas) || Number.isFinite(f.neto)).slice(-7);
     if (fs.length >= 3) {
       const mx = Math.max(...fs.flatMap(f => [f.ventas, f.neto, f.fcf].filter(Number.isFinite).map(Math.abs)), 1);
-      const div = mx >= 5e9 ? 1e9 : 1e6, u = div === 1e9 ? 'US$ B' : 'US$ M';
+      const mon = d.moneda && d.moneda !== 'USD' ? d.moneda : 'US$'; const div = mx >= 5e9 ? 1e9 : 1e6, u = `${mon} ${div === 1e9 ? 'B' : 'M'}`;
       const top = (() => { const raw = mx / div; const e = Math.pow(10, Math.floor(Math.log10(raw))); const n = Math.ceil(raw / e); return (n <= 2 ? 2 : n <= 3 ? 3 : n <= 5 ? 5 : 10) * e; })();
       const W = 358, H = 170, pl = 34, pb = 22, pt = 10, iw = W - pl - 6, ih = H - pb - pt; const Y = v => pt + ih - Math.max(0, v) / div / top * ih;
       const grid = [0, 1 / 3, 2 / 3, 1].map(f => { const v = top * f; return `<line x1="${pl}" x2="${W - 6}" y1="${Y(v * div).toFixed(1)}" y2="${Y(v * div).toFixed(1)}" class="gl"/><text x="${pl - 6}" y="${(Y(v * div) + 4).toFixed(1)}" text-anchor="end" class="gt">${num(v, v < 10 ? 1 : 0)}</text>`; }).join('');
@@ -5060,7 +5114,7 @@ function fundHTML(t, pos) {
       chart = `<div class="fs"><div class="fs-t">Revenue \u00b7 Net income \u00b7 FCF</div><svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>
         <div class="flg"><span><i style="background:rgba(255,255,255,.28)"></i>Revenue</span><span><i style="background:rgba(255,255,255,.8)"></i>Net income</span><span><i style="background:var(--accent)"></i>FCF</span><span class="u">${u}</span></div></div>`;
     }
-    const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / ${d.roicCuenta.capitalPrev ? 'capital promedio' : 'capital'} (patrimonio + deuda y leases de largo plazo) <b>${fmtU((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)} M</b>${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 a\u00f1o fiscal ${d.roicFYanio} ${pct1(d.roicFY)}` : ''}</div>` : '';
+    const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${d.moneda && d.moneda !== 'USD' ? `${d.moneda} ${num(d.roicCuenta.neto / 1e6, 0)}` : fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / ${d.roicCuenta.capitalPrev ? 'capital promedio' : 'capital'} (patrimonio + deuda y leases de largo plazo) <b>${d.moneda && d.moneda !== 'USD' ? `${d.moneda} ${num((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)}` : fmtU((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)} M</b>${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 a\u00f1o fiscal ${d.roicFYanio} ${pct1(d.roicFY)}` : ''}</div>` : '';
     const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
     const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
     const pie = `<div class="fpie">Finnhub \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} ${infoBtn(`Datos de Finnhub y de los balances presentados a la SEC${d.aniosDatos ? ` (${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta})` : ''}. Si un n\u00famero no coincide con TradingView, copi\u00e1 los datos crudos y pegalos en el chat.`)} <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>`;
