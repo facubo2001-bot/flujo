@@ -32,6 +32,13 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### ROIC y deuda/patrimonio calibrados con TradingView (28-sep, build 202609282156)
+- Capturas de Facu (MELI en TradingView): ROIC FY2025 **18,62 %**, FY2024 **27,03 %**, "Current" **15,02 %**; D/E FY2025 2,25.
+- **Capital invertido de TradingView = patrimonio + deuda de largo plazo + leases de largo plazo** (sin corto plazo ni porción corriente). La app da 18,82 % / 27,15 % (la diferencia son US$ 187 M de pagos con tarjeta no corrientes, concepto propio de MELI).
+- ROIC principal = TTM (el "Current" de TradingView); FY queda como `roicFY` (ficha y export). Leases por patrón (AMZN `LeaseLiabilityNoncurrent`, MCD `LongTermLeaseLiabilityNoncurrentNet`).
+- Deuda/patrimonio calculado: deuda total (corto + largo + leases) / patrimonio del último balance; patrimonio negativo → sin dato + aviso (MCD). MELI da 1,69 vs 2,25 de TradingView porque TV suma los US$ 3.800 M de pagos con tarjeta.
+- `Fund.VERSION = 4`. Página de chequeo contra TradingView publicada como artefacto ("Chequeo vs TradingView").
+
 ### Auditoría de fundamentales con datos reales (28-sep, build 202609282140)
 - Fixtures reales de Finnhub (16 tenencias, `/home/claude/t/fx/*.json`, armados con WebFetch) pasados por `Fund.traer` (`t/audit.py`). Ventas y ganancia neta FY coinciden con lo publicado (MSFT 281.724 / 101.832; GOOGL 402.836 / 132.170; MELI 28.893 / 1.997…).
 - Fixes: **EPS** = ganancia / acciones diluidas (Finnhub redondea a entero el EPS de varios 10-K: HD 15, UNH 24, META 15, MELI 39); **acciones** en millones se pasan a unidades (MCD 713) y se ajustan por **split** (NVDA 10:1); **P/B** trimestral antes que anual (el anual de MCD era de 2015); **CEG**: Finnhub trae la subsidiaria LLC → `MembersEquity` como patrimonio; rango 52 semanas se oculta solo si máx/mín >20 (MU real 155–1255 se ocultaba); `DebtCurrent` sin doble conteo.
