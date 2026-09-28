@@ -1445,7 +1445,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280144';
+const BUILD = '202609280147';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -3523,10 +3523,10 @@ function gastosAnalisis(c) {
   // grupo abierto: sus categorias debajo de su fila de tarjetas (1er toque abre, 2do toque va a los gastos)
   const gAb = grupos.find(x => x.g.id === ui.gaGrupo);
   const detalle = x => { const cs = Object.entries(c.byCat).filter(([id, v]) => v > 0 && L.grupo(L.cat(id).grupo).id === x.g.id).map(([id, v]) => ({ cat: L.cat(id), v, avg: E.promedioCat(id, ui.mes, 3) })).sort((a, b) => b.v - a.v); const cm = cs.length ? cs[0].v : 1;
-    return `<div class="gt-det"><div class="gt-dh"><b>${esc(x.g.nombre)}</b><span>tocá una categoría, o el grupo otra vez, para ver los gastos</span></div>${cs.map(k => { const d = k.avg > 0 ? k.v - k.avg : null; const dd = d != null && Math.abs(d) > Math.max(1000, k.avg * 0.1) ? ` · <em class="${d > 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${M.c(Math.abs(d))}</em>` : '';
+    return `<div class="gt-det"><div class="gt-dh"><b>${esc(x.g.nombre)}</b><span>tocá una categoría para ver sus gastos · el grupo otra vez para cerrar</span></div>${cs.map(k => { const d = k.avg > 0 ? k.v - k.avg : null; const dd = d != null && Math.abs(d) > Math.max(1000, k.avg * 0.1) ? ` · <em class="${d > 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${M.c(Math.abs(d))}</em>` : '';
       return `<div class="dv" data-act="ver-cat" data-id="${esc(k.cat.id)}"><div class="dv1"><span>${esc(k.cat.nombre)}</span><b>${M.c(k.v)}</b></div><div class="dv2"><span class="dvb"><i style="width:${Math.max(2, k.v / cm * 100).toFixed(1)}%;background:rgba(255,255,255,${(0.18 + 0.62 * Math.pow(k.v / cm, 0.8)).toFixed(3)})"></i></span><em>${M.pct(k.v / x.v, 0)}${dd}</em></div></div>`; }).join('')}</div>`; };
   let tiles = ''; grupos.forEach((x, i) => { tiles += gTile(x); const finFila = i % 2 === 1 || i === grupos.length - 1; if (finFila && gAb && [grupos[i], grupos[i - (i % 2)]].includes(gAb)) tiles += detalle(gAb); });
-  const macro = `<div class="card ga-g"><div class="ga-t">Por grupo ${infoBtn('Cuánto se fue en cada grupo este mes. En rojo, lo que ya gastaste de más contra tu promedio de los últimos 3 meses; en verde, lo que vas por debajo. Tocá un grupo para ver en qué categorías se fue; tocalo otra vez para ver los gastos.')}</div><div class="gts">${tiles}</div></div>`;
+  const macro = `<div class="card ga-g"><div class="ga-t">Por grupo ${infoBtn('Cuánto se fue en cada grupo este mes. En rojo, lo que ya gastaste de más contra tu promedio de los últimos 3 meses; en verde, lo que vas por debajo. Tocá un grupo para ver en qué categorías se fue (otra vez para cerrarlo) y una categoría para ver sus gastos.')}</div><div class="gts">${tiles}</div></div>`;
   // 3) ¿hacia falta?: compacto, una linea con un mini velocimetro
   const neces = `<div class="card ga-nec"><div class="ga-nec-b">${velo}<div class="vl1"><div><b class="in">${M.pct(pIn, 0)} innecesario</b> · ${M.c(byNec[3])} ${infoBtn('Sale de lo que marcás en cada gasto (Necesario, Útil o Innecesario). Al cargar se sugiere según la categoría y lo podés cambiar.')}</div><div class="vl2">Necesario ${M.c(byNec[1])} · Útil ${M.c(byNec[2])}</div></div></div></div>`;
   // 2) micro: top 3 categorias y el resto en lista (sin repetir el top)
@@ -5602,7 +5602,7 @@ const Actions = {
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
-  'ga-grupo'(id) { if (ui.gaGrupo === id) { ui.gaGrupo = null; ui.filtros = { ...(ui.filtros || {}), grupo: id }; } else ui.gaGrupo = id; render(); },
+  'ga-grupo'(id) { ui.gaGrupo = ui.gaGrupo === id ? null : id; render(); },  // 1er toque abre, 2do cierra; los gastos se ven tocando una categoria
   'gastos-todas'() { ui.gastosTodas = !ui.gastosTodas; render(); },
   'grupo-sel'(id) { ui.grupoSel = id; render(); },
   'ver-cat'(id) { ui.filtros = { ...(ui.filtros || {}), cat: id }; go('movimientos'); },
