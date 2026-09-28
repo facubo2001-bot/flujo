@@ -1,5 +1,5 @@
 {
- "corrida": "2026-09-28T23:00:09.535Z",
+ "corrida": "2026-09-28T23:26:23.560Z",
  "universo": 407,
  "ok": 323,
  "sinCik": [
@@ -85,10 +85,10 @@
   "DIA",
   "DTEGY",
   "IBN",
-  "SKHY",
-  "SPCX",
+  "SKHY (F-1:5 F-1/A:5)",
+  "SPCX (10-Q:417 S-8:8 S-1/A:5)",
   "SPY",
-  "XOM"
+  "XOM (10-Q:269 424B2:6 POSASR:5)"
  ],
  "errores": [],
  "ifrs": {
