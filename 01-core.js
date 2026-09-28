@@ -1160,16 +1160,25 @@ const Fund = {
   /** calendario de balances de TODO el mercado: una consulta por dia; se guardan solo los tickers que seguis */
   calendarioFresco() { const c = state.cartera.calendario; return !!(c && c.ok && Date.now() - c.at < 26 * 3600000); },
   calDe(t) { const c = state.cartera.calendario; if (!c || !c.ok) return null; const x = c.map[Precios.simbolo(t)] || c.map[t]; return x || null; },
+  /** calendario de balances. Finnhub corta la respuesta en ~1.000 entradas y se queda con las fechas MAS LEJANAS
+   *  (pedido de 75 dias devolvia solo del 17-nov en adelante: sin balances cercanos). Se pide dia por dia (60 consultas,
+   *  una vez por dia) y sigue donde quedo si se corta. */
   async calendario() {
-    const c = state.cartera.calendario; if (c && Date.now() - c.at < 24 * 3600000) return;
-    const hoy = D.today(); const hasta = D.addDays(hoy, 75);
-    const r = await Finnhub.get(`calendar/earnings?from=${hoy}&to=${hasta}`);
-    if (r.status === 429) return;
-    const lista = r.ok && r.json && Array.isArray(r.json.earningsCalendar) ? r.json.earningsCalendar : [];
-    const seguir = new Set(Precios.tickers().map(Precios.simbolo)); const map = {};
-    for (const e of lista) if (e && e.symbol && seguir.has(e.symbol) && e.date >= hoy && (!map[e.symbol] || e.date < map[e.symbol].date)) map[e.symbol] = { fecha: e.date, date: e.date, hour: e.hour || '', hora: e.hour || '', epsEstimate: e.epsEstimate ?? null, epsEst: e.epsEstimate ?? null, quarter: e.quarter ?? null, trimestre: e.quarter ?? null };
-    // si vino vacio (plan que no lo permite), cada ficha pide el suyo como antes
-    state.cartera.calendario = { at: Date.now(), ok: lista.length > 20, map };
+    const hoy = D.today(); let c = state.cartera.calendario;
+    if (c && c.ok && Date.now() - c.at < 24 * 3600000) return;
+    if (!c || c.hoy !== hoy || !c.hechos) c = state.cartera.calendario = { at: 0, ok: false, hoy, map: {}, hechos: {}, cortados: [] };
+    const seguir = new Set(Precios.tickers().map(Precios.simbolo));
+    for (let i = 0; i < 60; i++) {
+      const dia = D.addDays(hoy, i); if (c.hechos[dia]) continue;
+      if (document.hidden) return;
+      const r = await Finnhub.get(`calendar/earnings?from=${dia}&to=${dia}`);
+      if (!r.ok) return;  // 429 o error: sigue la proxima vuelta
+      const lista = r.json && Array.isArray(r.json.earningsCalendar) ? r.json.earningsCalendar : [];
+      if (lista.length >= 990) c.cortados.push(dia);
+      for (const e of lista) if (e && e.symbol && seguir.has(e.symbol) && e.date >= hoy && (!c.map[e.symbol] || e.date < c.map[e.symbol].date)) c.map[e.symbol] = { fecha: e.date, date: e.date, hour: e.hour || '', hora: e.hour || '', epsEstimate: e.epsEstimate ?? null, epsEst: e.epsEstimate ?? null, quarter: e.quarter ?? null, trimestre: e.quarter ?? null };
+      c.hechos[dia] = 1; Persist.save();
+    }
+    c.at = Date.now(); c.ok = true; Persist.save(); Motor.pintar();
   },
   /** compat: el export y la precarga vieja la llaman */
   async actualizarCartera(max = 8) { let n = 0; for (const t of Fund.pendientes().slice(0, max)) { try { if (await Fund.traer(t)) n++; } catch (e) {} } return n; },

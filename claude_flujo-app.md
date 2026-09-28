@@ -32,6 +32,9 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Balances que no aparecían (28-sep, build 202609282250)
+- `calendar/earnings` global de 75 días: Finnhub corta en ~1.000 entradas y se queda con las fechas MÁS LEJANAS (devolvía 17-nov → 11-dic: nada cercano). Ahora `Fund.calendario()` pide día por día (60 consultas, una vez por día, sigue donde quedó; `c.hechos`, `c.cortados` si un día llega a 990+). Verificado: 29–30 sep trae MU 30/09 amc.
+
 ### "Baratas contra su historia" (28-sep, build 202609282249)
 - Facu: "GOOGL con P/E 17 contra su historia, ¿cómo no lo vimos?". `Fund.barata(t)`: P/E ≥20 % bajo su mediana de 10 años, ≥7 años de historia (`peN`), empresa de calidad (ROIC ≥12 % o ROE ≥15 %) y confirmación con P/S o P/FCF ≥15 % bajo su mediana cuando hay dato (descarta AMZN, cuyo P/E baja por ganancias de inversiones).
 - Chips con borde celeste en Novedades ("GOOGL P/E −41%") y línea en "Datos que faltan" del export.
