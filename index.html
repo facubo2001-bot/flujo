@@ -1104,6 +1104,10 @@ h2 .i-btn{vertical-align:3px}
 .gt-dh{display:flex;flex-direction:column;gap:1px;margin-bottom:4px}.gt-dh b{font-size:15px;font-weight:900}.gt-dh span{font-size:11.5px;color:var(--ink-3)}
 .gt-det em.neg{color:var(--crit-text);font-style:normal;font-weight:800}.gt-det em.pos{color:var(--good-text);font-style:normal;font-weight:800}
 
+.gh-filtro{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 2px;padding:8px 8px 8px 12px;border-radius:12px;border:1px solid var(--accent);background:rgba(45,226,240,.08)}
+.gh-filtro span{font-size:14px;font-weight:700;color:var(--accent);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gh-filtro button{flex:none;border:0;border-radius:9px;background:var(--ink);color:var(--bg);font:inherit;font-size:13px;font-weight:800;padding:7px 12px;cursor:pointer}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1432,7 +1436,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280135';
+const BUILD = '202609280140';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -3541,6 +3545,9 @@ function viewMovimientos() {
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
   return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
+    ${(() => { // filtro activo: se ve arriba y se saca con un toque (antes habia que bajar hasta los chips)
+      const et = []; if (f.grupo) et.push(L.grupo(f.grupo).nombre); if (f.cat) et.push(L.cat(f.cat).nombre); if (f.q) et.push(`"${f.q}"`); if (f.tipo) et.push({ fijos: 'Fijos', variables: 'Compras', cuotas: 'Cuotas' }[f.tipo] || f.tipo); if (f.medio) et.push(f.medio.startsWith('t:') ? (L.tarjeta(f.medio.slice(2)) || {}).nombre || 'Tarjeta' : (MEDIOS[f.medio] || f.medio)); if (f.nec) et.push(NECESIDAD[f.nec] || '');
+      return et.length ? `<div class="gh-filtro"><span>${et.map(esc).join(' \u00b7 ')}</span><button type="button" data-act="clear-filters">Ver todo</button></div>` : ''; })()}
     <div class="gh-stats"><div><span>Compras</span><b>${kARS(compras)}</b></div><div><span>Cuotas</span><b>${kARS(cuotas)}</b></div><div><span>Fijos</span><b>${kARS(fijos)}</b></div></div>
     ${Object.values(f).some(Boolean) ? '' : gastosAnalisis(c)}
     <div class="gh-list">
@@ -5536,7 +5543,7 @@ const Actions = {
   'new-cat'() { formCat(); },
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
-  'clear-filters'() { ui.filtros = {}; render(); },
+  'clear-filters'() { ui.filtros = {}; ui.gaGrupo = null; render(); arriba(); },
   filtro(kv) { const i = String(kv).indexOf(':'); ui.filtros[kv.slice(0, i)] = kv.slice(i + 1); render(); },
   simular() {
     const monto = M.parse($('#sim-monto').value); const cuotas = clamp(Number($('#sim-cuotas').value) || 1, 1, 60); const tarjetaId = $('#sim-tarjeta').value || undefined; const desde = $('#sim-mes').value || D.thisMonth();
@@ -5669,7 +5676,8 @@ const Actions = {
 
 /* ---------- global events ---------- */
 document.addEventListener('click', e => {
-  const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
+  const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === 'movimientos' && (Object.values(ui.filtros || {}).some(Boolean) || ui.gaGrupo)) { ui.filtros = {}; ui.gaGrupo = null; if (ui.view === 'movimientos') { render(); arriba(); return; } }  // tocar Gastos abajo vuelve a la vista sin filtros
+    if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
   const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); lastView = null; render(); return; }
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }

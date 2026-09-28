@@ -92,7 +92,7 @@ const Actions = {
   'new-cat'() { formCat(); },
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
-  'clear-filters'() { ui.filtros = {}; render(); },
+  'clear-filters'() { ui.filtros = {}; ui.gaGrupo = null; render(); arriba(); },
   filtro(kv) { const i = String(kv).indexOf(':'); ui.filtros[kv.slice(0, i)] = kv.slice(i + 1); render(); },
   simular() {
     const monto = M.parse($('#sim-monto').value); const cuotas = clamp(Number($('#sim-cuotas').value) || 1, 1, 60); const tarjetaId = $('#sim-tarjeta').value || undefined; const desde = $('#sim-mes').value || D.thisMonth();
@@ -225,7 +225,8 @@ const Actions = {
 
 /* ---------- global events ---------- */
 document.addEventListener('click', e => {
-  const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
+  const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === 'movimientos' && (Object.values(ui.filtros || {}).some(Boolean) || ui.gaGrupo)) { ui.filtros = {}; ui.gaGrupo = null; if (ui.view === 'movimientos') { render(); arriba(); return; } }  // tocar Gastos abajo vuelve a la vista sin filtros
+    if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
   const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); lastView = null; render(); return; }
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }

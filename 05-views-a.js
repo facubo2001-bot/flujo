@@ -415,6 +415,9 @@ function viewMovimientos() {
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
   return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
+    ${(() => { // filtro activo: se ve arriba y se saca con un toque (antes habia que bajar hasta los chips)
+      const et = []; if (f.grupo) et.push(L.grupo(f.grupo).nombre); if (f.cat) et.push(L.cat(f.cat).nombre); if (f.q) et.push(`"${f.q}"`); if (f.tipo) et.push({ fijos: 'Fijos', variables: 'Compras', cuotas: 'Cuotas' }[f.tipo] || f.tipo); if (f.medio) et.push(f.medio.startsWith('t:') ? (L.tarjeta(f.medio.slice(2)) || {}).nombre || 'Tarjeta' : (MEDIOS[f.medio] || f.medio)); if (f.nec) et.push(NECESIDAD[f.nec] || '');
+      return et.length ? `<div class="gh-filtro"><span>${et.map(esc).join(' \u00b7 ')}</span><button type="button" data-act="clear-filters">Ver todo</button></div>` : ''; })()}
     <div class="gh-stats"><div><span>Compras</span><b>${kARS(compras)}</b></div><div><span>Cuotas</span><b>${kARS(cuotas)}</b></div><div><span>Fijos</span><b>${kARS(fijos)}</b></div></div>
     ${Object.values(f).some(Boolean) ? '' : gastosAnalisis(c)}
     <div class="gh-list">
