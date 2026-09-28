@@ -1099,6 +1099,11 @@ h2 .i-btn{vertical-align:3px}
 .vl2{font-size:12.5px;color:var(--ink-3);margin-top:2px}
 .ga-sep{margin:4px 0 -4px 2px}
 
+.gt.on{box-shadow:inset 0 0 0 2px var(--accent)}
+.gt-det{grid-column:1/-1;border:1px solid var(--line);border-radius:12px;padding:10px 12px 6px;margin:2px 0 4px}
+.gt-dh{display:flex;flex-direction:column;gap:1px;margin-bottom:4px}.gt-dh b{font-size:15px;font-weight:900}.gt-dh span{font-size:11.5px;color:var(--ink-3)}
+.gt-det em.neg{color:var(--crit-text);font-style:normal;font-weight:800}.gt-det em.pos{color:var(--good-text);font-style:normal;font-weight:800}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1253,6 +1258,7 @@ const GRUPOS = [
   { id: 'comida',    nombre: 'Comida',           slot: 1 },
   { id: 'movilidad', nombre: 'Movilidad',        slot: 2 },
   { id: 'salud',     nombre: 'Salud y cuidado',  slot: 3 },
+  { id: 'mascotas',  nombre: 'Mascotas',         slot: 7 },
   { id: 'ocio',      nombre: 'Ocio',             slot: 4 },
   { id: 'compras',   nombre: 'Compras',          slot: 5 },
   { id: 'fijos',     nombre: 'Fijos y digital',  slot: 6 },
@@ -1264,18 +1270,23 @@ const DEFAULT_CATS = [
   ['comida_trabajo', 'Comida del trabajo',           'comida',    'variable', 1],
   ['restaurantes',   'Restaurantes y parrillas',     'comida',    'variable', 0],
   ['fastfood',       'Delivery y fast food',         'comida',    'variable', 0],
-  ['antojos',        'Cafés, kioscos y antojos',     'comida',    'variable', 0],
+  ['antojos',        'Antojos',                      'comida',    'variable', 0],
   ['nafta',          'Nafta',                        'movilidad', 'variable', 1],
   ['auto',           'Seguro y mantenimiento del auto', 'movilidad', 'fijo',  1],
   ['peajes',         'Peajes y estacionamiento',     'movilidad', 'variable', 1],
   ['transporte',     'Transporte público',           'movilidad', 'variable', 1],
   ['taxi',           'Taxis (Uber, Cabify)',         'movilidad', 'variable', 0],
-  ['medicos',        'Médicos, estudios y óptica',   'salud',     'variable', 1],
+  ['medicos',        'Médicos y estudios',           'salud',     'variable', 1],
+  ['optica',         'Óptica y anteojos',            'salud',     'variable', 1],
   ['farmacia',       'Farmacia',                     'salud',     'variable', 1],
   ['peluqueria',     'Peluquería',                   'salud',     'variable', 1],
   ['personal',       'Cuidado personal',             'salud',     'variable', 1],
   ['gimnasio',       'Gimnasio y suplementos',       'salud',     'variable', 0],
-  ['odi',            'Odi (perro)',                  'salud',     'variable', 1],
+  ['odi_comida',     'Comida de Odi',                'mascotas',  'variable', 1],
+  ['odi_vet',        'Veterinaria',                  'mascotas',  'variable', 1],
+  ['odi_banio',      'Baño e higiene de Odi',        'mascotas',  'variable', 1],
+  ['odi_juguetes',   'Juguetes y accesorios',        'mascotas',  'variable', 0],
+  ['odi_otros',      'Otros de Odi',                 'mascotas',  'variable', 1],
   ['bares',          'Bares y noche',                'ocio',      'variable', 0],
   ['river',          'River',                        'ocio',      'variable', 0],
   ['entretenimiento','Cine y entretenimiento',       'ocio',      'variable', 0],
@@ -1293,11 +1304,17 @@ const DEFAULT_CATS = [
 /** reglas por descripcion (texto normalizado, sin acentos): las usan la migracion a v2 y las sugerencias al cargar.
  *  Van de lo especifico a lo general: la primera que matchea gana. */
 const CAT_REGLAS = [
-  [/\bodi\b|\bperro\b|huellas|puppy|curupet|veterinar|mascota|pet ?shop/, 'odi', 1],
+  // Odi (el perro de Facu): grupo propio con sus categorias
+  [/(bano|banio|peluquer|toallitas|shampoo).*(\bodi\b|perro)|pet ?grooming/, 'odi_banio', 1],
+  [/veterinar|vacuna|antiparasit|pipeta|desparasit/, 'odi_vet', 1],
+  [/(comida|alimento|balanceado|premio).*(\bodi\b|perro)|mon ami|dog ?chow|pro ?plan|royal canin|eukanuba|puppy|huellas|curupet|pet ?shop/, 'odi_comida', 1],
+  [/(juguete|pelota|correa|collar|cucha|cama).*(\bodi\b|perro)|correa|collar para/, 'odi_juguetes', 2],
+  [/\bodi\b|\bperro\b|mascota/, 'odi_otros', 1],
+  [/optica|oculus|anteojo|lentes/, 'optica', 1],
   [/afeitar|safe ?razor|maquinita|crema|perfum|desodor|shampoo/, 'personal', 1],
   [/barber|peluquer/, 'peluqueria', 1],
   [/farmac|farmacity/, 'farmacia', 1],
-  [/optica|oculus|medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
+  [/medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
   [/suplement|proteina|creatina|whey|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel/, 'gimnasio', 2],
   [/comida (del )?laburo|morfi (del )?laburo|almuerzo (del )?laburo|vianda/, 'comida_trabajo', 1],
   [/uber|cabify|didi|taxi|remis/, 'taxi', 2],
@@ -1328,6 +1345,26 @@ const CAT_V1_A_V2 = { super: 'super', delivery: 'fastfood', salidas: 'restaurant
 const GRUPO_V1_A_V2 = { hogar: 'fijos', comida: 'comida', auto: 'movilidad', servicios: 'fijos', ocio: 'ocio', compras: 'compras', salud: 'salud', otros: 'otros' };
 const normTxt = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 function catPorRegla(desc) { const d = ' ' + normTxt(desc) + ' '; for (const [re, cat, nec] of CAT_REGLAS) if (re.test(d)) return { catId: cat, necesidad: nec }; return null; }
+/** v2 -> v3 (27-sep): Odi pasa a su grupo Mascotas con categorias propias, optica se separa de medicos,
+ *  "Cafes, kioscos y antojos" pasa a "Antojos". Solo toca lo que salio de v2. */
+function migrarCategoriasV3(s) {
+  if (Number(s.settings.catsV) >= 3) return;
+  const ren = { antojos: ['Cafés, kioscos y antojos', 'Antojos'], medicos: ['Médicos, estudios y óptica', 'Médicos y estudios'] };
+  for (const c of s.categorias) if (ren[c.id] && c.nombre === ren[c.id][0]) c.nombre = ren[c.id][1];
+  const nueva = (desc, catId) => {
+    if (catId === 'odi') { const r = catPorRegla(desc); return r && r.catId.startsWith('odi_') ? r.catId : 'odi_otros'; }
+    if (catId === 'medicos') { const r = catPorRegla(desc); return r && r.catId === 'optica' ? 'optica' : 'medicos'; }
+    return catId;
+  };
+  for (const m of s.movimientos || []) m.catId = nueva(m.desc, m.catId);
+  for (const r of s.recurrentes || []) r.catId = nueva(r.desc, r.catId);
+  for (const [d, a] of Object.entries(s.aprendido || {})) if (a && a.catId) a.catId = nueva(d, a.catId);
+  const odi = s.categorias.find(c => c.id === 'odi');
+  s.categorias = s.categorias.filter(c => c.id !== 'odi');
+  for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) { const at = s.categorias.findIndex(k => k.id === 'revisar'); s.categorias.splice(at < 0 ? s.categorias.length : at, 0, { ...c }); }
+  if (odi && Number(odi.presupuesto)) { const k = s.categorias.find(c => c.id === 'odi_comida'); if (k) k.presupuesto = Number(odi.presupuesto); }
+  s.settings.catsV = 3;
+}
 function migrarCategoriasV2(s) {
   if (Number(s.settings.catsV) >= 2) return;
   const viejas = s.categorias || [];
@@ -1350,6 +1387,8 @@ function migrarCategoriasV2(s) {
     cats.splice(cats.length - 1, 0, { ...v, grupo: GRUPO_V1_A_V2[v.grupo] || (GRUPOS.find(g => g.id === v.grupo) ? v.grupo : 'otros'), esencial: v.esencial != null ? !!v.esencial : v.tipo === 'fijo' });
   }
   s.categorias = cats; s.settings.catsV = 2;
+  // la v2 todavia tenia 'odi' como una sola categoria: la v3 la abre
+  s.categorias.push({ id: 'odi', nombre: 'Odi (perro)', grupo: 'mascotas', tipo: 'variable', esencial: true, presupuesto: 0 });
 }
 
 const NECESIDAD = { 1: 'Necesario', 2: 'Útil', 3: 'Innecesario' };
@@ -1376,7 +1415,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280106';
+const BUILD = '202609280133';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1477,6 +1516,7 @@ const Persist = {
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     migrarCategoriasV2(s);
+    migrarCategoriasV3(s);
     for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
@@ -3447,8 +3487,14 @@ function gastosAnalisis(c) {
   const grupos = Object.entries(c.byGrupo).filter(([, v]) => v > 0).map(([g, v]) => ({ g: L.grupo(g), v, avg: sum(state.categorias.filter(k => L.grupo(k.grupo).id === g).map(k => E.promedioCat(k.id, ui.mes, 3))) })).sort((a, b) => b.v - a.v);
   const gmx = grupos.length ? grupos[0].v : 1;
   const gTile = x => { const d = x.avg > 0 ? x.v - x.avg : null; const alto = d != null && d > Math.max(1000, x.avg * 0.1); const bajo = d != null && d < -Math.max(1000, x.avg * 0.1);
-    return `<div class="gt" data-act="filtro" data-id="grupo:${esc(x.g.id)}" style="background:rgba(255,255,255,${(0.05 + 0.20 * Math.pow(x.v / gmx, 0.8)).toFixed(3)})"><span class="n">${esc(x.g.nombre)}</span><b>${M.c(x.v)}</b><span class="p">${M.pct(x.v / tot, 0)} del mes</span><span class="p">${alto ? `<em class="neg">+${M.c(d)} vs promedio</em>` : bajo ? `<em class="pos">−${M.c(-d)} vs promedio</em>` : 'en tu promedio'}</span></div>`; };
-  const macro = `<div class="card ga-g"><div class="ga-t">Por grupo ${infoBtn('Cuánto se fue en cada grupo este mes. En rojo, lo que ya gastaste de más contra tu promedio de los últimos 3 meses; en verde, lo que vas por debajo. Tocá un grupo para ver sus gastos.')}</div><div class="gts">${grupos.map(gTile).join('')}</div></div>`;
+    return `<div class="gt ${ui.gaGrupo === x.g.id ? 'on' : ''}" data-act="ga-grupo" data-id="${esc(x.g.id)}" style="background:rgba(255,255,255,${(0.05 + 0.20 * Math.pow(x.v / gmx, 0.8)).toFixed(3)})"><span class="n">${esc(x.g.nombre)}</span><b>${M.c(x.v)}</b><span class="p">${M.pct(x.v / tot, 0)} del mes</span><span class="p">${alto ? `<em class="neg">+${M.c(d)} vs promedio</em>` : bajo ? `<em class="pos">−${M.c(-d)} vs promedio</em>` : 'en tu promedio'}</span></div>`; };
+  // grupo abierto: sus categorias debajo de su fila de tarjetas (1er toque abre, 2do toque va a los gastos)
+  const gAb = grupos.find(x => x.g.id === ui.gaGrupo);
+  const detalle = x => { const cs = Object.entries(c.byCat).filter(([id, v]) => v > 0 && L.grupo(L.cat(id).grupo).id === x.g.id).map(([id, v]) => ({ cat: L.cat(id), v, avg: E.promedioCat(id, ui.mes, 3) })).sort((a, b) => b.v - a.v); const cm = cs.length ? cs[0].v : 1;
+    return `<div class="gt-det"><div class="gt-dh"><b>${esc(x.g.nombre)}</b><span>tocá una categoría, o el grupo otra vez, para ver los gastos</span></div>${cs.map(k => { const d = k.avg > 0 ? k.v - k.avg : null; const dd = d != null && Math.abs(d) > Math.max(1000, k.avg * 0.1) ? ` · <em class="${d > 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${M.c(Math.abs(d))}</em>` : '';
+      return `<div class="dv" data-act="ver-cat" data-id="${esc(k.cat.id)}"><div class="dv1"><span>${esc(k.cat.nombre)}</span><b>${M.c(k.v)}</b></div><div class="dv2"><span class="dvb"><i style="width:${Math.max(2, k.v / cm * 100).toFixed(1)}%;background:rgba(255,255,255,${(0.18 + 0.62 * Math.pow(k.v / cm, 0.8)).toFixed(3)})"></i></span><em>${M.pct(k.v / x.v, 0)}${dd}</em></div></div>`; }).join('')}</div>`; };
+  let tiles = ''; grupos.forEach((x, i) => { tiles += gTile(x); const finFila = i % 2 === 1 || i === grupos.length - 1; if (finFila && gAb && [grupos[i], grupos[i - (i % 2)]].includes(gAb)) tiles += detalle(gAb); });
+  const macro = `<div class="card ga-g"><div class="ga-t">Por grupo ${infoBtn('Cuánto se fue en cada grupo este mes. En rojo, lo que ya gastaste de más contra tu promedio de los últimos 3 meses; en verde, lo que vas por debajo. Tocá un grupo para ver en qué categorías se fue; tocalo otra vez para ver los gastos.')}</div><div class="gts">${tiles}</div></div>`;
   // 3) ¿hacia falta?: compacto, una linea con un mini velocimetro
   const neces = `<div class="card ga-nec"><div class="ga-nec-b">${velo}<div class="vl1"><div><b class="in">${M.pct(pIn, 0)} innecesario</b> · ${M.c(byNec[3])} ${infoBtn('Sale de lo que marcás en cada gasto (Necesario, Útil o Innecesario). Al cargar se sugiere según la categoría y lo podés cambiar.')}</div><div class="vl2">Necesario ${M.c(byNec[1])} · Útil ${M.c(byNec[2])}</div></div></div></div>`;
   // 2) micro: top 3 categorias y el resto en lista (sin repetir el top)
@@ -5370,7 +5416,7 @@ function cargarDemo() {
   const jun = months.find(m => m.endsWith('-06') || m.endsWith('-12')); if (jun) s.ingresos.push({ id: uid(), fecha: D.dateIn(jun, 30), monto: 1150000, moneda: 'ARS', desc: 'Aguinaldo' });
   // el demo se escribio con las categorias v1: se pasa por la misma migracion que los datos reales
   s.categorias = [...s.categorias, { id: 'delivery', nombre: 'Delivery', grupo: 'comida', tipo: 'variable' }, { id: 'salidas', nombre: 'Salidas', grupo: 'ocio', tipo: 'variable' }]; delete s.settings.catsV;
-  migrarCategoriasV2(s);
+  migrarCategoriasV2(s); migrarCategoriasV3(s);
   const pres = (id, v) => { const c = s.categorias.find(k => k.id === id); if (c) c.presupuesto = v; };
   pres('restaurantes', 180000); pres('fastfood', 120000); pres('super', 400000);
   s.pagos = [{ tarjetaId: 't_visa', mes: ymNow, cuentaId: 'a1', pagado: true }, { tarjetaId: 't_master', mes: ymNow, cuentaId: 'a1', pagado: false }];
@@ -5521,6 +5567,7 @@ const Actions = {
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
+  'ga-grupo'(id) { if (ui.gaGrupo === id) { ui.gaGrupo = null; ui.filtros = { ...(ui.filtros || {}), grupo: id }; } else ui.gaGrupo = id; render(); },
   'gastos-todas'() { ui.gastosTodas = !ui.gastosTodas; render(); },
   'grupo-sel'(id) { ui.grupoSel = id; render(); },
   'ver-cat'(id) { ui.filtros = { ...(ui.filtros || {}), cat: id }; go('movimientos'); },

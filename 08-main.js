@@ -141,6 +141,7 @@ const Actions = {
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
+  'ga-grupo'(id) { if (ui.gaGrupo === id) { ui.gaGrupo = null; ui.filtros = { ...(ui.filtros || {}), grupo: id }; } else ui.gaGrupo = id; render(); },
   'gastos-todas'() { ui.gastosTodas = !ui.gastosTodas; render(); },
   'grupo-sel'(id) { ui.grupoSel = id; render(); },
   'ver-cat'(id) { ui.filtros = { ...(ui.filtros || {}), cat: id }; go('movimientos'); },

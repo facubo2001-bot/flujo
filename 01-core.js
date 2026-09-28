@@ -113,6 +113,7 @@ const GRUPOS = [
   { id: 'comida',    nombre: 'Comida',           slot: 1 },
   { id: 'movilidad', nombre: 'Movilidad',        slot: 2 },
   { id: 'salud',     nombre: 'Salud y cuidado',  slot: 3 },
+  { id: 'mascotas',  nombre: 'Mascotas',         slot: 7 },
   { id: 'ocio',      nombre: 'Ocio',             slot: 4 },
   { id: 'compras',   nombre: 'Compras',          slot: 5 },
   { id: 'fijos',     nombre: 'Fijos y digital',  slot: 6 },
@@ -124,18 +125,23 @@ const DEFAULT_CATS = [
   ['comida_trabajo', 'Comida del trabajo',           'comida',    'variable', 1],
   ['restaurantes',   'Restaurantes y parrillas',     'comida',    'variable', 0],
   ['fastfood',       'Delivery y fast food',         'comida',    'variable', 0],
-  ['antojos',        'Cafés, kioscos y antojos',     'comida',    'variable', 0],
+  ['antojos',        'Antojos',                      'comida',    'variable', 0],
   ['nafta',          'Nafta',                        'movilidad', 'variable', 1],
   ['auto',           'Seguro y mantenimiento del auto', 'movilidad', 'fijo',  1],
   ['peajes',         'Peajes y estacionamiento',     'movilidad', 'variable', 1],
   ['transporte',     'Transporte público',           'movilidad', 'variable', 1],
   ['taxi',           'Taxis (Uber, Cabify)',         'movilidad', 'variable', 0],
-  ['medicos',        'Médicos, estudios y óptica',   'salud',     'variable', 1],
+  ['medicos',        'Médicos y estudios',           'salud',     'variable', 1],
+  ['optica',         'Óptica y anteojos',            'salud',     'variable', 1],
   ['farmacia',       'Farmacia',                     'salud',     'variable', 1],
   ['peluqueria',     'Peluquería',                   'salud',     'variable', 1],
   ['personal',       'Cuidado personal',             'salud',     'variable', 1],
   ['gimnasio',       'Gimnasio y suplementos',       'salud',     'variable', 0],
-  ['odi',            'Odi (perro)',                  'salud',     'variable', 1],
+  ['odi_comida',     'Comida de Odi',                'mascotas',  'variable', 1],
+  ['odi_vet',        'Veterinaria',                  'mascotas',  'variable', 1],
+  ['odi_banio',      'Baño e higiene de Odi',        'mascotas',  'variable', 1],
+  ['odi_juguetes',   'Juguetes y accesorios',        'mascotas',  'variable', 0],
+  ['odi_otros',      'Otros de Odi',                 'mascotas',  'variable', 1],
   ['bares',          'Bares y noche',                'ocio',      'variable', 0],
   ['river',          'River',                        'ocio',      'variable', 0],
   ['entretenimiento','Cine y entretenimiento',       'ocio',      'variable', 0],
@@ -153,11 +159,17 @@ const DEFAULT_CATS = [
 /** reglas por descripcion (texto normalizado, sin acentos): las usan la migracion a v2 y las sugerencias al cargar.
  *  Van de lo especifico a lo general: la primera que matchea gana. */
 const CAT_REGLAS = [
-  [/\bodi\b|\bperro\b|huellas|puppy|curupet|veterinar|mascota|pet ?shop/, 'odi', 1],
+  // Odi (el perro de Facu): grupo propio con sus categorias
+  [/(bano|banio|peluquer|toallitas|shampoo).*(\bodi\b|perro)|pet ?grooming/, 'odi_banio', 1],
+  [/veterinar|vacuna|antiparasit|pipeta|desparasit/, 'odi_vet', 1],
+  [/(comida|alimento|balanceado|premio).*(\bodi\b|perro)|mon ami|dog ?chow|pro ?plan|royal canin|eukanuba|puppy|huellas|curupet|pet ?shop/, 'odi_comida', 1],
+  [/(juguete|pelota|correa|collar|cucha|cama).*(\bodi\b|perro)|correa|collar para/, 'odi_juguetes', 2],
+  [/\bodi\b|\bperro\b|mascota/, 'odi_otros', 1],
+  [/optica|oculus|anteojo|lentes/, 'optica', 1],
   [/afeitar|safe ?razor|maquinita|crema|perfum|desodor|shampoo/, 'personal', 1],
   [/barber|peluquer/, 'peluqueria', 1],
   [/farmac|farmacity/, 'farmacia', 1],
-  [/optica|oculus|medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
+  [/medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
   [/suplement|proteina|creatina|whey|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel/, 'gimnasio', 2],
   [/comida (del )?laburo|morfi (del )?laburo|almuerzo (del )?laburo|vianda/, 'comida_trabajo', 1],
   [/uber|cabify|didi|taxi|remis/, 'taxi', 2],
@@ -188,6 +200,26 @@ const CAT_V1_A_V2 = { super: 'super', delivery: 'fastfood', salidas: 'restaurant
 const GRUPO_V1_A_V2 = { hogar: 'fijos', comida: 'comida', auto: 'movilidad', servicios: 'fijos', ocio: 'ocio', compras: 'compras', salud: 'salud', otros: 'otros' };
 const normTxt = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 function catPorRegla(desc) { const d = ' ' + normTxt(desc) + ' '; for (const [re, cat, nec] of CAT_REGLAS) if (re.test(d)) return { catId: cat, necesidad: nec }; return null; }
+/** v2 -> v3 (27-sep): Odi pasa a su grupo Mascotas con categorias propias, optica se separa de medicos,
+ *  "Cafes, kioscos y antojos" pasa a "Antojos". Solo toca lo que salio de v2. */
+function migrarCategoriasV3(s) {
+  if (Number(s.settings.catsV) >= 3) return;
+  const ren = { antojos: ['Cafés, kioscos y antojos', 'Antojos'], medicos: ['Médicos, estudios y óptica', 'Médicos y estudios'] };
+  for (const c of s.categorias) if (ren[c.id] && c.nombre === ren[c.id][0]) c.nombre = ren[c.id][1];
+  const nueva = (desc, catId) => {
+    if (catId === 'odi') { const r = catPorRegla(desc); return r && r.catId.startsWith('odi_') ? r.catId : 'odi_otros'; }
+    if (catId === 'medicos') { const r = catPorRegla(desc); return r && r.catId === 'optica' ? 'optica' : 'medicos'; }
+    return catId;
+  };
+  for (const m of s.movimientos || []) m.catId = nueva(m.desc, m.catId);
+  for (const r of s.recurrentes || []) r.catId = nueva(r.desc, r.catId);
+  for (const [d, a] of Object.entries(s.aprendido || {})) if (a && a.catId) a.catId = nueva(d, a.catId);
+  const odi = s.categorias.find(c => c.id === 'odi');
+  s.categorias = s.categorias.filter(c => c.id !== 'odi');
+  for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) { const at = s.categorias.findIndex(k => k.id === 'revisar'); s.categorias.splice(at < 0 ? s.categorias.length : at, 0, { ...c }); }
+  if (odi && Number(odi.presupuesto)) { const k = s.categorias.find(c => c.id === 'odi_comida'); if (k) k.presupuesto = Number(odi.presupuesto); }
+  s.settings.catsV = 3;
+}
 function migrarCategoriasV2(s) {
   if (Number(s.settings.catsV) >= 2) return;
   const viejas = s.categorias || [];
@@ -210,6 +242,8 @@ function migrarCategoriasV2(s) {
     cats.splice(cats.length - 1, 0, { ...v, grupo: GRUPO_V1_A_V2[v.grupo] || (GRUPOS.find(g => g.id === v.grupo) ? v.grupo : 'otros'), esencial: v.esencial != null ? !!v.esencial : v.tipo === 'fijo' });
   }
   s.categorias = cats; s.settings.catsV = 2;
+  // la v2 todavia tenia 'odi' como una sola categoria: la v3 la abre
+  s.categorias.push({ id: 'odi', nombre: 'Odi (perro)', grupo: 'mascotas', tipo: 'variable', esencial: true, presupuesto: 0 });
 }
 
 const NECESIDAD = { 1: 'Necesario', 2: 'Útil', 3: 'Innecesario' };
@@ -337,6 +371,7 @@ const Persist = {
     if (!Array.isArray(s.presets)) s.presets = [];
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     migrarCategoriasV2(s);
+    migrarCategoriasV3(s);
     for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;

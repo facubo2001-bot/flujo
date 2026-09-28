@@ -52,7 +52,7 @@ function cargarDemo() {
   const jun = months.find(m => m.endsWith('-06') || m.endsWith('-12')); if (jun) s.ingresos.push({ id: uid(), fecha: D.dateIn(jun, 30), monto: 1150000, moneda: 'ARS', desc: 'Aguinaldo' });
   // el demo se escribio con las categorias v1: se pasa por la misma migracion que los datos reales
   s.categorias = [...s.categorias, { id: 'delivery', nombre: 'Delivery', grupo: 'comida', tipo: 'variable' }, { id: 'salidas', nombre: 'Salidas', grupo: 'ocio', tipo: 'variable' }]; delete s.settings.catsV;
-  migrarCategoriasV2(s);
+  migrarCategoriasV2(s); migrarCategoriasV3(s);
   const pres = (id, v) => { const c = s.categorias.find(k => k.id === id); if (c) c.presupuesto = v; };
   pres('restaurantes', 180000); pres('fastfood', 120000); pres('super', 400000);
   s.pagos = [{ tarjetaId: 't_visa', mes: ymNow, cuentaId: 'a1', pagado: true }, { tarjetaId: 't_master', mes: ymNow, cuentaId: 'a1', pagado: false }];
