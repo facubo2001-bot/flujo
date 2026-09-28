@@ -1080,7 +1080,7 @@ const Fund = {
     // control automatico: que un numero raro se vea en la ficha y en el export en vez de pasar como bueno
     { const ult = filas[filas.length - 1]; const anioHoy = Number(hoy.slice(0, 4));
       if (!filas.length) d.avisos.push('Sin balances SEC recientes: los datos salen directo de Finnhub');
-      else { if (ult.anio < anioHoy - 1) d.avisos.push(`\u00daltimo balance anual: ${ult.anio}`); if (ult.ventas == null) d.avisos.push(`Ventas ${ult.anio}: no se encontr\u00f3 el concepto en el balance`); }
+      else { if (ult.fin && D.daysBetween(ult.fin, hoy) > 400) d.avisos.push(`Finnhub todav\u00eda no tiene el balance anual posterior a ${D.fmt(ult.fin, { year: true })}: el a\u00f1o fiscal que ves es ${ult.anio}${d.roicFuente === 'ttm' ? ` (el ROIC actual usa trimestres hasta ${D.fmt(d.roicCuenta.hasta, { year: true })})` : ''}`); if (ult.ventas == null) d.avisos.push(`Ventas ${ult.anio}: no se encontr\u00f3 el concepto en el balance`); }
       const fh = Number(m.roiTTM) / 100;
       if (d.roicFuente !== 'finnhub' && d.roicAct != null && Number.isFinite(fh) && fh > 0.02 && d.roicAct > 0 && (d.roicAct / fh > 2.5 || fh / d.roicAct > 2.5)) d.avisos.push(`ROIC ${Math.round(d.roicAct * 1000) / 10} % vs ROI de Finnhub ${Math.round(fh * 1000) / 10} %: diferencia grande, revisar`); }
     if (!state.cartera.fund) state.cartera.fund = {};

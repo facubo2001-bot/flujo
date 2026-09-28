@@ -32,6 +32,9 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Finnhub atrasado con los 10-K (28-sep, build 202609282203)
+- MSFT: Finnhub (gratis) no tiene el 10-K FY2026 (cerró 30-jun-26, presentado fin de julio); sí los 10-Q hasta mar-26. Aviso en la ficha si el último anual cerró hace >400 días.
+
 ### ROIC y deuda/patrimonio calibrados con TradingView (28-sep, build 202609282156)
 - Capturas de Facu (MELI en TradingView): ROIC FY2025 **18,62 %**, FY2024 **27,03 %**, "Current" **15,02 %**; D/E FY2025 2,25.
 - **Capital invertido de TradingView = patrimonio + deuda de largo plazo + leases de largo plazo** (sin corto plazo ni porción corriente). La app da 18,82 % / 27,15 % (la diferencia son US$ 187 M de pagos con tarjeta no corrientes, concepto propio de MELI).
