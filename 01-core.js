@@ -1057,7 +1057,8 @@ const Fund = {
     d.roicTTM = null;
     if (ttm && ttm.base === 'ttm') { const r = Fund.roicTV(ttm.neto, ttm.capital, ttm.capitalPrev); d.roicTTM = r; if (r != null) { roic = r; fuente = 'ttm'; const cp = ttm.capitalPrev ? ttm.capitalPrev.total : null; cuenta = { neto: ttm.neto, hasta: ttm.hasta, capital: ttm.capital.total, capitalPrev: cp, base: base(ttm.capital.total, cp) }; } }
     if (roic == null && d.roicFY != null) { roic = d.roicFY; fuente = 'anual'; cuenta = { neto: u.neto, hasta: u.fin, capital: u.capital.total, capitalPrev: cpA, base: base(u.capital.total, cpA) }; }
-    if (roic == null) { const f = Number(m.roiTTM) / 100; if (Number.isFinite(f) && f !== 0 && Math.abs(f) <= 3) { roic = f; fuente = 'finnhub'; } }
+    // sin balances de la SEC (ASML, NU, VIST presentan 20-F) el ROI de Finnhub no sirve como ROIC: NU daba 6 % contra 25 % de TradingView
+    if (roic == null && filas.length) { const f = Number(m.roiTTM) / 100; if (Number.isFinite(f) && f !== 0 && Math.abs(f) <= 3) { roic = f; fuente = 'finnhub'; } }
     if (roic == null && u && u.capital && !(u.capital.total > 0)) d.avisos.push('ROIC: capital total negativo (recompras); TradingView tampoco lo publica');
     d.roicAct = roic; d.roicFuente = fuente; d.roicCuenta = cuenta;
     // deuda / patrimonio como TradingView: deuda total (corto + largo + leases) / patrimonio del ultimo balance (trimestral si hay)
@@ -1079,7 +1080,7 @@ const Fund = {
     d.aniosDatos = filas.length ? { desde: filas[0].anio, hasta: filas[filas.length - 1].anio } : null;
     // control automatico: que un numero raro se vea en la ficha y en el export en vez de pasar como bueno
     { const ult = filas[filas.length - 1]; const anioHoy = Number(hoy.slice(0, 4));
-      if (!filas.length) d.avisos.push('Sin balances SEC recientes: los datos salen directo de Finnhub');
+      if (!filas.length) d.avisos.push('Sin balances de la SEC (empresa extranjera, presenta 20-F): no hay ROIC confiable; ROE, m\u00e1rgenes y deuda son de Finnhub y pueden diferir de TradingView');
       else { if (ult.fin && D.daysBetween(ult.fin, hoy) > 400) d.avisos.push(`Finnhub todav\u00eda no tiene el balance anual posterior a ${D.fmt(ult.fin, { year: true })}: el a\u00f1o fiscal que ves es ${ult.anio}${d.roicFuente === 'ttm' ? ` (el ROIC actual usa trimestres hasta ${D.fmt(d.roicCuenta.hasta, { year: true })})` : ''}`); if (ult.ventas == null) d.avisos.push(`Ventas ${ult.anio}: no se encontr\u00f3 el concepto en el balance`); }
       const fh = Number(m.roiTTM) / 100;
       if (d.roicFuente !== 'finnhub' && d.roicAct != null && Number.isFinite(fh) && fh > 0.02 && d.roicAct > 0 && (d.roicAct / fh > 2.5 || fh / d.roicAct > 2.5)) d.avisos.push(`ROIC ${Math.round(d.roicAct * 1000) / 10} % vs ROI de Finnhub ${Math.round(fh * 1000) / 10} %: diferencia grande, revisar`); }

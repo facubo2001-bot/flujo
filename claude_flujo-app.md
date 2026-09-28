@@ -32,6 +32,10 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Chequeo de Facu contra TradingView, tanda 1 (28-sep, build 202609282215)
+- Coinciden: ventas y ganancia FY de MELI, MSFT, NVDA, MCD; ROIC FY de MELI 18,8/18,62, MSFT 28/27, NVDA 93,6/93,6, MCD 17,2/17,15; P/E y dividend yield de todas.
+- Diferencias: ASML/NU (20-F, sin balances SEC) → el ROI de Finnhub no sirve como ROIC (NU 6 % vs 25 %, ASML 35,6 vs 51,4): la app ya no muestra ROIC para ellas. ROE/margen de Finnhub difieren algo de TradingView por el corte de 12 meses (NVDA ROE 110 vs 117). D/E de MSFT 0,18 vs 0,29: los leases financieros de MSFT no están como renglón del balance en Finnhub.
+
 ### Finnhub atrasado con los 10-K (28-sep, build 202609282203)
 - MSFT: Finnhub (gratis) no tiene el 10-K FY2026 (cerró 30-jun-26, presentado fin de julio); sí los 10-Q hasta mar-26. Aviso en la ficha si el último anual cerró hace >400 días.
 
