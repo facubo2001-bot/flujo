@@ -32,6 +32,14 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Causa real de los fundamentales viejos + ROIC como TradingView (28-sep, build 202609282029)
+- **Causa real**: Finnhub manda los conceptos de los 10-K nuevos con prefijo (`us-gaap_Revenues`) y los viejos sin prefijo. `Fund._v` comparaba exacto, así que solo matcheaban los años viejos (2011-2013 según la empresa) y los nuevos se descartaban. `Fund._c` saca el prefijo. (La teoría del "corte de Finnhub" era incorrecta; igual quedan dos pedidos: últimos 1150 días + historia desde 2008 hasta hace 1100 días.)
+- **Deuda de fintech**: `LoansPayableCurrent`, `LongTermLoansPayable`, `NotesPayableCurrent`, `LongTermNotesPayable` (MELI).
+- **ROIC = último ejercicio anual, sin leases operativos** (solo financieros). Contrastado con datos reales de la SEC de MELI: FY2025 1.997 / prom(15.941; 10.066) = **15,4 %** vs 15 % de TradingView (con leases daba 13,6 %; TTM 13,4 %). El TTM queda como `roicTTM` (se muestra en la cuenta y el export).
+- Fix: la cuenta del ROIC mostraba "capital promedio" con `base` inexistente (NaN).
+- **Control automático** en cada ficha (`d.avisos`, visible en la ficha y en el export): sin balances SEC recientes, último 10-K viejo, ventas no encontradas, ROIC propio vs ROI de Finnhub con diferencia >2,5×.
+- `Fund.VERSION = 3` (todo se rehace).
+
 ### ROIC con balances de 2012 (28-sep, build 202609282015)
 - **Bug grave**: `financials-reported` anual pedido desde 2008 devolvía solo los 10-K más viejos (Finnhub corta la respuesta): MELI tenía 2011-2012 y mostraba ROIC 39,8 % (el de 2012) contra ~15 % de TradingView. Afectaba a casi todas las fichas (ROIC "anual", CAGR, FCF/ganancia, TTM).
 - Ahora dos ventanas chicas: últimos 800 días (dos 10-K: ROIC y base del TTM) y hace 1600–2250 días (10-K de hace ~5 años para CAGR 5 a). 4 llamadas por ficha.

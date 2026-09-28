@@ -1449,7 +1449,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609282015';
+const BUILD = '202609282029';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1959,16 +1959,19 @@ const Fund = {
   /** datos guardados de un ticker (se muestran al instante mientras se refrescan) */
   de(t) { const f = state.cartera.fund || {}; return f[t] || null; },
   /** concepto de un balance SEC: primer match por nombre exacto o parcial */
+  /** Finnhub manda los conceptos de los 10-K nuevos con prefijo de taxonomia ("us-gaap_Revenues", "ifrs-full_Revenue") y los viejos sin prefijo.
+   *  Sin sacarlo, ningun concepto matcheaba y la ficha quedaba sin balances (o con los de 2012). */
+  _c(x) { return String((x && x.concept) || '').replace(/^[A-Za-z][A-Za-z0-9-]*_/, ''); },
   _v(arr, nombres) {
     if (!Array.isArray(arr)) return null;
-    for (const n of nombres) { const h = arr.find(x => x.concept === n); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    for (const n of nombres) { const h = arr.find(x => Fund._c(x) === n); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
     // parcial: el concepto empieza con el nombre y lo que sigue no lo cambia de significado. Antes "NetIncomeLoss"
     // caia en NetIncomeLossAttributableToNoncontrollingInterest (PFE, CEG, PEP, GEV: caja libre / ganancia de 200x)
-    for (const n of nombres) { const h = arr.find(x => { const c = x.concept || ''; return c.startsWith(n) && !/Noncontrolling|Minority|PerShare|Attributable|Other|Extraordinary/.test(c.slice(n.length)); }); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    for (const n of nombres) { const h = arr.find(x => { const c = Fund._c(x); return c.startsWith(n) && !/Noncontrolling|Minority|PerShare|Attributable|Other|Extraordinary/.test(c.slice(n.length)); }); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
     return null;
   },
   /** suma de todos los conceptos de una lista que aparezcan (cada uno una sola vez) */
-  _sum(arr, nombres) { if (!Array.isArray(arr)) return null; let t = null; for (const n of nombres) { const h = arr.find(x => x.concept === n); if (h && Number.isFinite(Number(h.value))) t = (t || 0) + Number(h.value); } return t; },
+  _sum(arr, nombres) { if (!Array.isArray(arr)) return null; let t = null; for (const n of nombres) { const h = arr.find(x => Fund._c(x) === n); if (h && Number.isFinite(Number(h.value))) t = (t || 0) + Number(h.value); } return t; },
   C: {
     ventas: ['Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax', 'RevenueFromContractWithCustomerIncludingAssessedTax', 'SalesRevenueNet', 'SalesRevenueGoodsNet'],
     neto: ['NetIncomeLoss', 'ProfitLoss'],
@@ -1977,11 +1980,12 @@ const Fund = {
     impuesto: ['IncomeTaxExpenseBenefit'],
     antesImp: ['IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxes'],
     patrimonio: ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
-    deuda: ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligations'],
+    deuda: ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligations', 'LongTermLoansPayable', 'LongTermNotesPayable'],
     // deuda total como la cuenta TradingView: largo plazo + porcion corriente + corto plazo + leases
     deudaCorriente: ['LongTermDebtCurrent', 'LongTermDebtAndCapitalLeaseObligationsCurrent', 'LongTermDebtAndFinanceLeaseObligationsCurrent', 'DebtCurrent', 'ShortTermDebtAndCurrentPortionOfLongTermDebt'],
-    deudaCorto: ['ShortTermBorrowings', 'CommercialPaper', 'OtherShortTermBorrowings'],
-    leases: ['OperatingLeaseLiabilityNoncurrent', 'OperatingLeaseLiabilityCurrent', 'FinanceLeaseLiabilityNoncurrent', 'FinanceLeaseLiabilityCurrent'],
+    deudaCorto: ['ShortTermBorrowings', 'CommercialPaper', 'OtherShortTermBorrowings', 'LoansPayableCurrent', 'NotesPayableCurrent'],
+    // solo leases financieros: los operativos no entran en la deuda del ROIC de TradingView (MELI FY2025: 15,4 % sin ellos, 13,6 % con ellos)
+    leases: ['FinanceLeaseLiabilityNoncurrent', 'FinanceLeaseLiabilityCurrent'],
     patrimonioTotal: ['StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
     minoritarios: ['MinorityInterest', 'StockholdersEquityAttributableToNoncontrollingInterest'],
     caja: ['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'],
@@ -2024,7 +2028,7 @@ const Fund = {
     if (pat == null) { const p = V(bs, C.patrimonio); if (p == null) return null; pat = p + (Fund._sum(bs, C.minoritarios) || 0); }
     const lp = V(bs, C.deuda) || 0, cor = V(bs, C.deudaCorriente) || 0, corto = Fund._sum(bs, C.deudaCorto) || 0, leases = Fund._sum(bs, C.leases) || 0;
     // si el filer informa "LongTermDebt" total (sin Noncurrent) ya incluye la porcion corriente
-    const h = Array.isArray(bs) && bs.find(x => x.concept === 'LongTermDebtNoncurrent' || x.concept === 'LongTermDebtAndCapitalLeaseObligationsNoncurrent');
+    const h = Array.isArray(bs) && bs.find(x => ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermLoansPayable', 'LongTermNotesPayable'].includes(Fund._c(x)));
     const deuda = (h ? lp + cor : Math.max(lp, cor)) + corto + leases;
     return { patrimonio: pat, deuda, total: pat + deuda };
   },
@@ -2100,9 +2104,9 @@ const Fund = {
     const [perfil0, met, fin, cal, finQ] = await Promise.all([
       perfilViejo ? get(`stock/profile2?symbol=${s}`) : null,
       get(`stock/metric?symbol=${s}&metric=all`),
-      // Finnhub corta la respuesta y se queda con los balances MAS VIEJOS: pedido desde 2008 devolvia 2011-2013 y el ROIC salia de 2012 (MELI 39,8 %).
-      // Dos ventanas chicas: los dos ultimos 10-K (ROIC y TTM) y el 10-K de hace ~5 anios (CAGR a 5 anios).
-      Promise.all([get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -800)}&to=${hoy}`), get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -2250)}&to=${D.addDays(hoy, -1600)}`)])
+      // Dos pedidos: los ultimos ~3 10-K (ROIC y base del TTM, siempre chico) y la historia desde 2008 (CAGR 5 y 10 anios).
+      // Si el historico llegara cortado, el ROIC actual igual sale del reciente.
+      Promise.all([get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -1150)}&to=${hoy}`), get(`stock/financials-reported?symbol=${s}&freq=annual&from=2008-01-01&to=${D.addDays(hoy, -1100)}`)])
         .then(([a, b]) => a || b ? { data: [...((a && a.data) || []), ...((b && b.data) || [])] } : null),
       calGlobal ? null : get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${s}`),
       get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${desdeQ}&to=${hoy}`),
@@ -2174,8 +2178,11 @@ const Fund = {
     const trims = Fund.trimestres(finQ); const ttm = Fund.ttm(filas, trims);
     const u = filas[filas.length - 1];
     let roic = null, fuente = null, cuenta = null;
-    if (ttm && ttm.base === 'ttm') { roic = Fund.roicTV(ttm.neto, ttm.capital, ttm.capitalPrev); if (roic != null) { fuente = 'ttm'; cuenta = { neto: ttm.neto, hasta: ttm.hasta, capital: ttm.capital.total, capitalPrev: ttm.capitalPrev ? ttm.capitalPrev.total : null }; } }
-    if (roic == null && u && u.roic != null) { roic = u.roic; fuente = 'anual'; const pv = filas[filas.length - 2]; cuenta = { neto: u.neto, hasta: u.fin, capital: u.capital.total, capitalPrev: pv && pv.capital ? pv.capital.total : null }; }
+    const base = (c, cp) => c && cp ? (c + cp) / 2 : c;
+    // ROIC como TradingView: ultimo ejercicio anual (contrastado con MELI FY2025: 15,4 % vs 15 % de TradingView). El TTM queda como dato aparte.
+    if (u && u.roic != null) { roic = u.roic; fuente = 'anual'; const pv = filas[filas.length - 2]; const cp = pv && pv.anio === u.anio - 1 && pv.capital ? pv.capital.total : null; cuenta = { neto: u.neto, hasta: u.fin, capital: u.capital.total, capitalPrev: cp, base: base(u.capital.total, cp) }; }
+    d.roicTTM = null;
+    if (ttm && ttm.base === 'ttm') { const r = Fund.roicTV(ttm.neto, ttm.capital, ttm.capitalPrev); d.roicTTM = r; if (roic == null && r != null) { roic = r; fuente = 'ttm'; const cp = ttm.capitalPrev ? ttm.capitalPrev.total : null; cuenta = { neto: ttm.neto, hasta: ttm.hasta, capital: ttm.capital.total, capitalPrev: cp, base: base(ttm.capital.total, cp) }; } }
     if (roic == null) { const f = Number(m.roiTTM) / 100; if (Number.isFinite(f) && f !== 0 && Math.abs(f) <= 3) { roic = f; fuente = 'finnhub'; } }
     if (roic == null && u && u.capital && !(u.capital.total > 0)) d.avisos.push('ROIC: capital total negativo (recompras); TradingView tampoco lo publica');
     d.roicAct = roic; d.roicFuente = fuente; d.roicCuenta = cuenta;
@@ -2191,6 +2198,12 @@ const Fund = {
     const accIni = filas.filter(f => f.acciones).slice(0, 1)[0], accFin = filas.filter(f => f.acciones).slice(-1)[0];
     d.accionesCambio = accIni && accFin && accIni.acciones && accIni.anio !== accFin.anio ? { desde: accIni.anio, hasta: accFin.anio, pct: accFin.acciones / accIni.acciones - 1 } : null;
     d.aniosDatos = filas.length ? { desde: filas[0].anio, hasta: filas[filas.length - 1].anio } : null;
+    // control automatico: que un numero raro se vea en la ficha y en el export en vez de pasar como bueno
+    { const ult = filas[filas.length - 1]; const anioHoy = Number(hoy.slice(0, 4));
+      if (!filas.length) d.avisos.push('Sin balances SEC recientes: los datos salen directo de Finnhub');
+      else { if (ult.anio < anioHoy - 1) d.avisos.push(`\u00daltimo balance anual: ${ult.anio}`); if (ult.ventas == null) d.avisos.push(`Ventas ${ult.anio}: no se encontr\u00f3 el concepto en el balance`); }
+      const fh = Number(m.roiTTM) / 100;
+      if (d.roicFuente !== 'finnhub' && d.roicAct != null && Number.isFinite(fh) && fh > 0.02 && d.roicAct > 0 && (d.roicAct / fh > 2.5 || fh / d.roicAct > 2.5)) d.avisos.push(`ROIC ${Math.round(d.roicAct * 1000) / 10} % vs ROI de Finnhub ${Math.round(fh * 1000) / 10} %: diferencia grande, revisar`); }
     if (!state.cartera.fund) state.cartera.fund = {};
     if (!met) { d.parcial = true; d.at = Date.now() - 31 * 86400000; }
     state.cartera.fund[t] = d;
@@ -2210,7 +2223,7 @@ const Fund = {
   },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 2,
+  VERSION: 3,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -4949,7 +4962,7 @@ function fundHTML(t, pos) {
       chart = `<div class="fs"><div class="fs-t">Revenue \u00b7 Net income \u00b7 FCF</div><svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>
         <div class="flg"><span><i style="background:rgba(255,255,255,.28)"></i>Revenue</span><span><i style="background:rgba(255,255,255,.8)"></i>Net income</span><span><i style="background:var(--accent)"></i>FCF</span><span class="u">${u}</span></div></div>`;
     }
-    const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / capital promedio <b>${fmtU(d.roicCuenta.base / 1e6, 0)} M</b></div>` : '';
+    const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / ${d.roicCuenta.capitalPrev ? 'capital promedio' : 'capital'} (patrimonio + deuda) <b>${fmtU((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)} M</b>${d.roicTTM != null && d.roicFuente !== 'ttm' ? ` \u00b7 \u00faltimos 12 meses ${pct1(d.roicTTM)}` : ''}</div>` : '';
     const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
     const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
     const pie = `<div class="fpie">Finnhub \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} ${infoBtn(`Datos de Finnhub y de los balances presentados a la SEC${d.aniosDatos ? ` (${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta})` : ''}. Si un n\u00famero no coincide con TradingView, copi\u00e1 los datos crudos y pegalos en el chat.`)} <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>`;
@@ -5300,7 +5313,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (anual)' : ' (ROI Finnhub)'}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${n2(d.deudaPat)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${d.yieldDiv ? pc(d.yieldDiv) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'anual' ? '' : d.roicFuente === 'ttm' ? ' (12 m)' : ' (ROI Finnhub)'}${d.roicTTM != null && d.roicFuente === 'anual' ? ` \u00b7 12 m ${pc(d.roicTTM)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${n2(d.deudaPat)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${d.yieldDiv ? pc(d.yieldDiv) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -5314,7 +5327,7 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (\u00faltimos 12 m; prom 5 a\u00f1os) | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
+| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (\u00faltimo a\u00f1o fiscal, como TradingView; prom 5 a\u00f1os) | ROE | Margen neto (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Deuda / patrimonio | Caja libre / ganancia | Dividendo | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));
@@ -5323,6 +5336,7 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
       if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
       if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
       if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
+      { const av = todas.map(p => [p.ticker, (Fund.de(p.ticker) || {}).avisos || []]).filter(([, a]) => a.length); if (av.length) l.push(`- **Avisos del control autom\u00e1tico** (tomalos con pinzas): ${av.map(([t, a]) => `${t}: ${a.join('; ')}`).join(' \u00b7 ')}`); }
       return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
   };
 }
