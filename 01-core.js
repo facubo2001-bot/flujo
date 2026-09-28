@@ -123,8 +123,9 @@ const GRUPOS = [
 const DEFAULT_CATS = [
   ['super',          'Supermercado',                 'comida',    'variable', 1],
   ['comida_trabajo', 'Comida del trabajo',           'comida',    'variable', 1],
-  ['restaurantes',   'Restaurantes y parrillas',     'comida',    'variable', 0],
-  ['fastfood',       'Delivery y fast food',         'comida',    'variable', 0],
+  ['restaurantes',   'Salidas a comer',              'comida',    'variable', 0],
+  ['pedido',         'Delivery',                     'comida',    'variable', 0],
+  ['alpaso',         'Al paso',                      'comida',    'variable', 0],
   ['antojos',        'Antojos',                      'comida',    'variable', 0],
   ['nafta',          'Nafta',                        'movilidad', 'variable', 1],
   ['auto',           'Seguro y mantenimiento del auto', 'movilidad', 'fijo',  1],
@@ -179,7 +180,9 @@ const CAT_REGLAS = [
   [/federacion patronal|seguro (del )?auto|auto ?partes|repuesto|patente|\bvtv\b|service|taller|gomeria|lavadero/, 'auto', 1],
   [/river|\bcarp\b/, 'river', 2],
   [/helad|chocolat|kiosco|kiosko|golosin|gomitas|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|starbucks|havanna|alfajor/, 'antojos', 3],
-  [/mcdonald|burger|\bmc\b|pedidos ?ya|rappi|\bwtb\b|mostaza|pizza|empanada|delivery/, 'fastfood', 2],
+  // Comida segun por que comiste: pediste a casa (Delivery) o compraste algo en la calle, solo (Al paso)
+  [/pedidos ?ya|rappi|delivery|\bpedido\b/, 'pedido', 2],
+  [/mcdonald|burger|\bmc\b|\bwtb\b|mostaza|pizza|empanada|sanguch|sandwich|pancho|hamburg|al paso/, 'alpaso', 2],
   [/asato|anapat|franks|mooi|miaokou|mostrador|lanelly|parrilla|restaurant|resto\b|sushi|cena|asado|almuerzo/, 'restaurantes', 2],
   [/antares|\bbar\b|jobs bar|bar jps|cerveza|birra|boliche|salida con|campari|vermouth|fernet|previa/, 'bares', 3],
   [/\bcine\b|teatro|recital|show|entrada/, 'entretenimiento', 3],
@@ -220,6 +223,20 @@ function migrarCategoriasV3(s) {
   if (odi && Number(odi.presupuesto)) { const k = s.categorias.find(c => c.id === 'odi_comida'); if (k) k.presupuesto = Number(odi.presupuesto); }
   s.settings.catsV = 3;
 }
+/** v3 -> v4 (27-sep): "Delivery y fast food" se parte en Delivery (pediste a casa) y Al paso; Restaurantes -> Salidas a comer. */
+function migrarCategoriasV4(s) {
+  if (Number(s.settings.catsV) >= 4) return;
+  const r = s.categorias.find(c => c.id === 'restaurantes'); if (r && r.nombre === 'Restaurantes y parrillas') r.nombre = 'Salidas a comer';
+  const nueva = (desc, catId) => { if (catId !== 'fastfood') return catId; const k = catPorRegla(desc); return k && k.catId === 'pedido' ? 'pedido' : 'alpaso'; };
+  for (const m of s.movimientos || []) m.catId = nueva(m.desc, m.catId);
+  for (const x of s.recurrentes || []) x.catId = nueva(x.desc, x.catId);
+  for (const [d, a] of Object.entries(s.aprendido || {})) if (a && a.catId) a.catId = nueva(d, a.catId);
+  const ff = s.categorias.find(c => c.id === 'fastfood');
+  s.categorias = s.categorias.filter(c => c.id !== 'fastfood');
+  for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) { const at = s.categorias.findIndex(k => k.id === 'revisar'); s.categorias.splice(at < 0 ? s.categorias.length : at, 0, { ...c }); }
+  if (ff && Number(ff.presupuesto)) { const k = s.categorias.find(c => c.id === 'alpaso'); if (k) k.presupuesto = Number(ff.presupuesto); }
+  s.settings.catsV = 4;
+}
 function migrarCategoriasV2(s) {
   if (Number(s.settings.catsV) >= 2) return;
   const viejas = s.categorias || [];
@@ -243,7 +260,7 @@ function migrarCategoriasV2(s) {
   }
   s.categorias = cats; s.settings.catsV = 2;
   // la v2 todavia tenia 'odi' como una sola categoria: la v3 la abre
-  s.categorias.push({ id: 'odi', nombre: 'Odi (perro)', grupo: 'mascotas', tipo: 'variable', esencial: true, presupuesto: 0 });
+  s.categorias.push({ id: 'odi', nombre: 'Odi (perro)', grupo: 'mascotas', tipo: 'variable', esencial: true, presupuesto: 0 }, { id: 'fastfood', nombre: 'Delivery y fast food', grupo: 'comida', tipo: 'variable', esencial: false, presupuesto: 0 });
 }
 
 const NECESIDAD = { 1: 'Necesario', 2: 'Útil', 3: 'Innecesario' };
@@ -372,6 +389,7 @@ const Persist = {
     if (!s.settings.presupuesto && s.settings.ingreso) s.settings.presupuesto = Math.max(0, Math.round(s.settings.ingreso * (1 - (Number(s.settings.metaInversionPct) || 0) / 100) - (Number(s.settings.colchon) || 0)));
     migrarCategoriasV2(s);
     migrarCategoriasV3(s);
+    migrarCategoriasV4(s);
     for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
