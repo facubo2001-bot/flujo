@@ -161,6 +161,8 @@ const DEFAULT_CATS = [
 /** reglas por descripcion (texto normalizado, sin acentos): las usan la migracion a v2 y las sugerencias al cargar.
  *  Van de lo especifico a lo general: la primera que matchea gana. */
 const CAT_REGLAS = [
+  // lo que dice "vacaciones / escapada / viaje" va a Viajes aunque sea comida (Facu: "comida vacaciones")
+  [/vacacion|escapada|\bfinde\b|\bviaje\b|excursion|\bhotel\b|hostel|airbnb|booking|vuelo|pasaje|aerol|flybondi|jetsmart/, 'viajes', 2],
   // Odi (el perro de Facu): grupo propio con sus categorias
   [/(bano|banio|peluquer|toallitas|shampoo).*(\bodi\b|perro)|pet ?grooming/, 'odi_banio', 1],
   [/veterinar|vacuna|antiparasit|pipeta|desparasit/, 'odi_vet', 1],
@@ -170,19 +172,19 @@ const CAT_REGLAS = [
   [/optica|oculus|anteojo|lentes/, 'optica', 1],
   [/afeitar|safe ?razor|maquinita|crema|perfum|desodor|shampoo/, 'personal', 1],
   [/barber|peluquer/, 'peluqueria', 1],
-  [/farmac|farmacity/, 'farmacia', 1],
+  [/farmac|farmacity|remedio|medicament|ibuprofeno|ibupirac|actron|paracetamol|tafirol|aspirina|bayaspirina|amoxicilina|antibiotic|antialergic|loratadina|omeprazol|sertal|buscapina|reliverán|reliveran|curitas|gasa|alcohol en gel|vitamina|termometro|preservativ/, 'farmacia', 1],
   [/medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
-  [/suplement|proteina|creatina|whey|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel/, 'gimnasio', 2],
-  [/comida (del )?laburo|morfi (del )?laburo|almuerzo (del )?laburo|vianda/, 'comida_trabajo', 1],
+  [/suplement|proteina|creatina|whey|colageno|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel|futbol 5|cancha/, 'gimnasio', 2],
+  [/(comida|almuerzo|morfi|vianda|desayuno|merienda|cena).*(laburo|trabajo|oficina|\bpae\b)|\bpae\b|vianda/, 'comida_trabajo', 1],
   [/uber|cabify|didi|taxi|remis/, 'taxi', 2],
   [/subte|emova|\bsube\b|colectivo|\btren\b/, 'transporte', 1],
   [/telepase|peaje|ausa|autopista|park ?work|estacionamiento|cochera/, 'peajes', 1],
   [/nafta|axion|\bypf\b|shell|puma energy|combustible|\bgnc\b/, 'nafta', 1],
   [/federacion patronal|seguro (del )?auto|auto ?partes|repuesto|patente|\bvtv\b|service|taller|gomeria|lavadero/, 'auto', 1],
   [/river|\bcarp\b/, 'river', 2],
-  [/helad|chocolat|kiosco|kiosko|golosin|gomitas|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|starbucks|havanna|alfajor/, 'antojos', 3],
+  [/helad|chocolat|kiosco|kiosko|golosin|gomitas|caramelo|chicle|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|cafecito|starbucks|havanna|alfajor|facturas|medialuna|snack|gaseosa|coca|monster|speed/, 'antojos', 3],
   // Comida segun por que comiste: pediste a casa (Delivery) o compraste algo en la calle, solo (Al paso)
-  [/pedidos ?ya|rappi|delivery|\bpedido\b/, 'pedido', 2],
+  [/pedidos ?ya|rappi|delivery|\bpedido\b|pedi |pedimos/, 'pedido', 2],
   [/mcdonald|burger|\bmc\b|\bwtb\b|mostaza|pizza|empanada|sanguch|sandwich|pancho|hamburg|al paso/, 'alpaso', 2],
   [/asato|anapat|franks|mooi|miaokou|mostrador|lanelly|parrilla|restaurant|resto\b|sushi|cena|asado|almuerzo/, 'restaurantes', 2],
   [/antares|\bbar\b|jobs bar|bar jps|cerveza|birra|boliche|salida con|campari|vermouth|fernet|previa/, 'bares', 3],
@@ -196,7 +198,7 @@ const CAT_REGLAS = [
   [/zara|nike|adidas|dexter|campero|alpargatas|bowie|ropa|zapat|remera|jean|camisa|calzado|campera|solido|uniqlo/, 'ropa', 2],
   [/monitor|notebook|celular|iphone|samsung|auricular|cargador|tecnolog|portal insumos|fravega|garbarino|musimundo/, 'tech', 2],
   [/aliexpress|\bchina\b|mercado ?libre|amazon|temu|shein/, 'compras_otros', 2],
-  [/jumbo|carrefour|coto|\bdia\b|disco|\bvea\b|chango|super|almacen|verduler|carniceria|panaderia|tienda molinos|nestle/, 'super', 1],
+  [/jumbo|carrefour|coto|\bdia\b|disco|\bvea\b|chango|super|almacen|verduler|carniceria|panaderia|fiambreria|dietetica|chino|tienda molinos|nestle|carne|fruta|verdura|leche|huevos|yerba/, 'super', 1],
 ];
 /** migracion de categorias v1 -> v2: se reclasifica cada gasto, fijo y aprendido de las categorias viejas por defecto
  *  (primero por su descripcion, si no por la equivalencia vieja->nueva). Las categorias propias se conservan. */

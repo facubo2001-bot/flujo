@@ -1310,6 +1310,8 @@ const DEFAULT_CATS = [
 /** reglas por descripcion (texto normalizado, sin acentos): las usan la migracion a v2 y las sugerencias al cargar.
  *  Van de lo especifico a lo general: la primera que matchea gana. */
 const CAT_REGLAS = [
+  // lo que dice "vacaciones / escapada / viaje" va a Viajes aunque sea comida (Facu: "comida vacaciones")
+  [/vacacion|escapada|\bfinde\b|\bviaje\b|excursion|\bhotel\b|hostel|airbnb|booking|vuelo|pasaje|aerol|flybondi|jetsmart/, 'viajes', 2],
   // Odi (el perro de Facu): grupo propio con sus categorias
   [/(bano|banio|peluquer|toallitas|shampoo).*(\bodi\b|perro)|pet ?grooming/, 'odi_banio', 1],
   [/veterinar|vacuna|antiparasit|pipeta|desparasit/, 'odi_vet', 1],
@@ -1319,19 +1321,19 @@ const CAT_REGLAS = [
   [/optica|oculus|anteojo|lentes/, 'optica', 1],
   [/afeitar|safe ?razor|maquinita|crema|perfum|desodor|shampoo/, 'personal', 1],
   [/barber|peluquer/, 'peluqueria', 1],
-  [/farmac|farmacity/, 'farmacia', 1],
+  [/farmac|farmacity|remedio|medicament|ibuprofeno|ibupirac|actron|paracetamol|tafirol|aspirina|bayaspirina|amoxicilina|antibiotic|antialergic|loratadina|omeprazol|sertal|buscapina|reliverán|reliveran|curitas|gasa|alcohol en gel|vitamina|termometro|preservativ/, 'farmacia', 1],
   [/medic|dentista|odont|laborator|estudio|clinica|hospital|kinesi|psico|prepaga|obra social|osde|swiss|galeno/, 'medicos', 1],
-  [/suplement|proteina|creatina|whey|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel/, 'gimnasio', 2],
-  [/comida (del )?laburo|morfi (del )?laburo|almuerzo (del )?laburo|vianda/, 'comida_trabajo', 1],
+  [/suplement|proteina|creatina|whey|colageno|gimnasio|\bgym\b|megatlon|sportclub|crossfit|padel|futbol 5|cancha/, 'gimnasio', 2],
+  [/(comida|almuerzo|morfi|vianda|desayuno|merienda|cena).*(laburo|trabajo|oficina|\bpae\b)|\bpae\b|vianda/, 'comida_trabajo', 1],
   [/uber|cabify|didi|taxi|remis/, 'taxi', 2],
   [/subte|emova|\bsube\b|colectivo|\btren\b/, 'transporte', 1],
   [/telepase|peaje|ausa|autopista|park ?work|estacionamiento|cochera/, 'peajes', 1],
   [/nafta|axion|\bypf\b|shell|puma energy|combustible|\bgnc\b/, 'nafta', 1],
   [/federacion patronal|seguro (del )?auto|auto ?partes|repuesto|patente|\bvtv\b|service|taller|gomeria|lavadero/, 'auto', 1],
   [/river|\bcarp\b/, 'river', 2],
-  [/helad|chocolat|kiosco|kiosko|golosin|gomitas|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|starbucks|havanna|alfajor/, 'antojos', 3],
+  [/helad|chocolat|kiosco|kiosko|golosin|gomitas|caramelo|chicle|pilipops|open ?25|delvi|spot alem|fikafe|green apple|lado bueno|\bcafe\b|cafecito|starbucks|havanna|alfajor|facturas|medialuna|snack|gaseosa|coca|monster|speed/, 'antojos', 3],
   // Comida segun por que comiste: pediste a casa (Delivery) o compraste algo en la calle, solo (Al paso)
-  [/pedidos ?ya|rappi|delivery|\bpedido\b/, 'pedido', 2],
+  [/pedidos ?ya|rappi|delivery|\bpedido\b|pedi |pedimos/, 'pedido', 2],
   [/mcdonald|burger|\bmc\b|\bwtb\b|mostaza|pizza|empanada|sanguch|sandwich|pancho|hamburg|al paso/, 'alpaso', 2],
   [/asato|anapat|franks|mooi|miaokou|mostrador|lanelly|parrilla|restaurant|resto\b|sushi|cena|asado|almuerzo/, 'restaurantes', 2],
   [/antares|\bbar\b|jobs bar|bar jps|cerveza|birra|boliche|salida con|campari|vermouth|fernet|previa/, 'bares', 3],
@@ -1345,7 +1347,7 @@ const CAT_REGLAS = [
   [/zara|nike|adidas|dexter|campero|alpargatas|bowie|ropa|zapat|remera|jean|camisa|calzado|campera|solido|uniqlo/, 'ropa', 2],
   [/monitor|notebook|celular|iphone|samsung|auricular|cargador|tecnolog|portal insumos|fravega|garbarino|musimundo/, 'tech', 2],
   [/aliexpress|\bchina\b|mercado ?libre|amazon|temu|shein/, 'compras_otros', 2],
-  [/jumbo|carrefour|coto|\bdia\b|disco|\bvea\b|chango|super|almacen|verduler|carniceria|panaderia|tienda molinos|nestle/, 'super', 1],
+  [/jumbo|carrefour|coto|\bdia\b|disco|\bvea\b|chango|super|almacen|verduler|carniceria|panaderia|fiambreria|dietetica|chino|tienda molinos|nestle|carne|fruta|verdura|leche|huevos|yerba/, 'super', 1],
 ];
 /** migracion de categorias v1 -> v2: se reclasifica cada gasto, fijo y aprendido de las categorias viejas por defecto
  *  (primero por su descripcion, si no por la equivalencia vieja->nueva). Las categorias propias se conservan. */
@@ -1445,7 +1447,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280200';
+const BUILD = '202609280203';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -4253,7 +4255,7 @@ function formMov(m = null, opts = {}) {
     ${tipoBar}
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
-    ${F.field('Categoría', `<div class="chips" id="f-catchips">${topCats.map(c => `<button type="button" data-act="pick-cat" data-id="${c.id}" class="${c.id === base.catId ? 'on' : ''}"><i style="background:${L.catColor(c.id)}"></i>${esc(c.nombre)}</button>`).join('')}</div>${F.catSelect('f-cat', base.catId)}`, '', 'full')}
+    ${F.field('Categoría', F.catSelect('f-cat', base.catId), '', 'full')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date" data-id="ayer">Ayer</button>${F.input('f-fecha', base.fecha, 'type="date"')}</div>`, '', 'full')}
     ${F.field('Medio de pago', F.choice('f-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('Cuotas', `<div class="row" style="gap:6px;flex-wrap:nowrap">${F.choice('f-cuotas', [[1, 'Un pago'], [3, '3'], [6, '6'], [12, '12']], [1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? (base.cuotas || 1) : '')}<input class="input sm mono" id="f-cuotas-n" inputmode="numeric" placeholder="otra" style="width:70px" value="${[1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? '' : base.cuotas}"></div>`, '<span id="f-pago-hint"></span>', 'full')}
