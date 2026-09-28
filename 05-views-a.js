@@ -108,21 +108,29 @@ function viewResumen() {
   html += kpi({ label: isCur ? 'Te queda' : ym < D.thisMonth() ? 'Te qued\u00f3' : 'Quedar\u00e1', value: `<span class="${margen.queda < 0 ? 'neg' : ''}">${M.f(margen.queda)}</span>`, stats: [
     { k: 'Presup.', v: pres ? kARS(pres) : '\u2014' },
     { k: isCur ? 'Cierre' : 'Gastado', v: isCur ? kARS(proj.total) : kARS(c.total), cls: pres ? semPres((isCur ? proj.total : c.total) / pres) : '' },
-    { k: 'Del presup.', v: pres ? M.pct((isCur ? proj.total : c.total) / pres, 0) : '\u2014', cls: pres ? semPres((isCur ? proj.total : c.total) / pres) : '' },
+    // pasado el 100 % se muestra el exceso (+16 %), no el total (116 %): Facu
+    (() => { const r = pres ? (isCur ? proj.total : c.total) / pres : null; return r != null && r > 1 ? { k: isCur ? 'Te pas\u00e1s' : 'Te pasaste', v: `+${M.pct(r - 1, 0)}`, cls: 'neg' } : { k: 'Del presup.', v: r != null ? M.pct(r, 0) : '\u2014', cls: r != null ? semPres(r) : '' }; })(),
     { k: 'Por d\u00eda', v: isCur && margen.restantes ? kARS(Math.max(0, margen.queda) / margen.restantes) : '\u2014' },
   ] });
   html += `</div>`;
 
   // ritmo + margen
   const days = D.daysIn(ym); const labels = Array.from({ length: days }, (_, i) => String(i + 1));
-  // lo que tenga fecha posterior a hoy (un fijo confirmado por adelantado, una compra cargada a futuro) entra hoy:
-  // el ultimo punto del grafico tiene que ser igual a "Gastos del mes", si no la proyeccion y el cruce mienten
-  const cum = (agg, upto) => { let a = 0; const resto = sum(Object.entries(agg.byDay).filter(([d]) => Number(d) > upto).map(([, v]) => v)); return labels.map((_, i) => { if (i + 1 > upto) return null; a += (agg.byDay[i + 1] || 0) + (i + 1 === upto ? resto : 0); return a; }); };
-  const curVals = cum(c, isCur ? dia : days);
+  // Linea real = lo gastado con fecha hasta hoy (las cuotas cuentan desde el 1). Lo que tiene fecha posterior
+  // (un fijo que se debita el 28, una compra cargada a futuro) va en la proyeccion, en su dia. Antes se sumaba
+  // todo "hoy" y el cruce del presupuesto saltaba al dia de hoy cada vez que abrias la app (Facu, 27-sep).
+  const hastaHoy = isCur ? dia : days;
+  const cumReal = agg => { let a = 0; return labels.map((_, i) => { if (i + 1 > hastaHoy) return null; a += agg.byDay[i + 1] || 0; return a; }); };
+  const curVals = cumReal(c);
   const avgVals = avg.vals ? avg.vals.slice(0, days) : labels.map(() => null);
   let projVals = labels.map(() => null);
-  if (isCur && proj.pace != null) { const base = curVals[dia - 1] || 0; const fijosRest = Math.max(0, proj.fijo - c.fijo); for (let i = dia - 1; i < days; i++) projVals[i] = base + (proj.pace + fijosRest / Math.max(1, proj.restantes)) * (i + 1 - dia); }
-  // cruce del presupuesto: el día en que el acumulado real lo pasó, o el día en que lo pasaría al ritmo actual (marca sutil en el gráfico)
+  if (isCur && proj.pace != null) {
+    const base = curVals[dia - 1] || 0; const fijosRest = Math.max(0, proj.fijo - c.fijo);
+    let fut = 0;
+    for (let i = dia - 1; i < days; i++) { if (i >= dia) fut += c.byDay[i + 1] || 0; projVals[i] = base + fut + (proj.pace + fijosRest / Math.max(1, proj.restantes)) * (i + 1 - dia); }
+  }
+  // cruce: el primer dia en que lo gastado (por fecha) paso el presupuesto; si todavia no, el dia en que lo pasaria
+  // con lo que ya esta cargado a futuro mas el ritmo de compras. Asi el dia no cambia al abrir la app otro dia.
   let cruce = null;
   if (pres) { const iReal = curVals.findIndex(v => v != null && v >= pres); const iProj = iReal < 0 ? projVals.findIndex(v => v != null && v >= pres) : -1;
     if (iReal >= 0) cruce = { i: iReal, label: String(iReal + 1), color: 'var(--crit)', pasado: true }; else if (iProj >= 0) cruce = { i: iProj, label: String(iProj + 1), color: 'var(--warn)', pasado: false }; }
@@ -143,7 +151,9 @@ function viewResumen() {
   html += `<div class="grid g-21 section">
     <div class="card"><div class="card-head"><h2>Lectura del mes</h2><span class="hint">Alertas y patrones calculados sobre tus datos</span></div>${renderInsights(ins)}</div>
     <div class="card"><div class="card-head"><h2>Dónde se fue</h2><span class="hint">${D.monthName(ym)}</span></div>
-      ${grupos.length ? mapaBloques(grupos.map(g => ({ label: g.name.split(' ')[0], peso: g.value / (c.total || 1), der: M.c(g.value) }))) : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
+      ${grupos.length ? (() => { const tot = c.total || 1; const big = grupos.filter(g => g.value / tot >= 0.05), chicos = grupos.filter(g => g.value / tot < 0.05); const resto = sum(chicos.map(g => g.value));
+        // lo que pesa menos de 5 % no entra al mapa (quedaba una tira de 20 px ilegible): va en la franja de abajo
+        return mapaBloques(big.map(g => ({ label: g.name.split(' ')[0], peso: g.value / tot, der: M.c(g.value) })), chicos.length ? { n: chicos.length, peso: resto / tot, label: chicos.length === 1 ? chicos[0].name : `Otros ${chicos.length} \u00b7 ${chicos.map(g => g.name.split(' ')[0]).join(', ')}`, der: `${M.pct(resto / tot, 1)} \u00b7 ${M.c(resto)}` } : null); })() : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
     </div>
   </div>`;
 
@@ -152,7 +162,7 @@ function viewResumen() {
   const hz = E.horizonte(D.thisMonth(), 12); const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Por categoría</h2><span class="hint">Barra = vs presupuesto o promedio 3 meses</span></div>
-      ${cats.length ? cats.slice(0, 9).map(({ cat, v, avg }) => { const ref = cat.presupuesto || avg || v; const r = v / (ref || 1); const sobre = avg > 0 && v > avg * 1.001; return `<div class="meter-row"><div class="l"><span>${esc(cat.nombre)}</span>${cat.presupuesto ? `<span class="pill ${r > 1 ? 'crit' : r > .8 ? 'warn' : 'neutral'}" style="font-size:10.5px">${M.pct(r)}</span>` : ''}</div><div class="v"><b class="mono">${M.f(v)}</b>${cat.presupuesto ? ` <span class="muted">/ ${M.c(cat.presupuesto)}</span>` : avg ? ` <span class="muted">prom. ${M.c(avg)}</span>` : ''}</div><div class="meter neutral ${sobre ? 'warn' : ''}"><i style="width:${clamp(r * 100, 2, 100)}%"></i>${!cat.presupuesto && avg ? `<span class="mark" style="left:${clamp(avg / Math.max(v, avg) * 100, 0, 100)}%"></span>` : ''}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
+      ${cats.length ? cats.slice(0, 9).map(({ cat, v, avg }) => { const ref = cat.presupuesto || avg || v; const r = v / (ref || 1); const sobre = avg > 0 && v > avg * 1.001; return `<div class="meter-row"><div class="l"><span>${esc(cat.nombre)}</span>${cat.presupuesto ? `<span class="pill ${r > 1 ? 'crit' : r > .8 ? 'warn' : 'neutral'}" style="font-size:10.5px">${r > 1 ? `+${M.pct(r - 1, 0)}` : M.pct(r)}</span>` : ''}</div><div class="v"><b class="mono">${M.f(v)}</b>${cat.presupuesto ? ` <span class="muted">/ ${M.c(cat.presupuesto)}</span>` : avg ? ` <span class="muted">prom. ${M.c(avg)}</span>` : ''}</div><div class="meter neutral ${sobre ? 'warn' : ''}"><i style="width:${clamp(r * 100, 2, 100)}%"></i>${!cat.presupuesto && avg ? `<span class="mark" style="left:${clamp(avg / Math.max(v, avg) * 100, 0, 100)}%"></span>` : ''}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${D.monthName(ui.mes).split(' ')[0]}`, sub: 'Cuando cargues el primero va a aparecer acá.' })}
     </div>
     <div class="card"><div class="card-head"><h2>Próximos 12 meses</h2><span class="hint">Fijos + cuotas ya comprometidos vs presupuesto</span></div>
       ${ChartQ.reg(w => Charts.stacked({ w, h: 230, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 230)}

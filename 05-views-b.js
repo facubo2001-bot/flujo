@@ -21,12 +21,12 @@ function viewTarjetas() {
     const cerrando = E.resumen(t.id, now.mesPago);
     const lim = Number(t.limite) || 0; const uso = lim ? (prox.ym === now.mesPago ? cerrando.total : prox.total + cerrando.total) / lim : 0;
     const stats = [{ k: 'Nuevo', v: kARS(consumoPeriodo) }, { k: 'Cuotas', v: kARS(cerrando.total - consumoPeriodo) }];
-    if (prox.ym !== now.mesPago) stats.push({ k: `Pag\u00e1s ${D.fmt(prox.fecha)}`, v: kARS(prox.total), cls: 'mid' });
+    if (prox.ym !== now.mesPago) stats.push({ k: 'A pagar', v: kARS(prox.total), cls: 'mid' });
     if (lim) stats.push({ k: 'L\u00edmite', v: M.pct(uso, 0), cls: uso >= 0.85 ? 'neg' : uso >= 0.6 ? 'mid' : 'pos' });
     const esSel = (ui.resCard || state.tarjetas[0].id) === t.id;
     html += `<div class="card kpi tap ${esSel ? 'sel' : ''}" data-act="tj-sel" data-id="${t.id}"><div class="label"><i class="bankdot" style="background:${cardDot(t.color || CARD_COLORS[i % CARD_COLORS.length])}"></i>${esc(t.nombre)}</div><div class="value">${M.f(cerrando.total)}</div>
       <div class="mini">${stats.map(x => `<div><span class="k">${x.k}</span><b class="${x.cls || ''}">${x.v}</b></div>`).join('')}</div>
-      <div class="foot">cierra en ${now.diasAlCierre} d\u00eda${now.diasAlCierre === 1 ? '' : 's'} \u00b7 vence ${D.fmt(cerrando.fecha)}</div></div>`;
+      <div class="foot">${prox.ym !== now.mesPago ? `pag\u00e1s el ${D.fmt(prox.fecha)} \u00b7 ` : ''}cierra en ${now.diasAlCierre} d\u00eda${now.diasAlCierre === 1 ? '' : 's'}</div></div>`;
   });
   html += `</div><button class="tj-add" data-act="new-card">${ICONS.plus} Agregar tarjeta</button>`;
 
@@ -243,9 +243,9 @@ function viewCartera() {
   const pt = E.patrimonio(k); const hayActivos = pt.activos.length > 0;
   const rendStr = v => v && v.disponible && v.rend.realDiv != null ? { v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { v: '—', cls: '' };
   const reparto = pt.grupos.filter(g => g.valor > 0).map(g => `${g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'fondo' : g.nombre.toLowerCase()} ${M.pct(g.valor / pt.total, 0)}`).join(' · ');
-  // balances de la semana (hasta 7 dias): primero los mas proximos, entre iguales lo que esta en cartera
+  // balances cerca: 14 dias antes si la tenes, 7 si es watchlist; primero los mas proximos, entre iguales lo que tenes
   const balSemana = [...k.posiciones.map(x => ({ t: x.ticker, tengo: true, peso: x.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(x => ({ t: x.ticker, tengo: false, peso: 0 }))]
-    .map(x => ({ ...x, b: Fund.balance(x.t) })).filter(x => x.b && x.b.dias <= 7).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
+    .map(x => ({ ...x, b: Fund.balanceCerca(x.t, x.tengo) })).filter(x => x.b).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
   // chips: "MELI 25/09 pm" (pm = tras el cierre, am = antes de abrir)
   const ddmm = f => `${f.slice(8, 10)}/${f.slice(5, 7)}`;
   const balLineas = balSemana.length ? `<div class="nov-l nov-z"><span class="nov-chips">${balSemana.map(x => `<span class="nov-chip bal" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)} ${ddmm(x.b.fecha)}${x.b.hora === 'bmo' ? '<i>am</i>' : x.b.hora === 'amc' ? '<i>pm</i>' : ''}</span>`).join('')}</span></div>` : '';
@@ -257,7 +257,7 @@ function viewCartera() {
       stats: (hayActivos
         ? pt.grupos.slice(0, 3).map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'Reserva' : g.id === 'renta' ? 'Bonos' : g.nombre, v: fmtARS.format(Math.round(g.valor)), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
         : [{ k: 'CEDEARs', v: fmtARS.format(Math.round(k.valor != null ? k.valor : k.costo)) }, { k: 'Otros', v: '<span class="soft">abajo</span>' }]
-      ).concat([{ k: 'En pesos', v: pt.mep ? `$ ${abrevARS((hayActivos ? pt.total : (k.valorTotal != null ? k.valorTotal : k.costo)) * pt.mep)}` : '—' }]) })}
+      ).concat([{ k: 'En $', v: pt.mep ? `$ ${abrevARS((hayActivos ? pt.total : (k.valorTotal != null ? k.valorTotal : k.costo)) * pt.mep)}` : '—' }]) })}
     ${kpi({ label: 'CEDEARs', value: valorTxt,
       stats: [
         { k: 'YTD', ...rendStr(va) }, { k: 'Inicio', ...rendStr(vi) },
@@ -280,14 +280,14 @@ function viewCartera() {
   html += `<div class="grid g-12 section">
     ${chartCard}
     <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
-      <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio · hoy</span><span>Tenés</span></div>
+      <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio</span><span>Ten\u00e9s</span></div>
       ${(() => {
-      const valTxt = p => fmtU(p.valor != null ? p.valor : p.costo, 0), pxTxt = p => p.precio != null ? fmtU(p.precio) : '';
-      return k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balance(p.ticker);
+      const valTxt = p => fmtU(p.valor != null ? p.valor : p.costo, 0), pxTxt = p => p.precio != null ? MENOS(Number(p.precio).toLocaleString('es-AR', { minimumFractionDigits: p.precio < 100 ? 2 : 0, maximumFractionDigits: p.precio < 100 ? 2 : 0 })) : '';  // sin US$: la columna ya dice precio
+      return k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balanceCerca(p.ticker, true);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
-        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<i class="pz-dot ${p.estado}" title="${p.estado}"></i>` : ''}${bal && bal.dias <= 14 ? `<i class="pz-dot bal" title="balance en ${bal.dias} d"></i>` : ''}</div><span class="pz-s">${(() => { const a = Math.round(p.acciones * 100) / 100; return `${a.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${a === 1 ? 'acción' : 'acciones'}`; })()}</span><span class="pz-s">PPC ${fmtU(p.ppc)}</span></div>
-        <div class="pz-m"><div class="stk">${p.precio != null ? `<span class="pz-px">${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '—'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div></div>
-        <div class="pz-r"><div class="stk"><b>${esc(valTxt(p))}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}</div></div>
+        <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<i class="pz-dot ${p.estado}" title="${p.estado}"></i>` : ''}${bal ? `<i class="pz-dot bal" title="balance en ${bal.dias} d"></i>` : ''}</div><span class="pz-s">${(Math.round(p.acciones * 100) / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 })} acc \u00b7 PPC ${MENOS(Number(p.ppc).toLocaleString('es-AR', { maximumFractionDigits: p.ppc < 100 ? 2 : 0 }))}</span></div>
+        <div class="pz-m">${p.precio != null ? `<span class="pz-px">${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '\u2014'}</span>` : '<span class="pz-px muted">sin precio</span>'}</div>
+        <div class="pz-r"><b>${esc(valTxt(p))}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}</div>
         ${avisos.length ? `<div class="pz-f warn-text">${avisos.join(' · ')}</div>` : ''}
       </div>`; }).join(''); })()}
       </div>
@@ -337,36 +337,53 @@ function viewCartera() {
  *  Nueve bloques en tres filas (alto de cada fila = peso de la fila, ancho de cada bloque = su peso)
  *  y una franja para el resto. La variación del día va sin color a propósito: si el mapa se pinta de
  *  verde y rojo compite con el semáforo del resto de la app. */
-/** Mapa de bloques proporcionales: el area es el dato, asi que no hace falta leyenda.
- *  Hasta nueve bloques en tres filas (alto de la fila = peso de la fila, ancho del bloque = su peso)
- *  y una franja para el resto. Sirve igual para posiciones de cartera que para grupos de gasto:
- *  el color es solo jerarquia, que es lo unico que una rampa secuencial sabe hacer.
- *  items: [{ label, peso (0..1), der, act, id }] — `der` es la cifra chica de la derecha.
- *  otras: { n, peso } o null. */
-function mapaBloques(items, otras = null, todas = false) {
-  const top = todas ? items.slice() : items.slice(0, 9); if (!top.length) return '';
-  const TK = [17, 15, 13], NM = [12, 11, 10], PD = [10, 9, 8];
-  // flex-grow reparte el espacio libre solo hasta donde suman los factores: con pesos de 0 a 1
-  // la suma queda por debajo de 1 y los bloques no llegan a llenar la fila. Se escalan.
-  const G = 1000, grow = x => Math.max(x * G, 0.01);
-  // con pocos items no tiene sentido forzar tres filas: quedan tiras de 20 px ilegibles
-  const porFila = 3, nFilas = top.length <= 3 ? 1 : top.length <= 6 ? 2 : Math.ceil(top.length / porFila);
-  const filas = Array.from({ length: nFilas }, (_, r) => top.slice(r * porFila, (r + 1) * porFila)).filter(f => f.length).map((fila, r) => {
-    const bs = fila.map(it => {
-      const i = top.indexOf(it);
-      // rampa de cian por opacidad: por debajo de alfa 0,62 el texto oscuro ya no se lee
-      const attrs = it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}" style="cursor:pointer;` : ' style="';
-      return `<div class="cmap-b"${attrs}flex-grow:${grow(it.peso)};background:var(--c${Math.min(i, 8) + 1});color:${i < 3 ? 'var(--on-fill)' : '#FFFFFF'};padding:${PD[Math.min(r, 2)]}px">
-        <b style="font-size:${TK[Math.min(r, 2)]}px">${esc(it.label)}</b>
-        <span class="n" style="font-size:${NM[Math.min(r, 2)]}px"><i>${M.pct(it.peso, 1)}</i><em>${it.der || ''}</em></span>
-      </div>`;
-    }).join('');
-    return `<div class="cmap-row" style="flex-grow:${grow(sum(fila.map(x => x.peso)))}">${bs}</div>`;
+/** Mapa de bloques (treemap "squarified"): el area de cada bloque es exactamente su peso y el tono va de
+ *  blanco (el mas pesado) a gris oscuro (el mas liviano), asi tamaño y color dicen lo mismo.
+ *  Antes eran filas de tres con flex-grow y la altura de cada fila salia del contenido, no del peso:
+ *  NVDA con 9,4 % quedaba mas chica que META con 6,9 % (Facu, 27-sep).
+ *  El layout se calcula en porcentajes sobre una caja de proporcion fija, asi que las areas siguen siendo
+ *  proporcionales a cualquier ancho de pantalla.
+ *  items: [{ label, peso (0..1), der, act, id }] — `der` es la cifra chica de la derecha. otras: { n, peso, label, der, act } o null. */
+const CMAP_W = 358, CMAP_H = 200;   // caja de referencia (celular): solo decide la forma, no el area
+function squarify(vals, x, y, w, h) {
+  // Bruls, Huizing, van Wijk (2000). vals ya escalados al area w*h, ordenados de mayor a menor
+  const out = []; let fila = [], i = 0;
+  const peor = (f, lado) => { const s = sum(f); const mx = Math.max(...f), mn = Math.min(...f); return Math.max(lado * lado * mx / (s * s), (s * s) / (lado * lado * mn)); };
+  const cerrar = f => {
+    const s = sum(f);
+    if (w >= h) { const ww = s / h; let yy = y; f.forEach(v => { const hh = v / ww; out.push([x, yy, ww, hh]); yy += hh; }); x += ww; w -= ww; }
+    else { const hh = s / w; let xx = x; f.forEach(v => { const ww = v / hh; out.push([xx, y, ww, hh]); xx += ww; }); y += hh; h -= hh; }
+  };
+  while (i < vals.length) {
+    const v = vals[i]; const lado = Math.min(w, h);
+    if (!fila.length || peor(fila.concat(v), lado) <= peor(fila, lado)) { fila.push(v); i++; }
+    else { cerrar(fila); fila = []; }
+  }
+  if (fila.length) cerrar(fila);
+  return out;
+}
+function mapaBloques(items, otras = null) {
+  const top = items.filter(it => it.peso > 0).sort((a, b) => b.peso - a.peso).slice(0, 9); if (!top.length) return '';
+  const tot = sum(top.map(it => it.peso)); const mx = top[0].peso;
+  const rects = squarify(top.map(it => it.peso / tot * CMAP_W * CMAP_H), 0, 0, CMAP_W, CMAP_H);
+  const bs = top.map((it, i) => {
+    const [x, y, w, h] = rects[i];
+    // tono por peso (no por puesto): el mas pesado casi blanco, el mas liviano gris oscuro
+    const a = 0.16 + 0.78 * Math.pow(it.peso / mx, 0.85);
+    const oscuro = a >= 0.55;
+    // bloques chicos: primero se cae la cifra de la derecha, despues todo va en un renglon;
+    // el nombre achica la letra hasta entrar (nunca "ME...")
+    const tam = h < 40 ? 'fila' : w < 84 ? 'ang' : w < 118 || h < 60 ? 's' : '';
+    const conDer = tam === '' || (tam === 's' && w >= 132);
+    const base = tam === '' ? 16 : tam === 's' ? 14 : 13;
+    const fs = Math.max(10, Math.min(base, Math.floor((w * 0.9 - (tam === 'fila' ? 44 : 14)) / (String(it.label).length * 0.72))));
+    const pos = `left:${(x / CMAP_W * 100).toFixed(3)}%;top:${(y / CMAP_H * 100).toFixed(3)}%;width:${(w / CMAP_W * 100).toFixed(3)}%;height:${(h / CMAP_H * 100).toFixed(3)}%`;
+    const act = it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}"` : '';
+    return `<div class="cmap-c" style="${pos}"><div class="cmap-b ${tam}"${act} style="background:rgba(255,255,255,${a.toFixed(3)});color:${oscuro ? 'var(--on-fill)' : '#FFFFFF'}">
+      <b style="font-size:${fs}px">${esc(it.label)}</b><span class="n"><i>${M.pct(it.peso, 1)}</i>${conDer ? `<em>${it.der || ''}</em>` : ''}</span></div></div>`;
   }).join('');
-  // la franja del resto se toca: abre el mapa con todas las posiciones (y vuelve)
   const franja = otras && otras.n ? `<div class="cmap-otras"${otras.act ? ` data-act="${otras.act}" role="button" style="cursor:pointer"` : ''}><span>${esc(otras.label)}</span><span>${otras.der != null ? otras.der : M.pct(otras.peso, 1)}</span></div>` : '';
-  // con todas, el alto crece con las filas: 210 px para tres, ~52 por fila de ahi en mas
-  return `<div class="cmap"${nFilas > 3 ? ` style="height:${Math.max(210, nFilas * 52)}px"` : ''}>${filas}${franja}</div>`;
+  return `<div class="cmap"><div class="cmap-area">${bs}</div>${franja}</div>`;
 }
 
 function mapaCartera(k) {

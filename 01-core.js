@@ -848,6 +848,8 @@ const Fund = {
     return Fund._calentando;
   },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
+  /** balance "cerca": 14 dias antes si la tenes en cartera, 7 si solo la vigilas (Facu) */
+  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= (tengo ? 14 : 7) ? b : null; },
   balance(t) { const d = Fund.de(t); if (!d || !d.balance) return null; const dias = D.daysBetween(D.today(), d.balance.fecha); return dias >= 0 ? { ...d.balance, dias } : null; },
 };
 

@@ -44,7 +44,7 @@ const Insights = {
     // 4. budgets
     for (const cat of state.categorias) {
       if (!cat.presupuesto) continue; const v = c.byCat[cat.id] || 0; const r = v / M.toARS(cat.presupuesto, 'ARS');
-      if (r >= 1) out.push({ level: 'crit', icon: 'alert', title: `Presupuesto de ${cat.nombre} superado (${M.pct(r)})`, text: `Gastaste ${M.f(v)} de los ${M.f(cat.presupuesto)} que definiste.` });
+      if (r >= 1) out.push({ level: 'crit', icon: 'alert', title: `Presupuesto de ${cat.nombre} superado ${r > 1.005 ? `por ${M.pct(r - 1)}` : ''}`.trim(), text: `Gastaste ${M.f(v)} de los ${M.f(cat.presupuesto)} que definiste.` });
       else if (r >= 0.8 && isCur && proj.restantes > 5) out.push({ level: 'warn', icon: 'clock', title: `${cat.nombre} al ${M.pct(r)} del presupuesto`, text: `Quedan ${M.f(cat.presupuesto - v)} para ${proj.restantes} días.` });
     }
     // 5. unnecessary share

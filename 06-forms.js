@@ -495,7 +495,7 @@ function fundHTML(t, pos) {
   const al = state.cartera.alertas[t] || {};
   const est = pos && pos.estado; const b = Fund.balance(t);
   const cab = `<div class="fh2">
-    <div style="min-width:0"><div class="tk">${esc(t)}${est ? `<i class="pz-dot ${est}"></i>` : ''}${b && b.dias <= 14 ? '<i class="pz-dot bal"></i>' : ''}</div>${ident ? `<div class="nm">${ident}</div>` : ''}</div>
+    <div style="min-width:0"><div class="tk">${esc(t)}${est ? `<i class="pz-dot ${est}"></i>` : ''}${Fund.balanceCerca(t, !!(pos && pos.acciones)) ? '<i class="pz-dot bal"></i>' : ''}</div>${ident ? `<div class="nm">${ident}</div>` : ''}</div>
     <div class="px">${precio != null ? `<b>${fmtU(precio)}</b>` : '<b class="muted">\u2014</b>'}${dp != null ? `<span class="${dp > 0 ? 'up' : dp < 0 ? 'down' : ''}">${dp > 0 ? '+' : ''}${MENOS(dp.toLocaleString('es-AR', { maximumFractionDigits: 2 }))} %</span>` : ''}</div>
   </div>${al.desc ? `<div class="ds">${esc(al.desc)}</div>` : ''}`;
   let rango = '';
