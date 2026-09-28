@@ -32,6 +32,14 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Múltiplos propios con la SEC + precio (28-sep, build 202609282351)
+- `Fund.ttmCampo`: últimos 12 meses de cualquier flujo (ventas, neto, cfo, capex, dividendos, recompras) = anual + YTD − YTD del año anterior. `d.ttm` con acciones diluidas del último trimestre.
+- `Fund.mult(t)`: con el precio de hoy → P/E, P/S, P/FCF, FCF yield, EPS 12 m, payout, recompras/valor. Sin dato ("—") si el balance no está en USD, si es 20-F o el anual tiene >13 meses (NU, VIST), o si el valor de mercado propio difiere >25 % del de Finnhub (ADR con otra relación).
+- **P/E propio vs TradingView**: MELI 47,7/47,69 · MSFT 28,8/28,76 · NVDA 28,4/28,45 · MCD 19,2/19,2 · IBM 20/20 · GOOGL 17,3/17,28 · HD 20,5/20,52 · PEP 16,9/16,87 · AMZN 20,1/20 · UNH 24,2/24,22 · MU 24,5/24,46 → la cuenta de 12 meses, acciones y precio está bien.
+- `Sec.mezclar` completa los reportes de Finnhub con flujos de la SEC del mismo período (dividendos, recompras, bruto, operativo, acciones, cfo, capex); el balance no se toca.
+- Ficha: P/S y P/FCF propios, FCF yield (reemplaza P/B), payout y recompra en Div. yield. Export: columna P/S · P/FCF · FCF yield. "Baratas" confirma con P/S o P/FCF propios.
+- Ronda 2 de chequeo publicada ("Chequeo vs TradingView 2"): EPS, P/S, P/FCF, payout, márgenes bruto/operativo FY, recompras TTM.
+
 ### Balances oficiales de la SEC (28-sep, build 202609282324)
 - **Tarea diaria** `.github/workflows/sec.yml` (10:17 UTC + al cambiar `tools/sec.mjs`): baja `companyfacts` de la SEC para todo el universo de CEDEARs (`cedears.json`, ~407; 323 con datos) y deja `sec/<TICKER>.json` en el MISMO formato que Finnhub `financials-reported` (año, trimestre, form, fechas, `report.ic`/`report.bs`; `cf` = `ic`). IFRS → nombres us-gaap. `sec/index.json` y `sec/_debug.json` (sin CIK, sin datos, conceptos IFRS). El teléfono no puede consultar la SEC (sin CORS): la app lee `sec/` del mismo GitHub Pages.
 - **App** (`Sec.de`, `Sec.mezclar`): pide igual los balances de Finnhub (son los del frente del balance, los contrastados con TradingView) y la SEC completa por cierre lo que falta: años nuevos (MSFT FY2026, MELI Q2-26), 20-F (ASML en EUR, NU, VIST), historia de 13 años. Si el reporte de Finnhub no trae patrimonio de la empresa que cotiza (CEG: subsidiaria LLC) manda el de la SEC.

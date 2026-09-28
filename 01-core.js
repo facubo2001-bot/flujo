@@ -830,7 +830,13 @@ const Sec = {
     const sirve = d => { const cs = ((d.report && d.report.bs) || []).map(x => Fund._c(x)); return cs.includes('StockholdersEquity') || cs.includes('StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'); };
     const aOk = a.filter(y => sirve(y) || !b.some(x => cerca(x, y) && sirve(x)));
     const extra = b.filter(x => !aOk.some(y => cerca(x, y)));
-    return { data: [...aOk, ...extra], mezcla: extra.length };
+    // mismo periodo en las dos: se usa el de Finnhub y se le agregan de la SEC los flujos que no trae (dividendos, recompras,
+    // margen bruto, acciones). El balance (deuda) no se toca: es el que coincide con TradingView.
+    const RELLENO = /(PaymentsOfDividends|PaymentsForRepurchaseOfCommonStock|GrossProfit|CostOfRevenue|CostOfGoodsAndServicesSold|OperatingIncomeLoss|WeightedAverageNumberOf|NetCashProvidedByUsedInOperatingActivities|PaymentsToAcquirePropertyPlantAndEquipment)/;
+    const aFull = aOk.map(y => { const x = b.find(z => cerca(z, y)); if (!x || !x.report) return y; const ic = (y.report.ic || []).slice(), cf = (y.report.cf || []).slice(); const tiene = new Set([...ic, ...cf].map(c => Fund._c(c)));
+      for (const c of (x.report.ic || [])) { const n = Fund._c(c); if (RELLENO.test(n) && !tiene.has(n)) { ic.push(c); cf.push(c); tiene.add(n); } }
+      return { ...y, report: { ...y.report, ic, cf } }; });
+    return { data: [...aFull, ...extra], mezcla: extra.length };
   },
 };
 
@@ -890,6 +896,7 @@ const Fund = {
         ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
         bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); return v != null && cr != null ? v - cr : null; })(),
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
+        div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
         acciones: V(ic, C.acciones) || V(bs, C.acciones),
         roicNopat: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
@@ -956,7 +963,10 @@ const Fund = {
       const ic = d.report.ic || [], bs = d.report.bs || [];
       const fin = String(d.endDate).slice(0, 10), ini = String(d.startDate || '').slice(0, 10);
       const meses = ini && D.parse(ini) ? Math.round((D.parse(fin) - D.parse(ini)) / (30.4 * 86400000)) : null;
-      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), capital: Fund.capitalTotal(bs) };
+      const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = V(cf, C.capex); const abs = v => v != null ? Math.abs(v) : null;
+      let acc = V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']); if (acc > 0 && acc < 1e5) acc *= 1e6;
+      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), capital: Fund.capitalTotal(bs),
+        cfo, capex: abs(cpx), div: abs(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), recompra: abs(V(cf, ['PaymentsForRepurchaseOfCommonStock'])), acciones: acc };
     }).sort((a, b) => a.fin.localeCompare(b.fin));
   },
   /** Ganancia neta de los ultimos 12 meses y capital promedio (hoy y hace un anio) a partir de 10-K + 10-Q.
@@ -987,6 +997,35 @@ const Fund = {
     // balance de hace un anio: el trimestre mas cercano a esa fecha (a lo sumo 45 dias de diferencia)
     const prev = q.filter(t => t.capital && Math.abs(D.parse(t.fin) - D.parse(hastaPrev)) <= 45 * 86400000).sort((a, b) => Math.abs(D.parse(a.fin) - D.parse(hastaPrev)) - Math.abs(D.parse(b.fin) - D.parse(hastaPrev)))[0];
     return { neto, hasta: ult.fin, capital: ult.capital, capitalPrev: prev ? prev.capital : null, base: 'ttm' };
+  },
+  /** ultimos 12 meses de un campo de flujo (ventas, neto, cfo, capex, div, recompra) = ultimo anual + lo que va del anio − lo mismo del anio anterior.
+   *  Soporta trimestres sueltos (3 meses) o acumulados del anio. Si no hay trimestres posteriores al anual, devuelve el anual. */
+  ttmCampo(filasAnuales, trims, campo) {
+    const ua = filasAnuales[filasAnuales.length - 1]; if (!ua || ua[campo] == null) return null;
+    const q = trims.filter(t => t[campo] != null); const ult = q[q.length - 1];
+    if (!ult || ult.fin <= ua.fin) return { v: ua[campo], hasta: ua.fin, base: 'fy' };
+    const ytdDesde = (cierre, hasta, nMax = 4) => { const tramo = q.filter(t => t.fin > cierre && t.fin <= hasta).slice(0, nMax); if (!tramo.length) return null; const u = tramo[tramo.length - 1]; if (u.meses != null && u.meses >= 5) return u[campo]; if (tramo.every(t => t.meses == null || t.meses <= 4)) return sum(tramo.map(t => t[campo])); return null; };
+    const nTramo = q.filter(t => t.fin > ua.fin && t.fin <= ult.fin).length;
+    const ytd = ytdDesde(ua.fin, ult.fin); const pv = filasAnuales[filasAnuales.length - 2];
+    const ytdPrev = pv && pv.fin ? ytdDesde(pv.fin, D.addDays(D.addDays(ult.fin, -365), 20), nTramo) : null;
+    if (ytd == null || ytdPrev == null) return { v: ua[campo], hasta: ua.fin, base: 'fy' };
+    return { v: ua[campo] + ytd - ytdPrev, hasta: ult.fin, base: 'ttm' };
+  },
+  /** multiplos con el precio de hoy y los ultimos 12 meses de la SEC/Finnhub. Solo si el balance esta en dolares y el valor de
+   *  mercado propio coincide con el de Finnhub (+-25 %): si no (ADR con otra relacion de acciones, otra moneda) -> sin dato */
+  mult(t, d = Fund.de(t)) {
+    const o = { pe: null, ps: null, pfcf: null, fcfY: null, eps: null, payout: null, recompras: null, base: null };
+    if (!d || !d.ttm || d.moneda && d.moneda !== 'USD') return o;
+    // sin 10-Q (20-F) o con el ultimo anual de hace mas de 13 meses no hay "ultimos 12 meses" -> sin dato (NU, VIST: 2024)
+    if (d.solo20F || (d.ttm.base === 'fy' && d.ttm.hasta && D.daysBetween(d.ttm.hasta, D.today()) > 400)) return o;
+    const px = state.cartera.precios[t] && state.cartera.precios[t].c; const x = d.ttm; if (!px || !(x.acciones > 0)) return o;
+    const mcap = px * x.acciones;
+    if (d.capUSD && d.pxCap && Math.abs((d.capUSD / d.pxCap * px) / mcap - 1) > 0.25) return o;
+    o.base = x.base; o.eps = x.neto != null ? x.neto / x.acciones : null;
+    o.pe = x.neto > 0 ? mcap / x.neto : null; o.ps = x.ventas > 0 ? mcap / x.ventas : null;
+    o.pfcf = x.fcf > 0 ? mcap / x.fcf : null; o.fcfY = x.fcf != null ? x.fcf / mcap : null;
+    o.payout = x.div != null && x.neto > 0 ? x.div / x.neto : null; o.recompras = x.recompra != null ? x.recompra / mcap : null;
+    return o;
   },
   /** CAGR entre el primero y el último valor positivo de la serie (n años) */
   cagr(filas, campo, n) {
@@ -1108,6 +1147,11 @@ const Fund = {
     if (roic == null && filas.length) { const f = Number(m.roiTTM) / 100; if (Number.isFinite(f) && f !== 0 && Math.abs(f) <= 3) { roic = f; fuente = 'finnhub'; } }
     if (roic == null && u && u.capital && !(u.capital.total > 0)) d.avisos.push('ROIC: capital total negativo (recompras); TradingView tampoco lo publica');
     d.roicAct = roic; d.roicFuente = fuente; d.roicCuenta = cuenta;
+    // ultimos 12 meses para los multiplos propios (Fund.mult)
+    if (u) { const T = c => Fund.ttmCampo(filas, trims, c); const ve = T('ventas'), ne = T('neto'), cfo = T('cfo'), cpx = T('capex'), dv = T('div'), rc = T('recompra');
+      const qa = trims.filter(q => q.acciones > 0 && q.fin > u.fin); const acc = qa.length ? qa[qa.length - 1].acciones : u.acciones;
+      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null }; }
+    d.pxCap = state.cartera.precios[t] && state.cartera.precios[t].c || null;
     // deuda / patrimonio como TradingView: deuda total (corto + largo + leases) / patrimonio del ultimo balance (trimestral si hay)
     { const qs = trims.filter(q => q.capital && q.capital.deudaTotal != null); const ultQ = qs[qs.length - 1];
       const cap = ultQ && (!u || ultQ.fin >= u.fin) ? ultQ.capital : (u && u.capital);
@@ -1182,7 +1226,7 @@ const Fund = {
     if (d.peN != null && d.peN < 7) return null;  // poca historia (GEV): la mediana no dice nada
     // confirmacion con ventas o caja libre: si el P/E baja por una ganancia extraordinaria (AMZN, inversiones) y P/S o P/FCF
     // no estan baratos contra su historia, no cuenta
-    const otros = [[d.ps, d.psMed], [d.pfcf, d.pfcfMed]].filter(([v, m]) => v > 0 && m > 0).map(([v, m]) => 1 - v / m);
+    const mu = Fund.mult(t, d); const otros = [[mu.ps ?? d.ps, d.psMed], [mu.pfcf ?? d.pfcf, d.pfcfMed]].filter(([v, m]) => v > 0 && m > 0).map(([v, m]) => 1 - v / m);
     if (otros.length && !otros.some(x => x >= 0.15)) return null;
     const calidad = (d.roicAct != null && d.roicAct >= 0.12) || (d.roe != null && d.roe >= 0.15);
     if (!calidad) return null;
@@ -1193,7 +1237,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 6,
+  VERSION: 7,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)

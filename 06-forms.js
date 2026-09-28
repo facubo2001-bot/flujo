@@ -533,13 +533,14 @@ function fundHTML(t, pos) {
       tile('Dividend', d.divCrec5 != null ? pct1(d.divCrec5) : '\u2014', abs(d.divCrec5, 0.06, 0.02), d.divCrec5 != null ? '5Y CAGR' : 'no paga'),
       tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', '5Y CAGR'),
     ]);
-    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece.', [
+    const mu = Fund.mult(t, d);
+    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
       tile('P/E', num(d.pe, 1), vsH(d.pe, d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''),
       tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'),
-      tile('P/S', num(d.ps, 1), vsH(d.ps, d.psMed, false), d.psMed ? `10Y med ${num(d.psMed, 1)}` : ''),
-      tile('P/FCF', num(d.pfcf, 1), vsH(d.pfcf, d.pfcfMed, false), d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : ''),
-      tile('P/B', num(d.pb, 1), vsH(d.pb, d.pbMed, false), d.pbMed ? `10Y med ${num(d.pbMed, 1)}` : ''),
-      tile('Div. yield', Fund.yieldDe(t, d) ? pct1(Fund.yieldDe(t, d)) : '\u2014', '', d.payout ? `payout ${pct1(d.payout)}` : ''),
+      tile('P/S', num(mu.ps, 1), vsH(mu.ps, d.psMed, false), mu.ps != null ? (d.psMed ? `10Y med ${num(d.psMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
+      tile('P/FCF', num(mu.pfcf, 1), vsH(mu.pfcf, d.pfcfMed, false), mu.pfcf != null ? (d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
+      tile('FCF yield', mu.fcfY != null ? pct1(mu.fcfY) : '\u2014', abs(mu.fcfY, 0.05, 0.025), 'caja libre / valor'),
+      tile('Div. yield', Fund.yieldDe(t, d) ? pct1(Fund.yieldDe(t, d)) : '\u2014', '', [mu.payout != null ? `payout ${pct1(mu.payout)}` : '', mu.recompras ? `recompra ${pct1(mu.recompras)}` : ''].filter(Boolean).join(' \u00b7 ')),
     ]);
     const bs = grupo('Balance sheet', 'Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana.', [
       tile('Current ratio', num(d.currentRatio, 2), abs(d.currentRatio, 1.2, 0.9), d.currentRatio5 ? `5Y avg ${num(d.currentRatio5, 2)}` : ''),
@@ -910,8 +911,8 @@ function ctxPartes(pendientes = []) {
   }).join('\n');
 
   const filasF = todas.map(p => {
-    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
+    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.fcfY != null ? pc(mu.fcfY) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -925,8 +926,8 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | ROE | Margen neto del \u00faltimo a\u00f1o fiscal (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 FCF yield (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto del \u00faltimo a\u00f1o fiscal (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));
       const l = [];
