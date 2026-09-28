@@ -147,8 +147,9 @@ const DEFAULT_CATS = [
   ['river',          'River',                        'ocio',      'variable', 0],
   ['entretenimiento','Cine y entretenimiento',       'ocio',      'variable', 0],
   ['viajes',         'Viajes y escapadas',           'ocio',      'variable', 0],
-  ['regalos',        'Regalos',                      'ocio',      'variable', 0],
+
   ['ropa',           'Ropa y calzado',               'compras',   'variable', 0],
+  ['regalos',        'Regalos',                      'compras',   'variable', 0],
   ['tech',           'Tecnología',                   'compras',   'variable', 0],
   ['casa',           'Casa y deco',                  'compras',   'variable', 0],
   ['compras_otros',  'Otras compras (ML, AliExpress)', 'compras', 'variable', 0],
@@ -236,6 +237,14 @@ function migrarCategoriasV4(s) {
   for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) { const at = s.categorias.findIndex(k => k.id === 'revisar'); s.categorias.splice(at < 0 ? s.categorias.length : at, 0, { ...c }); }
   if (ff && Number(ff.presupuesto)) { const k = s.categorias.find(c => c.id === 'alpaso'); if (k) k.presupuesto = Number(ff.presupuesto); }
   s.settings.catsV = 4;
+}
+/** v4 -> v5 (27-sep): Regalos pasa de Ocio a Compras; "Chocolates cr" fue un regalo (Facu). */
+function migrarCategoriasV5(s) {
+  if (Number(s.settings.catsV) >= 5) return;
+  const r = s.categorias.find(c => c.id === 'regalos'); if (r && r.grupo === 'ocio') r.grupo = 'compras';
+  for (const m of s.movimientos || []) if (normTxt(m.desc) === 'chocolates cr') m.catId = 'regalos';
+  if (s.aprendido && s.aprendido['chocolates cr']) s.aprendido['chocolates cr'].catId = 'regalos';
+  s.settings.catsV = 5;
 }
 function migrarCategoriasV2(s) {
   if (Number(s.settings.catsV) >= 2) return;
@@ -390,6 +399,7 @@ const Persist = {
     migrarCategoriasV2(s);
     migrarCategoriasV3(s);
     migrarCategoriasV4(s);
+    migrarCategoriasV5(s);
     for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;

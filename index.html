@@ -1296,8 +1296,9 @@ const DEFAULT_CATS = [
   ['river',          'River',                        'ocio',      'variable', 0],
   ['entretenimiento','Cine y entretenimiento',       'ocio',      'variable', 0],
   ['viajes',         'Viajes y escapadas',           'ocio',      'variable', 0],
-  ['regalos',        'Regalos',                      'ocio',      'variable', 0],
+
   ['ropa',           'Ropa y calzado',               'compras',   'variable', 0],
+  ['regalos',        'Regalos',                      'compras',   'variable', 0],
   ['tech',           'Tecnología',                   'compras',   'variable', 0],
   ['casa',           'Casa y deco',                  'compras',   'variable', 0],
   ['compras_otros',  'Otras compras (ML, AliExpress)', 'compras', 'variable', 0],
@@ -1386,6 +1387,14 @@ function migrarCategoriasV4(s) {
   if (ff && Number(ff.presupuesto)) { const k = s.categorias.find(c => c.id === 'alpaso'); if (k) k.presupuesto = Number(ff.presupuesto); }
   s.settings.catsV = 4;
 }
+/** v4 -> v5 (27-sep): Regalos pasa de Ocio a Compras; "Chocolates cr" fue un regalo (Facu). */
+function migrarCategoriasV5(s) {
+  if (Number(s.settings.catsV) >= 5) return;
+  const r = s.categorias.find(c => c.id === 'regalos'); if (r && r.grupo === 'ocio') r.grupo = 'compras';
+  for (const m of s.movimientos || []) if (normTxt(m.desc) === 'chocolates cr') m.catId = 'regalos';
+  if (s.aprendido && s.aprendido['chocolates cr']) s.aprendido['chocolates cr'].catId = 'regalos';
+  s.settings.catsV = 5;
+}
 function migrarCategoriasV2(s) {
   if (Number(s.settings.catsV) >= 2) return;
   const viejas = s.categorias || [];
@@ -1436,7 +1445,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609280140';
+const BUILD = '202609280144';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1539,6 +1548,7 @@ const Persist = {
     migrarCategoriasV2(s);
     migrarCategoriasV3(s);
     migrarCategoriasV4(s);
+    migrarCategoriasV5(s);
     for (const c of s.categorias) if (c.esencial == null) c.esencial = c.tipo === 'fijo';
     for (const c of DEFAULT_CATS) if (!s.categorias.find(k => k.id === c.id)) s.categorias.splice(Math.max(0, s.categorias.length - 1), 0, { ...c });
     return s;
@@ -5441,7 +5451,7 @@ function cargarDemo() {
   const jun = months.find(m => m.endsWith('-06') || m.endsWith('-12')); if (jun) s.ingresos.push({ id: uid(), fecha: D.dateIn(jun, 30), monto: 1150000, moneda: 'ARS', desc: 'Aguinaldo' });
   // el demo se escribio con las categorias v1: se pasa por la misma migracion que los datos reales
   s.categorias = [...s.categorias, { id: 'delivery', nombre: 'Delivery', grupo: 'comida', tipo: 'variable' }, { id: 'salidas', nombre: 'Salidas', grupo: 'ocio', tipo: 'variable' }]; delete s.settings.catsV;
-  migrarCategoriasV2(s); migrarCategoriasV3(s); migrarCategoriasV4(s);
+  migrarCategoriasV2(s); migrarCategoriasV3(s); migrarCategoriasV4(s); migrarCategoriasV5(s);
   const pres = (id, v) => { const c = s.categorias.find(k => k.id === id); if (c) c.presupuesto = v; };
   pres('restaurantes', 180000); pres('alpaso', 120000); pres('super', 400000);
   s.pagos = [{ tarjetaId: 't_visa', mes: ymNow, cuentaId: 'a1', pagado: true }, { tarjetaId: 't_master', mes: ymNow, cuentaId: 'a1', pagado: false }];
