@@ -439,14 +439,14 @@ function viewMovimientos() {
 /* ---------- CUOTAS Y FIJOS ---------- */
 function viewCuotas() {
   const ym = D.thisMonth(); const next = D.addMonths(ym, 1);
-  const hz = E.horizonte(ym, 12); const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
+  const hz = E.horizontePago(ym, 12); /* por mes de PAGO: cuota k cae el mes que vence su resumen */ const alerta = (Number(state.settings.alertaCuotasPct) || 60) / 100;
   const act = E.cuotasActivas(ym); const fNext = hz[1];
   const restante = sum(act.map(a => a.restante));
   const recs = state.recurrentes.slice().sort((a, b) => M.toARS(b.monto, b.moneda) - M.toARS(a.monto, a.moneda));
   const fijosMes = sum(recs.filter(r => r.activo !== false).map(r => M.toARS(r.monto, r.moneda)));
   // --- 2 tarjetas + grafico tocable: cada barra abre las cuotas y fijos de ese mes (sin tabla de 12 filas)
   const kARS = v => `$ ${abrevARS(v)}`;
-  const ultima = act.length ? act.map(a => a.last).sort().pop() : null;
+  const ultima = act.length ? act.map(a => (E.data().pieces.find(p => p.m === a.m && p.idx === a.n) || {}).mesPago || a.last).sort().pop() : null;
   let html = `<div class="grid g-kpi">
     ${kpi({ label: `${D.monthName(next).split(' ')[0].replace(/^./, c => c.toUpperCase())} ya comprometido`, value: M.f(fNext.comprometido), cls: 'hero', stats: [
       { k: 'Fijos', v: kARS(fNext.fijos) }, { k: 'Cuotas', v: kARS(fNext.cuotas) },
@@ -456,20 +456,20 @@ function viewCuotas() {
       { k: 'Termina', v: ultima ? D.monthName(ultima, true) : '\u2014' }] })}
   </div>`;
   const sel = clamp(Number.isInteger(ui.cqMes) ? ui.cqMes : 1, 0, hz.length - 1); const hs = hz[sel];
-  const cuotasMes = E.cuotasActivas(hs.ym).filter(a => a.idx >= 1 && a.idx <= a.n).sort((a, b) => b.cuota - a.cuota);
+  const cuotasMes = E.pagosCuotas(hs.ym);
   const nombreSinCuotas = d => String(d || '').replace(/,\s*\d+\s*cuotas?\)/i, ')').replace(/\s*\(\s*\d+\s*cuotas?\s*\)\s*$/i, '');
-  html += `<div class="card section"><div class="card-head"><h2>Pr\u00f3ximos 12 meses</h2><span class="hint">toc\u00e1 un mes para ver qu\u00e9 cae</span></div>
-    ${ChartQ.reg(w => Charts.stacked({ w, h: 230, act: 'cq-mes', highlight: sel, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }, { name: 'Compras', color: 'var(--line-2)', values: hz.map(h => h.nuevo) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 250)}
-    ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Compras del mes', color: 'var(--line-2)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }])}
+  html += `<div class="card section"><div class="card-head"><h2>Pr\u00f3ximos 12 meses</h2><span class="hint">lo que pag\u00e1s cada mes \u00b7 toc\u00e1 uno</span></div>
+    ${ChartQ.reg(w => Charts.stacked({ w, h: 230, act: 'cq-mes', highlight: sel, labels: hz.map(h => D.monthName(h.ym, true)), series: [{ name: 'Fijos', color: 'var(--c1)', values: hz.map(h => h.fijos) }, { name: 'Cuotas', color: 'var(--c4)', values: hz.map(h => h.cuotas) }], line: { name: 'Presupuesto', color: 'var(--ink-2)', values: hz.map(h => h.presupuesto || null) }, thresholdPct: alerta }), 250)}
+    ${Charts.legend([{ name: 'Fijos', color: 'var(--c1)' }, { name: 'Cuotas', color: 'var(--c4)' }, { name: 'Presupuesto', color: 'var(--ink-2)', kind: 'dash' }])}
     <div class="cq-det">
-      <div class="cq-det-h"><b>${D.monthName(hs.ym).replace(/^./, c => c.toUpperCase())}</b><span class="mono">${M.f(hs.comprometido)}</span>${hs.presupuesto ? `<span class="${hs.pct > alerta ? 'neg' : hs.pct > 0.3 ? 'mid' : 'pos'}">${M.pct(hs.pct, 0)}</span>` : ''}</div>
+      <div class="cq-det-h"><b>En ${D.monthName(hs.ym).split(' ')[0]} pag\u00e1s</b><span class="mono">${M.f(hs.comprometido)}</span>${hs.presupuesto ? `<span class="${hs.pct > alerta ? 'neg' : hs.pct > 0.3 ? 'mid' : 'pos'}">${M.pct(hs.pct, 0)}</span>` : ''}</div>
       <div class="cq-det-sub">libre ${M.f(hs.libre)} \u00b7 fijos ${M.f(hs.fijos)}</div>
-      ${cuotasMes.length ? cuotasMes.map(a => `<div class="cq-det-r"><span>${esc(nombreSinCuotas(a.m.desc))}<i>cuota ${a.idx} de ${a.n}${a.idx === a.n ? ' \u00b7 \u00faltima' : ''}</i></span><b class="mono">${M.f(a.cuota)}</b></div>`).join('') : '<div class="cq-det-sub">Sin cuotas ese mes.</div>'}
+      ${cuotasMes.length ? cuotasMes.map(a => `<div class="cq-det-r"><span>${esc(nombreSinCuotas(a.m.desc))}<i>cuota ${a.idx} de ${a.n}${a.idx === a.n ? ' \u00b7 \u00faltima' : ''}</i></span><b class="mono">${M.f(a.cuota)}</b></div>`).join('') : '<div class="cq-det-sub">No pag\u00e1s cuotas ese mes.</div>'}
     </div>
   </div>`;
   html += `<div class="grid g-2 section">
     <div class="card"><div class="card-head"><h2>Cuotas en curso</h2><span class="hint">${act.length} planes</span></div>
-      ${act.length ? act.map(a => { const pagadas = Math.max(0, a.idxPeriodo - 1); return `<div class="cq-i" data-act="edit" data-id="${esc(a.m.id)}"><div class="l1"><b>${esc(String(a.m.desc || '').replace(/,\s*\d+\s*cuotas?\)/i, ')').replace(/\s*\(\s*\d+\s*cuotas?\s*\)\s*$/i, ''))}</b><span class="mm">${M.f(a.cuota)}</span></div><div class="l2"><span>${esc(medioLabel(a.m))} \u00b7 cuota ${a.idxPeriodo} de ${a.n} \u00b7 termina ${D.monthName(a.last, true)}</span><span>/mes</span></div><div class="l3"><i style="width:${Math.round(a.idxPeriodo / a.n * 100)}%"></i></div><div class="l4">faltan ${M.f(a.restante)}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: 'Sin cuotas en curso', sub: 'Las compras en cuotas aparecen ac\u00e1 con cu\u00e1nto falta.' })}
+      ${act.length ? act.map(a => { const pagadas = a.pagadas; const ult = (E.data().pieces.find(p => p.m === a.m && p.idx === a.n) || {}).mesPago || a.last; return `<div class="cq-i" data-act="edit" data-id="${esc(a.m.id)}"><div class="l1"><b>${esc(String(a.m.desc || '').replace(/,\s*\d+\s*cuotas?\)/i, ')').replace(/\s*\(\s*\d+\s*cuotas?\s*\)\s*$/i, ''))}</b><span class="mm">${M.f(a.cuota)}</span></div><div class="l2"><span>${esc(medioLabel(a.m))} \u00b7 ${pagadas ? `pagaste ${pagadas} de ${a.n}` : `1.\u00aa de ${a.n} en el pr\u00f3ximo resumen`} \u00b7 termina ${D.monthName(ult, true)}</span><span>/mes</span></div><div class="l3"><i style="width:${Math.round(pagadas / a.n * 100)}%"></i></div><div class="l4">faltan ${M.f(a.restante)}</div></div>`; }).join('') : empty({ kind: 'periodo', icon: 'cal', head: 'Sin cuotas en curso', sub: 'Las compras en cuotas aparecen ac\u00e1 con cu\u00e1nto falta.' })}
     </div>
     <div class="card"><div class="card-head"><h2>Simulador: ¿me conviene sacar cuotas?</h2></div>
       <div class="form-grid">

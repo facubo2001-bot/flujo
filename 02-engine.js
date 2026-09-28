@@ -237,6 +237,14 @@ const E = {
       return { ym, ingreso: ing, presupuesto: pres, fijos, cuotas: c.cuotas, nuevo: c.compras, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 };
     });
   },
+  /** Cuotas que se PAGAN en el mes ym (entran en el resumen que vence ese mes): cuota k de N */
+  pagosCuotas(ym) {
+    return E.data().pieces.filter(p => p.n > 1 && p.mesPago === ym).map(p => ({ m: p.m, idx: p.idx, n: p.n, cuota: p.montoARS })).sort((a, b) => b.cuota - a.cuota);
+  },
+  /** Horizonte por mes de PAGO (vista Cuotas): fijos del mes + cuotas que pagas ese mes, contra el presupuesto */
+  horizontePago(fromYm, n = 12) {
+    return E.horizonte(fromYm, n).map(h => { const cuotas = sum(E.pagosCuotas(h.ym).map(x => x.cuota)); const comprometido = h.fijos + cuotas; const pres = h.presupuesto; return { ...h, cuotas, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 }; });
+  },
   /** Active installment plans. idx = calendar month; idxPeriodo advances when the card closes */
   cuotasActivas(ym = D.thisMonth()) {
     const hoy = D.today();
@@ -251,12 +259,15 @@ const E = {
       // Solo se usa el calendario si no hay tarjeta o si se mira un mes que no es el actual.
       let idxPeriodo, pasados = null;
       if (t && ym === D.thisMonth()) {
+        // el dia del cierre todavia no cerro (una compra de ese dia entra en ese resumen): cuenta desde el dia siguiente
         let c = E.cycle(t, m.fecha).cierre; pasados = 0;
-        while (c && c <= hoy && pasados < n) { pasados++; c = E.cycle(t, D.addDays(c, 1)).cierre; }
+        while (c && c < hoy && pasados < n) { pasados++; c = E.cycle(t, D.addDays(c, 1)).cierre; }
         idxPeriodo = clamp(pasados + 1, 1, n);
       } else idxPeriodo = clamp(Math.min(D.diffMonths(first, ymPer) + 1, idx + 1), 0, n);
       const total = M.toARS(m.monto, m.moneda);
-      return { m, first, last, n, idx, idxPeriodo, cierre, cuota: total / n, total, restante: total / n * (n - idxPeriodo), restantes: n - idxPeriodo, activa: pasados !== null ? pasados < n : (last >= ymPer || last >= ym) };
+      // pagadas = cuotas que ya entraron en un resumen cerrado (Facu: "cuando cierra la tarjeta se adelanta una cuota")
+      const pagadas = pasados !== null ? pasados : Math.max(0, idxPeriodo - 1);
+      return { m, first, last, n, idx, idxPeriodo, pagadas, cierre, cuota: total / n, total, restante: total / n * (n - pagadas), restantes: n - pagadas, activa: pasados !== null ? pasados < n : (last >= ymPer || last >= ym) };
     }).filter(x => x.activa).sort((a, b) => a.last.localeCompare(b.last));
   },
   /** Cartera de inversiones.
