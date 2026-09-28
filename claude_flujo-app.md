@@ -32,6 +32,11 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Auditoría de fundamentales con datos reales (28-sep, build 202609282140)
+- Fixtures reales de Finnhub (16 tenencias, `/home/claude/t/fx/*.json`, armados con WebFetch) pasados por `Fund.traer` (`t/audit.py`). Ventas y ganancia neta FY coinciden con lo publicado (MSFT 281.724 / 101.832; GOOGL 402.836 / 132.170; MELI 28.893 / 1.997…).
+- Fixes: **EPS** = ganancia / acciones diluidas (Finnhub redondea a entero el EPS de varios 10-K: HD 15, UNH 24, META 15, MELI 39); **acciones** en millones se pasan a unidades (MCD 713) y se ajustan por **split** (NVDA 10:1); **P/B** trimestral antes que anual (el anual de MCD era de 2015); **CEG**: Finnhub trae la subsidiaria LLC → `MembersEquity` como patrimonio; rango 52 semanas se oculta solo si máx/mín >20 (MU real 155–1255 se ocultaba); `DebtCurrent` sin doble conteo.
+- ASML, NU, VIST (20-F) no tienen balances en `financials-reported`: ROIC = ROI de Finnhub (avisado). MU: ROIC FY2025 13,4 % vs ROI TTM de Finnhub 61,5 % → el control automático lo marca; decide si TradingView usa FY o TTM.
+
 ### "Dónde se fue" legible (28-sep, build 202609282050)
 - Regla: todo bloque dibujado se lee (nombre + monto). Mínimo 62×46 (el "+N" 44×40); lo que no entra se junta en "+N"; si el "+N" no entra y pesa <12 % del grupo no se dibuja; si nada entra, un solo bloque con el grupo.
 - Nombres cortos para bloques (`nomCorto`, `NOM_CORTO`: Auto, Laburo, Suscripciones, Óptica…; en Mascotas solo "Comida", "Otros"). Letra del nombre, del monto y del encabezado del grupo calculada por ancho (sin "...").

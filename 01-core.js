@@ -828,14 +828,14 @@ const Fund = {
     operativo: ['OperatingIncomeLoss'],
     impuesto: ['IncomeTaxExpenseBenefit'],
     antesImp: ['IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxes'],
-    patrimonio: ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
+    patrimonio: ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest', 'MembersEquity', 'LimitedLiabilityCompanyOrLimitedPartnershipMembersEquityIncludingPortionAttributableToNoncontrollingInterest'],
     deuda: ['LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligationsNoncurrent', 'LongTermDebtAndFinanceLeaseObligationsNoncurrent', 'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligations', 'LongTermLoansPayable', 'LongTermNotesPayable'],
     // deuda total como la cuenta TradingView: largo plazo + porcion corriente + corto plazo + leases
     deudaCorriente: ['LongTermDebtCurrent', 'LongTermDebtAndCapitalLeaseObligationsCurrent', 'LongTermDebtAndFinanceLeaseObligationsCurrent', 'DebtCurrent', 'ShortTermDebtAndCurrentPortionOfLongTermDebt'],
     deudaCorto: ['ShortTermBorrowings', 'CommercialPaper', 'OtherShortTermBorrowings', 'LoansPayableCurrent', 'NotesPayableCurrent'],
     // solo leases financieros: los operativos no entran en la deuda del ROIC de TradingView (MELI FY2025: 15,4 % sin ellos, 13,6 % con ellos)
     leases: ['FinanceLeaseLiabilityNoncurrent', 'FinanceLeaseLiabilityCurrent'],
-    patrimonioTotal: ['StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
+    patrimonioTotal: ['StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest', 'LimitedLiabilityCompanyOrLimitedPartnershipMembersEquityIncludingPortionAttributableToNoncontrollingInterest'],
     minoritarios: ['MinorityInterest', 'StockholdersEquityAttributableToNoncontrollingInterest'],
     caja: ['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'],
     invCorto: ['ShortTermInvestments', 'MarketableSecuritiesCurrent', 'AvailableForSaleSecuritiesDebtSecuritiesCurrent'],
@@ -866,6 +866,16 @@ const Fund = {
     }).filter(f => f.anio && (f.ventas || f.neto));
     const vistos = {}; for (const f of filas) if (!vistos[f.anio] || f.fin > vistos[f.anio].fin) vistos[f.anio] = f;
     const out = Object.values(vistos).sort((a, b) => a.anio - b.anio);
+    // acciones: algunos 10-K vienen en millones (MCD 713) y los splits (NVDA 10:1 en 2024) rompen la serie. Se normaliza a unidades
+    // y se ajustan los anios viejos por split, como hace TradingView.
+    for (const f of out) if (f.acciones > 0 && f.acciones < 1e5) f.acciones *= 1e6;
+    for (let i = out.length - 1; i > 0; i--) {
+      const a1 = out[i].acciones, a0 = out[i - 1].acciones; if (!(a1 > 0 && a0 > 0)) continue;
+      const r = a1 / a0; const k = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50].find(x => Math.abs(r / x - 1) < 0.12) || [2, 3, 4, 5, 8, 10, 20].map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.12);
+      if (k) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
+    }
+    // EPS: Finnhub redondea el de varios 10-K recientes a entero (HD 15, UNH 24, META 15). Se calcula ganancia / acciones diluidas.
+    for (const f of out) if (f.neto != null && f.acciones > 0) f.eps = f.neto / f.acciones;
     // ROIC como lo publica TradingView: ganancia neta / promedio del capital total (patrimonio + deuda total) de dos periodos
     out.forEach((f, i) => { const prev = i ? out[i - 1] : null; f.roic = Fund.roicTV(f.neto, f.capital, prev && prev.anio === f.anio - 1 ? prev.capital : null); });
     return out;
@@ -993,7 +1003,7 @@ const Fund = {
       perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
       max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
       pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)),
-      pb: Number(m.pbAnnual ?? m.pbQuarterly) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
+      pb: Number(m.pbQuarterly ?? m.pbAnnual) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
       roe: Number(m.roeTTM ?? m.roeRfy) / 100 || null, roa: Number(m.roaTTM ?? m.roaRfy) / 100 || null,
       margenNeto: Number(m.netProfitMarginTTM) / 100 || null, margenNeto5: Number(m.netProfitMargin5Y) / 100 || null,
       margenBruto: Number(m.grossMarginTTM) / 100 || null, margenOper: Number(m.operatingMarginTTM) / 100 || null,
@@ -1046,7 +1056,7 @@ const Fund = {
     if (d.fcfSobreNeto != null && Math.abs(d.fcfSobreNeto) > 15) { d.avisos.push(`Caja libre / ganancia: ${Math.round(d.fcfSobreNeto)}x no es creible; se oculta`); d.fcfSobreNeto = null; }
     // rango de 52 semanas: Finnhub a veces manda el de otro listado (BRK-A por BRK-B, VIST en pesos mexicanos, TSM en Taiwan)
     const px = state.cartera.precios[t] && state.cartera.precios[t].c;
-    if (d.min52 != null && d.max52 != null && px && (px < d.min52 * 0.8 || px > d.max52 * 1.2 || d.max52 / d.min52 > 8)) { d.avisos.push(`Rango 52 semanas: ${Math.round(d.min52)}\u2013${Math.round(d.max52)} no corresponde a este listado; se oculta`); d.min52 = d.max52 = null; }
+    if (d.min52 != null && d.max52 != null && px && (px < d.min52 * 0.8 || px > d.max52 * 1.2 || d.max52 / d.min52 > 20)) { d.avisos.push(`Rango 52 semanas: ${Math.round(d.min52)}\u2013${Math.round(d.max52)} no corresponde a este listado; se oculta`); d.min52 = d.max52 = null; }
     const accIni = filas.filter(f => f.acciones).slice(0, 1)[0], accFin = filas.filter(f => f.acciones).slice(-1)[0];
     d.accionesCambio = accIni && accFin && accIni.acciones && accIni.anio !== accFin.anio ? { desde: accIni.anio, hasta: accFin.anio, pct: accFin.acciones / accIni.acciones - 1 } : null;
     d.aniosDatos = filas.length ? { desde: filas[0].anio, hasta: filas[filas.length - 1].anio } : null;
