@@ -818,7 +818,7 @@ const Tec = {
     // el precio de BYMA/Finnhub y el ajustado de la serie pueden diferir si hubo split reciente: si el cierre de la serie y el precio de hoy
     // estan a mas de 35 % se descarta
     if (!px || Math.abs(px / x.cierre - 1) > 0.35) return null;
-    return { ema: x.ema200, sma: x.sma200, dist: px / x.ema200 - 1, toques10: x.toques10, ultimoToque: x.ultimoToque, anios: x.anios, fecha: x.fecha, sube: x.ema200 >= x.ema200hace30 };
+    return { ema: x.ema200, sma: x.sma200, dist: px / x.ema200 - 1, toques10: x.toques10, ultimoToque: x.ultimoToque, pctAbajo10: x.pctAbajo10, anios: x.anios, fecha: x.fecha, sube: x.ema200 >= x.ema200hace30 };
   },
   /** cerca de la EMA 200: entre 3 % arriba y 5 % abajo */
   /** "+16 %", "\u22123 %"; si redondea a 0 no lleva signo */

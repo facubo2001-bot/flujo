@@ -1116,5 +1116,6 @@ h2 .i-btn{vertical-align:3px}
 #modal.cmp-modal{min-height:86vh;min-height:86dvh}
 
 .nov-chip.tec{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
+.nov-chip.tec.abajo{box-shadow:inset 0 0 0 1.5px var(--crit-text)}
 .ema{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;margin-top:8px;color:var(--ink-2)}
 .ema b{color:var(--ink);font-weight:800;margin-right:4px}

@@ -1140,6 +1140,7 @@ h2 .i-btn{vertical-align:3px}
 #modal.cmp-modal{min-height:86vh;min-height:86dvh}
 
 .nov-chip.tec{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
+.nov-chip.tec.abajo{box-shadow:inset 0 0 0 1.5px var(--crit-text)}
 .ema{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;margin-top:8px;color:var(--ink-2)}
 .ema b{color:var(--ink);font-weight:800;margin-right:4px}
 
@@ -1482,7 +1483,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609290943';
+const BUILD = '202609291026';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2002,7 +2003,7 @@ const Tec = {
     // el precio de BYMA/Finnhub y el ajustado de la serie pueden diferir si hubo split reciente: si el cierre de la serie y el precio de hoy
     // estan a mas de 35 % se descarta
     if (!px || Math.abs(px / x.cierre - 1) > 0.35) return null;
-    return { ema: x.ema200, sma: x.sma200, dist: px / x.ema200 - 1, toques10: x.toques10, ultimoToque: x.ultimoToque, anios: x.anios, fecha: x.fecha, sube: x.ema200 >= x.ema200hace30 };
+    return { ema: x.ema200, sma: x.sma200, dist: px / x.ema200 - 1, toques10: x.toques10, ultimoToque: x.ultimoToque, pctAbajo10: x.pctAbajo10, anios: x.anios, fecha: x.fecha, sube: x.ema200 >= x.ema200hace30 };
   },
   /** cerca de la EMA 200: entre 3 % arriba y 5 % abajo */
   /** "+16 %", "\u22123 %"; si redondea a 0 no lleva signo */
@@ -4344,8 +4345,9 @@ function viewCartera() {
   const zona = [...k.posiciones, ...k.watch].filter(x => x.estado).sort((x, y) => (x.estado === 'urgente' ? 0 : 1) - (y.estado === 'urgente' ? 0 : 1) || ((k.posiciones.some(p => p.ticker === y.ticker) ? 1 : 0) - (k.posiciones.some(p => p.ticker === x.ticker) ? 1 : 0)));
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
   const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 8);
-  const emaCerca = [...k.posiciones, ...k.watch].map(p => ({ t: p.ticker, e: Tec.cerca(p.ticker) })).filter(x => x.e).sort((a, b) => a.e.dist - b.e.dist).slice(0, 8);
-  const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip tec" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}">${esc(x.t)}<i>EMA ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
+  // todas las que estan en su EMA 200 o por debajo, de la mas lejos abajo a la mas cerca; mas de 5 % abajo en rojo
+  const emaCerca = [...k.posiciones, ...k.watch].map(p => ({ t: p.ticker, e: Tec.de(p.ticker) })).filter(x => x.e && x.e.dist <= 0.005).sort((a, b) => a.e.dist - b.e.dist);
+  const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip tec${x.e.dist < -0.05 ? ' abajo' : ''}" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}${x.e.pctAbajo10 != null ? ` \u00b7 estuvo abajo el ${Math.round(x.e.pctAbajo10 * 100)} % de los d\u00edas` : ''}">${esc(x.t)}<i>EMA ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
   const barLinea = baratas.length ? `<div class="nov-l nov-z"><span class="nov-chips">${baratas.map(x => `<span class="nov-chip val" data-act="pos" data-id="${esc(x.t)}" title="P/E ${x.b.pe.toFixed(1)} vs mediana 10 a\u00f1os ${x.b.med.toFixed(1)}">${esc(x.t)}<i>P/E \u2212${Math.round(x.b.desc * 100)}%</i></span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
@@ -5650,7 +5652,8 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
       if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
       if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
       if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
-      { const ce = todas.map(p => [p.ticker, Tec.cerca(p.ticker)]).filter(([, e]) => e); if (ce.length) l.push(`- **Cerca de su EMA 200** (entre 3 % arriba y 5 % abajo; pasa pocas veces): ${ce.map(([t, e]) => `${t} ${e.dist >= 0 ? '+' : '\u2212'}${Math.abs(e.dist * 100).toFixed(1)} % (${Tec.toquesTxt(e)})`).join(' \u00b7 ')}`); }
+      { const ce = todas.map(p => [p.ticker, Tec.cerca(p.ticker)]).filter(([, e]) => e); if (ce.length) l.push(`- **Cerca de su EMA 200** (entre 3 % arriba y 5 % abajo; pasa pocas veces): ${ce.map(([t, e]) => `${t} ${e.dist >= 0 ? '+' : '\u2212'}${Math.abs(e.dist * 100).toFixed(1)} % (${Tec.toquesTxt(e)})`).join(' \u00b7 ')}`);
+        const lj = todas.map(p => [p.ticker, Tec.de(p.ticker)]).filter(([, e]) => e && e.dist < -0.05).sort((a, b) => a[1].dist - b[1].dist); if (lj.length) l.push(`- **M\u00e1s de 5 % abajo de su EMA 200**: ${lj.map(([t, e]) => `${t} \u2212${Math.abs(e.dist * 100).toFixed(1)} % (${Tec.toquesTxt(e)}${e.pctAbajo10 != null ? `; estuvo abajo el ${Math.round(e.pctAbajo10 * 100)} % de los d\u00edas` : ''})`).join(' \u00b7 ')}`); }
       { const bz = Fund.baratas(todas.map(p => p.ticker)); if (bz.length) l.push(`- **Baratas contra su propia historia** (P/E de hoy \u2265 20 % por debajo de su mediana de 10 a\u00f1os, con ROIC \u2265 12 % o ROE \u2265 15 %): ${bz.map(x => `${x.t} ${x.b.pe.toFixed(1)} vs ${x.b.med.toFixed(1)} (\u2212${Math.round(x.b.desc * 100)} %)`).join(' \u00b7 ')}. Revis\u00e1 si es una oportunidad o si el mercado ve algo que la historia no.`); }
       { const av = todas.map(p => [p.ticker, (Fund.de(p.ticker) || {}).avisos || []]).filter(([, a]) => a.length); if (av.length) l.push(`- **Avisos del control autom\u00e1tico** (tomalos con pinzas): ${av.map(([t, a]) => `${t}: ${a.join('; ')}`).join(' \u00b7 ')}`); }
       return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
