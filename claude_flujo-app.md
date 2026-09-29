@@ -32,6 +32,18 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Gráfico de a uno + auditoría de rendimiento y fundamentales (29-sep, build 202609292247)
+- Ficha: Revenue · Net income · FCF ahora es un gráfico por vez con selector (`fundChartHTML`, acción `fund-chart`, `ui.fundChart`); valor arriba de cada barra, negativos en rojo hacia abajo, último año en celeste, pie con el CAGR 5 años del dato elegido.
+- **Rendimiento (auditado contra un cálculo independiente en Python: costo, realizado, dividendos, caja, TIR Todo/YTD con y sin dividendos: todo igual)**. Escenario sintético compra → venta a caja → recompra con caja → dividendo → plata nueva: cuadra (1.400 puestos, 1.640 hoy, ganancia 240 = no realizado 120 + realizado 100 + dividendo 20).
+- Arreglado: fotos diarias viejas. Si se carga o corrige una operación con fecha ≤ a una foto guardada, esa foto ya no representa la cartera (su costo `h.c` no coincide con `E.costoAl`): `E.fotoOk` la saltea en TWR, valuación de arranque de las ventanas y gráfico. Antes la compra aparecía como ganancia/pérdida.
+- Venta con 0,0001 acciones de más (CSV de Yahoo, ADBE): el flujo usa lo que realmente había.
+- **Fundamentales (auditados en las 323 empresas de la SEC: EPS calculado vs EPS presentado y años faltantes; de 113 con problemas a ~40, ninguna de las que seguís)**:
+  - Año fiscal mal rotulado por la SEC (HON etiquetó 2021 como 2020 → pisaba 2020 y el CAGR usaba 2021; TJX y CRM cambiaron convención): `Fund.rotular` rotula por la fecha de cierre con la convención del último balance.
+  - Año sin 10-K en los datos de la SEC (SPGI 2024): `tools/sec.mjs` lo arma con los comparativos del 10-K siguiente (`comparativo: true`). TTM ya no se calcula si falta el anual anterior.
+  - Splits: el 10-K siguiente reexpresa las acciones del año anterior (`accSig`); con eso el split es exacto y una fusión no se confunde con un split (IFF 2021). TSLA 5:1 de 2020 ahora se detecta.
+  - Acciones en miles (COP, GRMN): se corrigen con el EPS presentado. EPS sobre la ganancia de los accionistas comunes (bancos con preferidas, GM). Sin acciones ponderadas (GOOGL 2020), EPS presentado ajustado por splits: GOOGL EPS 5 años 29,8 % (antes "—").
+  - Finnhub con un concepto sin valor ya no tapa el dato de la SEC (`Fund._v` busca uno con valor). Fund.VERSION 10.
+
 ### Revisión general (29-sep, build 202609290259)
 - Recorrido automático: 8 vistas, ~1.480 botones (y un nivel dentro de cada ventana) con Finnhub caído y con respuestas vacías: 0 errores, 0 textos "NaN/undefined/null". Flujos: gasto con tarjeta en 3 cuotas, comparador de a 4 + lupa, export, import v3, 47 fichas × 3 pestañas. Finnhub caído no borra fichas.
 - Arreglado: **mediana de P/E 10 años** contaba los años con pérdida como P/E 0 (Finnhub manda `v: null` y `Number(null)` = 0): AMZN 62→72,9, MU 7,5→11. Ahora solo P/E positivos de los últimos 10 ejercicios, mínimo 3 (lo mismo P/S, P/FCF).
@@ -417,7 +429,6 @@ Cuatro cards con la misma estructura (etiqueta · valor grande · dos filas de s
 Campos: movimientos, remove, scrub, updateTarjetas, updateRecurrentes, removeRecurrentes, pagos, settings/forceSettings, inversiones, limpiarInversionesExcepto, cartera{removeInversiones, removeOperaciones, operaciones, alertas, inicio}.
 
 ## Backlog (después del rediseño)
-**Cola de Facu (pedidos pendientes, en orden):**
-1. (29-sep) Ficha: el gráfico de Revenue · Net income · FCF por año pasa a ser 3 gráficos separados, uno a la vez, con un selector para tocar y cambiar entre los 3 (los 3 juntos no se leen bien).
+**Cola de Facu (pedidos pendientes, en orden):** (vacía; el gráfico de a uno quedó hecho el 29-sep)
 
 Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "Otras tenencias" (letra $600k, ONs, pesos) para cuadrar con el total de Balanz · sueldo real vs inflación (IPC INDEC) y meta de tasa de inversión por mes · fechar los 12 lotes previos · módulo impositivo (Ganancias cedular, costo FIFO) · riesgo (concentración por sector, beta) · rebalanceo contra pesos objetivo · segundo benchmark (QQQ / Merval USD) · importar tenencia de Balanz para conciliar sin tipear · 18 tickers de "Capa 2" de alertas pendientes.

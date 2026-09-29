@@ -858,10 +858,12 @@ const Sec = {
     const extra = b.filter(x => !aOk.some(y => cerca(x, y)));
     // mismo periodo en las dos: se usa el de Finnhub y se le agregan de la SEC los flujos que no trae (dividendos, recompras,
     // margen bruto, acciones). El balance (deuda) no se toca: es el que coincide con TradingView.
-    const RELLENO = /(PaymentsOfDividends|PaymentsForRepurchaseOfCommonStock|GrossProfit|CostOfRevenue|CostOfGoodsAndServicesSold|OperatingIncomeLoss|WeightedAverageNumberOf|NetCashProvidedByUsedInOperatingActivities|PaymentsToAcquirePropertyPlantAndEquipment)/;
-    const aFull = aOk.map(y => { const x = b.find(z => cerca(z, y)); if (!x || !x.report) return y; const ic = (y.report.ic || []).slice(), cf = (y.report.cf || []).slice(); const tiene = new Set([...ic, ...cf].map(c => Fund._c(c)));
+    const RELLENO = /(NetIncomeLossAvailableToCommonStockholders|CommonStockDividendsPerShare|PaymentsOfDividends|PaymentsForRepurchaseOfCommonStock|GrossProfit|CostOfRevenue|CostOfGoodsAndServicesSold|OperatingIncomeLoss|WeightedAverageNumberOf|NetCashProvidedByUsedInOperatingActivities|PaymentsToAcquirePropertyPlantAndEquipment)/;
+    const aFull = aOk.map(y => { const x = b.find(z => cerca(z, y)); if (!x || !x.report) return y; const ic = (y.report.ic || []).slice(), cf = (y.report.cf || []).slice(); const tiene = new Set([...ic, ...cf].filter(c => Number.isFinite(Number(c.value)) && c.value !== null && c.value !== '').map(c => Fund._c(c)));  // GOOGL 2020: Finnhub trae el concepto de acciones sin valor
       for (const c of (x.report.ic || [])) { const n = Fund._c(c); if (RELLENO.test(n) && !tiene.has(n)) { ic.push(c); cf.push(c); tiene.add(n); } }
-      return { ...y, report: { ...y.report, ic, cf } }; });
+      // sin ninguna cantidad de acciones (GOOGL 2020/2023: Finnhub no trae las ponderadas por clase): las en circulacion de la SEC
+      let bs = y.report.bs || []; if (Fund._v(ic, Fund.C.acciones) == null && Fund._v(bs, Fund.C.acciones) == null) bs = [...bs, ...((x.report.bs || []).filter(c => /SharesOutstanding/.test(Fund._c(c))))];
+      return { ...y, accSig: x.accSig, report: { ...y.report, ic, cf, bs } }; });
     return { data: [...aFull, ...extra], mezcla: extra.length };
   },
 };
@@ -876,7 +878,7 @@ const Fund = {
   _c(x) { return String((x && x.concept) || '').replace(/^[A-Za-z][A-Za-z0-9-]*_/, ''); },
   _v(arr, nombres) {
     if (!Array.isArray(arr)) return null;
-    for (const n of nombres) { const h = arr.find(x => Fund._c(x) === n); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    for (const n of nombres) { const h = arr.find(x => Fund._c(x) === n && x.value !== null && x.value !== '' && Number.isFinite(Number(x.value))); if (h) return Number(h.value); }
     // parcial: el concepto empieza con el nombre y lo que sigue no lo cambia de significado. Antes "NetIncomeLoss"
     // caia en NetIncomeLossAttributableToNoncontrollingInterest (PFE, CEG, PEP, GEV: caja libre / ganancia de 200x)
     for (const n of nombres) { const h = arr.find(x => { const c = Fund._c(x); return c.startsWith(n) && !/Noncontrolling|Minority|PerShare|Attributable|Other|Extraordinary/.test(c.slice(n.length)); }); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
@@ -908,6 +910,17 @@ const Fund = {
   },
   /** dividendo por accion pagado (o declarado) en el periodo */
   dps(ic, cf) { const k = ['CommonStockDividendsPerShareCashPaid', 'CommonStockDividendsPerShareDeclared']; const v = Fund._v(ic, k) ?? Fund._v(cf, k); return v != null ? Math.abs(v) : null; },
+  /** el "año fiscal" que viene en la SEC (fy) a veces esta mal: HON etiqueto su 10-K de 2021 como 2020 (pisaba al 2020 y el CAGR
+   *  a 5 anios usaba 2021), TJX cambio de convencion. Se rotula por la fecha de cierre, con la convencion del ultimo balance
+   *  (HD llama 2025 al anio que cierra en feb-26). 15 dias antes del cierre: un anio que cierra el 1-ene cuenta como el anterior */
+  rotular(filas) {
+    const E = f => { const d = D.parse(f.fin); return d ? new Date(d.getTime() - 15 * 86400000).getFullYear() : null; };
+    const conFin = filas.filter(f => f.fin && E(f)); if (!conFin.length) return filas;
+    const ult = conFin.reduce((m, f) => (f.fin > m.fin ? f : m)); const off = ult.anio - E(ult);
+    if (Math.abs(off) > 1) return filas;
+    for (const f of conFin) f.anio = E(f) + off;
+    return filas;
+  },
   /** una fila por año fiscal, de más viejo a más nuevo */
   anios(fin) {
     if (!fin || !Array.isArray(fin.data)) return [];
@@ -921,7 +934,7 @@ const Fund = {
       const invertido = pat != null ? pat + deu - caj : null;
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
-        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
+        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi,
         bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); if (v == null || cr == null) return null;
           // sin ganancia bruta presentada se arma ventas - costo; si el "costo" es una parte chica (UNH: solo productos, sin costos medicos)
           // el margen sale absurdo (88 % bruto con 4 % operativo) -> sin dato
@@ -929,25 +942,42 @@ const Fund = {
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), dps: Fund.dps(ic, cf), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
-        acciones: V(ic, C.acciones) || V(bs, C.acciones),
+        acciones: V(ic, C.acciones) || V(bs, C.acciones), accPond: V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']) != null,
         roicNopat: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
         capital: Fund.capitalTotal(bs), caja: V(bs, C.caja), invCorto: V(bs, C.invCorto),
       };
     }).filter(f => f.anio && (f.ventas || f.neto));
+    Fund.rotular(filas);
     const vistos = {}; for (const f of filas) if (!vistos[f.anio] || f.fin > vistos[f.anio].fin) vistos[f.anio] = f;
     const out = Object.values(vistos).sort((a, b) => a.anio - b.anio);
     // acciones: algunos 10-K vienen en millones (MCD 713) y los splits (NVDA 10:1 en 2024) rompen la serie. Se normaliza a unidades
     // y se ajustan los anios viejos por split, como hace TradingView.
     for (const f of out) if (f.acciones > 0 && f.acciones < 1e5) f.acciones *= 1e6;
+    // acciones en miles (COP 2021, GRMN 2022, TEM): el EPS presentado dice la escala real (ganancia / acciones da 1.000 veces el EPS)
+    for (const f of out) { const rep = f.epsRep, n = f.netoComun ?? f.neto; if (!(f.acciones > 0) || !n || !rep || Math.abs(rep) < 0.05) continue;
+      const r = (n / f.acciones) / rep; for (const k of [1e3, 1e6]) { if (Math.abs(r / k - 1) < 0.1) f.acciones *= k; else if (Math.abs(r * k - 1) < 0.1) f.acciones /= k; } }
     // JNJ, PFE no etiquetan el dividendo pagado en el flujo de caja: dividendo por accion x acciones (antes de ajustar por splits)
     for (const f of out) if (f.div == null && f.dps > 0 && f.acciones > 0) f.div = f.dps * f.acciones;
+    // splits: la prueba es el 10-K siguiente, que reexpresa las acciones del anio anterior (accSig). Si no la hay, se adivina por el salto.
+    const SPL = [1.5, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
+    const orig = out.map(f => f.acciones);  // accSig se compara con lo presentado, no con lo ya ajustado por splits posteriores
     for (let i = out.length - 1; i > 0; i--) {
-      const a1 = out[i].acciones, a0 = out[i - 1].acciones; if (!(a1 > 0 && a0 > 0)) continue;
-      const r = a1 / a0; const k = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50].find(x => Math.abs(r / x - 1) < 0.12) || [2, 3, 4, 5, 8, 10, 20].map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.12);
-      if (k) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
+      const a1 = orig[i], a0 = orig[i - 1]; if (!(a1 > 0 && a0 > 0)) continue;
+      let k = null; let sig = out[i - 1].accSig;
+      if (sig > 0 && out[i - 1].fin && out[i].fin && D.daysBetween(out[i - 1].fin, out[i].fin) < 400) {
+        if (sig < 1e5) sig *= 1e6;
+        let r = sig / a0; for (const u of [1e6, 1e3]) { if (Math.abs(r / u - 1) < 0.2) r /= u; else if (Math.abs(r * u - 1) < 0.2) r *= u; }
+        if (Math.abs(r - 1) < 0.03) k = 1;
+        else k = SPL.find(x => Math.abs(r / x - 1) < 0.04) || SPL.map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.04) || null;
+      }
+      if (k == null) { const r = a1 / a0; k = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50].find(x => Math.abs(r / x - 1) < 0.12) || [2, 3, 4, 5, 8, 10, 20].map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.12) || 1; }
+      if (k !== 1) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
     }
     // EPS: Finnhub redondea el de varios 10-K recientes a entero (HD 15, UNH 24, META 15). Se calcula ganancia / acciones diluidas.
-    for (const f of out) { f.epsCalc = false; if (f.neto != null && f.acciones > 0) { f.eps = f.neto / f.acciones; f.epsCalc = true; } }
+    // con acciones preferidas (bancos) el EPS es sobre la ganancia de los accionistas comunes, como lo presenta la empresa y TradingView
+    // sin acciones ponderadas (GOOGL 2020: solo las en circulacion al cierre) el EPS presentado, llevado a las acciones de hoy por los splits
+    out.forEach((f, i) => { f.epsPres = null; if (!f.accPond && f.epsRep != null && orig[i] > 0 && f.acciones > 0) f.epsPres = f.epsRep / (f.acciones / orig[i]); });
+    for (const f of out) { if (f.epsPres != null) { f.eps = f.epsPres; f.epsCalc = true; continue; } f.epsCalc = false; const n = f.netoComun != null && (f.neto == null || Math.sign(f.netoComun) === Math.sign(f.neto)) ? f.netoComun : f.neto; if (n != null && f.acciones > 0) { f.eps = n / f.acciones; f.epsCalc = true; } }
     // ROIC como lo publica TradingView: ganancia neta / promedio del capital total (patrimonio + deuda total) de dos periodos
     out.forEach((f, i) => { const prev = i ? out[i - 1] : null; f.roic = Fund.roicTV(f.neto, f.capital, prev && prev.anio === f.anio - 1 ? prev.capital : null); });
     return out;
@@ -1022,7 +1052,8 @@ const Fund = {
     const nTramo = q.filter(t => t.fin > ultAnual.fin && t.fin <= ult.fin).length;
     const ytd = ytdDesde(ultAnual.fin, ult.fin);
     // el mismo tramo del anio anterior: los cierres fiscales se corren unos dias (NVDA cierra 27/28 de julio), por eso el margen
-    const finPrev = (filasAnuales[filasAnuales.length - 2] || {}).fin; const hastaPrev = D.addDays(ult.fin, -365);
+    let finPrev = (filasAnuales[filasAnuales.length - 2] || {}).fin; const hastaPrev = D.addDays(ult.fin, -365);
+    if (finPrev && Math.abs(D.daysBetween(finPrev, D.addDays(ultAnual.fin, -365))) > 20) finPrev = null;  // falta el anual anterior (SPGI 2024): sin TTM
     const ytdPrev = finPrev ? ytdDesde(finPrev, D.addDays(hastaPrev, 20), nTramo) : null;
     if (ytd == null || ytdPrev == null || ultAnual.neto == null) return null;
     const neto = ultAnual.neto + ytd - ytdPrev;
@@ -1039,7 +1070,8 @@ const Fund = {
     if (!ult || ult.fin <= ua.fin) return { v: ua[campo], hasta: ua.fin, base: 'fy' };
     const ytdDesde = (cierre, hasta, nMax = 4) => { const tramo = q.filter(t => t.fin > cierre && t.fin <= hasta).slice(0, nMax); if (!tramo.length) return null; const u = tramo[tramo.length - 1]; if (u.meses != null && u.meses >= 5) return u[campo]; if (tramo.every(t => t.meses == null || t.meses <= 4)) return sum(tramo.map(t => t[campo])); return null; };
     const nTramo = q.filter(t => t.fin > ua.fin && t.fin <= ult.fin).length;
-    const ytd = ytdDesde(ua.fin, ult.fin); const pv = filasAnuales[filasAnuales.length - 2];
+    const ytd = ytdDesde(ua.fin, ult.fin); let pv = filasAnuales[filasAnuales.length - 2];
+    if (pv && pv.fin && Math.abs(D.daysBetween(pv.fin, D.addDays(ua.fin, -365))) > 20) pv = null;  // falta el anual anterior
     const ytdPrev = pv && pv.fin ? ytdDesde(pv.fin, D.addDays(D.addDays(ult.fin, -365), 20), nTramo) : null;
     if (ytd == null || ytdPrev == null) return { v: ua[campo], hasta: ua.fin, base: 'fy' };
     return { v: ua[campo] + ytd - ytdPrev, hasta: ult.fin, base: 'ttm' };
@@ -1285,7 +1317,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 9,
+  VERSION: 10,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)

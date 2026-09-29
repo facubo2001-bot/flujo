@@ -288,16 +288,16 @@ const E = {
     const flujos = []; let dividendos = 0, cajaUsada = 0, ventasEnCaja = 0;
     for (const o of ops) {
       const p = get(o.ticker); p.nOps++;
-      const q = Number(o.acciones) || 0, px = Number(o.precio) || 0;
+      const q = Number(o.acciones) || 0, px = Number(o.precio) || 0; let qFlujo = q;
       if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; const dc = Number(o.deCaja != null ? o.deCaja : o.deDividendos) || 0; if (dc > 0) cajaUsada += Math.min(dc, q * px); }
       else if (o.tipo === 'venta') {
-        let rest = Math.min(q, p.acciones); const qv = rest; let costoVendido = 0;
+        let rest = Math.min(q, p.acciones); const qv = rest; qFlujo = qv; let costoVendido = 0;  // si el CSV redondea y vende 0,0001 de mas, el flujo es lo que realmente habia
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
         p.realizado += qv * px - costoVendido; p.costo -= costoVendido; p.acciones -= qv;
         if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (las ventas anteriores a esta función no entran; las nuevas sí, salvo que se apague el switch)
         if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; p.lotes = []; }
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
-      const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -q * px);
+      const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -qFlujo * px);
       const spx = Number(o.spy) || Spy.at(o.fecha) || null;
       flujos.push({ fecha: o.fecha, monto, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
       if (spx && o.tipo !== 'dividendo') p.spyShares += monto / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
@@ -476,6 +476,21 @@ const E = {
     return { activos, grupos, total, mep, reserva, reservaPct: ced ? reserva / ced : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
   },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
+  /** costo (FIFO) de lo que se tenia al cierre de una fecha, con las operaciones de hoy */
+  costoAl(k, fecha) {
+    const m = k._costoAl || (k._costoAl = {}); if (m[fecha] != null) return m[fecha];
+    const lotes = {};
+    for (const o of k.ops) {
+      if (o.fecha > fecha) break; if (o.tipo === 'dividendo') continue;
+      const L = lotes[o.ticker] || (lotes[o.ticker] = []); const q = Number(o.acciones) || 0, px = Number(o.precio) || 0;
+      if (o.tipo === 'compra') L.push([q, px]);
+      else { let r = q; while (r > 1e-9 && L.length) { const t = Math.min(L[0][0], r); L[0][0] -= t; r -= t; if (L[0][0] <= 1e-9) L.shift(); } }
+    }
+    return (m[fecha] = sum(Object.values(lotes).map(L => L.reduce((a, [q, px]) => a + q * px, 0))));
+  },
+  /** una foto diaria sirve si lo que se tenia ese dia (su costo) coincide con las operaciones de hoy. Si despues se cargo o
+   *  corrigio una operacion con fecha anterior o igual, la foto quedo vieja: usarla mete la compra como ganancia o perdida */
+  fotoOk(k, f, h) { if (!h || h.v == null) return false; if (h.c == null) return true; const c = E.costoAl(k, f); return Math.abs(c - h.c) <= Math.max(1, Math.abs(c) * 0.002); },
   /** Valuación conocida más reciente ≤ fecha: seed (c.inicio, 31-dic) o snapshot diario. Devuelve {fecha, V, spy, tipo} o null */
   valuacionEn(k, fecha) {
     const c = state.cartera; const cands = [];
@@ -486,14 +501,14 @@ const E = {
       cands.push({ fecha: seed.fecha, V, spy: seed.spy, tipo: 'seed', esInicial });
     }
     const h = c.historial || {};
-    for (const f of Object.keys(h)) if (f <= fecha && h[f].spy && h[f].v != null) cands.push({ fecha: f, V: h[f].v, spy: h[f].spy, tipo: 'snapshot', esInicial: o => o.fecha <= f });
+    for (const f of Object.keys(h)) if (f <= fecha && h[f].spy && E.fotoOk(k, f, h[f])) cands.push({ fecha: f, V: h[f].v, spy: h[f].spy, tipo: 'snapshot', esInicial: o => o.fecha <= f });
     if (!cands.length) return null;
     cands.sort((a, b) => a.fecha.localeCompare(b.fecha)); return cands[cands.length - 1];
   },
   /** TWR desde la primera valuacion diaria real hasta hoy (encadenando Dietz entre valuaciones guardadas) */
   twrReal(k) {
     const h = state.cartera.historial || {}; const hoy = D.today(); if (k.valor == null) return null;
-    const vals = Object.keys(h).filter(f => h[f].v != null && f < hoy).sort().map(f => ({ fecha: f, V: h[f].v, spy: h[f].spy }));
+    const vals = Object.keys(h).filter(f => f < hoy && E.fotoOk(k, f, h[f])).sort().map(f => ({ fecha: f, V: h[f].v, spy: h[f].spy }));
     if (!vals.length) return null; const desde = vals[0].fecha;
     vals.push({ fecha: hoy, V: k.valor });
     const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && f.fecha > desde);
@@ -560,7 +575,7 @@ const E = {
         let ok = true; const V = sum(Object.entries(pos0).map(([t, q]) => { if (q <= 1e-9) return 0; if (!seed.precios[t]) ok = false; return q * (seed.precios[t] || 0); }));
         if (ok && V > 0) vals.push({ fecha: seed.fecha, V });
       }
-      for (const [f, h] of Object.entries(c.historial || {})) if (f > desde && f < hoy && h.v != null) vals.push({ fecha: f, V: h.v });
+      for (const [f, h] of Object.entries(c.historial || {})) if (f > desde && f < hoy && E.fotoOk(k, f, h)) vals.push({ fecha: f, V: h.v });
       vals.push({ fecha: hoy, V: k.valor }); vals.sort((a, b) => a.fecha.localeCompare(b.fecha));
       let acc = 1, ok = Vstart > 0;
       for (let i = 0; ok && i < vals.length - 1; i++) { const a = vals[i], b = vals[i + 1]; const sub = fl0.filter(f => f.fecha > a.fecha && f.fecha <= b.fecha); const r = E.dietz(a.V, b.V, sub, a.fecha, b.fecha); if (r == null) ok = false; else acc *= 1 + r; }
@@ -599,7 +614,7 @@ const E = {
       if (f === hoy) r = k.valor != null ? k.valor : null;
       else if (f === v.desde) r = modo === 'inicio' || v.desde === k.primeraOp ? 0 : v.V0;
       else if (seed && f === seed.fecha && seed.tipo === 'seed') r = seed.V;
-      else if (hist[f]) r = hist[f].v;
+      else if (hist[f] && E.fotoOk(k, f, hist[f])) r = hist[f].v;
       real.push(r);
     }
     // La cartera solo se conoce en los dias con foto (arranque, seed, snapshots diarios, hoy). Unir fotos

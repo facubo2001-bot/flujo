@@ -552,20 +552,8 @@ function fundHTML(t, pos) {
       tile('Interest cov.', d.interesCob != null ? num(d.interesCob, 0) + '\u00d7' : '\u2014', abs(d.interesCob, 8, 3), 'EBIT / inter\u00e9s'),
       tile('Beta', num(d.beta, 2), '', 'vs S&amp;P 500'),
     ]);
-    // Revenue · Net income · FCF por año, con escala
-    let chart = '';
-    const fs = (d.filas || []).filter(f => Number.isFinite(f.ventas) || Number.isFinite(f.neto)).slice(-7);
-    if (fs.length >= 3) {
-      const mx = Math.max(...fs.flatMap(f => [f.ventas, f.neto, f.fcf].filter(Number.isFinite).map(Math.abs)), 1);
-      const mon = d.moneda && d.moneda !== 'USD' ? d.moneda : 'US$'; const div = mx >= 5e9 ? 1e9 : 1e6, u = `${mon} ${div === 1e9 ? 'B' : 'M'}`;
-      const top = (() => { const raw = mx / div; const e = Math.pow(10, Math.floor(Math.log10(raw))); const n = Math.ceil(raw / e); return (n <= 2 ? 2 : n <= 3 ? 3 : n <= 5 ? 5 : 10) * e; })();
-      const W = 358, H = 170, pl = 34, pb = 22, pt = 10, iw = W - pl - 6, ih = H - pb - pt; const Y = v => pt + ih - Math.max(0, v) / div / top * ih;
-      const grid = [0, 1 / 3, 2 / 3, 1].map(f => { const v = top * f; return `<line x1="${pl}" x2="${W - 6}" y1="${Y(v * div).toFixed(1)}" y2="${Y(v * div).toFixed(1)}" class="gl"/><text x="${pl - 6}" y="${(Y(v * div) + 4).toFixed(1)}" text-anchor="end" class="gt">${num(v, v < 10 ? 1 : 0)}</text>`; }).join('');
-      const slot = iw / fs.length, bw = slot * 0.26;
-      const bars = fs.map((f, i) => { const x0 = pl + slot * i + slot * 0.1; return [[f.ventas, 'rgba(255,255,255,.28)'], [f.neto, 'rgba(255,255,255,.8)'], [f.fcf, 'var(--accent)']].map(([val, col], j) => Number.isFinite(val) && val > 0 ? `<rect x="${(x0 + j * bw).toFixed(1)}" y="${Y(val).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${(pt + ih - Y(val)).toFixed(1)}" rx="2" fill="${col}"/>` : '').join('') + `<text x="${(pl + slot * i + slot / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" class="gt">${String(f.anio).slice(2)}</text>`; }).join('');
-      chart = `<div class="fs"><div class="fs-t">Revenue \u00b7 Net income \u00b7 FCF</div><svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>
-        <div class="flg"><span><i style="background:rgba(255,255,255,.28)"></i>Revenue</span><span><i style="background:rgba(255,255,255,.8)"></i>Net income</span><span><i style="background:var(--accent)"></i>FCF</span><span class="u">${u}</span></div></div>`;
-    }
+    // Revenue · Net income · FCF por año: un gráfico a la vez, con selector (los 3 juntos no se leían)
+    const chart = `<div class="fs" id="fch-box" data-t="${esc(t)}">${fundChartHTML(d)}</div>`;
     const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${d.moneda && d.moneda !== 'USD' ? `${d.moneda} ${num(d.roicCuenta.neto / 1e6, 0)}` : fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / ${d.roicCuenta.capitalPrev ? 'capital promedio' : 'capital'} (patrimonio + deuda y leases de largo plazo) <b>${d.moneda && d.moneda !== 'USD' ? `${d.moneda} ${num((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)}` : fmtU((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)} M</b>${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 a\u00f1o fiscal ${d.roicFYanio} ${pct1(d.roicFY)}` : ''}</div>` : '';
     const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
     const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
@@ -573,6 +561,38 @@ function fundHTML(t, pos) {
     pane = q + cuenta + g + v + bs + chart + bal + avisos + pie;
   }
   return `<div class="fund hoja" id="fund-box">${cab}${rango}${acciones}${tabs}<div class="fp fp-fund">${pane}</div></div>`;
+}
+const FCH = [['ventas', 'Revenue'], ['neto', 'Net income'], ['fcf', 'FCF']];
+/** barras por año de una serie (ui.fundChart), con escala propia, valor arriba de cada barra y negativos hacia abajo */
+function fundChartHTML(d) {
+  const k = FCH.some(([x]) => x === ui.fundChart) ? ui.fundChart : 'ventas';
+  const num = (v, n = 1) => MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+  const pct1 = v => `${v >= 0 ? '' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+  const fs = (d.filas || []).filter(f => Number.isFinite(f.ventas) || Number.isFinite(f.neto)).slice(-7);
+  if (fs.length < 3) return '';
+  const seg = `<div class="fch-seg">${FCH.map(([x, l]) => `<button type="button" class="${x === k ? 'on' : ''}" data-act="fund-chart" data-id="${x}">${l}</button>`).join('')}</div>`;
+  const vals = fs.map(f => Number.isFinite(f[k]) ? f[k] : null); const ok = vals.filter(v => v != null);
+  if (!ok.length) return seg + `<div class="fch-vacio">Sin datos de ${FCH.find(([x]) => x === k)[1]} en los balances.</div>`;
+  const mx = Math.max(...ok.map(Math.abs), 1); const neg = Math.min(0, ...ok);
+  const mon = d.moneda && d.moneda !== 'USD' ? d.moneda : 'US$'; const div = mx >= 5e9 ? 1e9 : 1e6, u = `${mon} ${div === 1e9 ? 'B' : 'M'}`;
+  const nice = raw => { if (raw <= 0) return 0; const e = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / e; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 3 ? 3 : n <= 5 ? 5 : 10) * e; };
+  const top = nice(Math.max(0, ...ok) / div) || nice(mx / div); const bot = neg < 0 ? -Math.max(nice(-neg / div), top * 0.18) : 0;  // lugar para el rotulo de la barra negativa
+  const W = 358, H = 190, pl = 36, pb = 22, pt = 20, iw = W - pl - 6, ih = H - pb - pt;
+  const Y = v => pt + (top - v / div) / (top - bot) * ih; const y0 = Y(0);
+  const fmtV = v => { const x = v / div; return num(x, Math.abs(x) < 10 ? 1 : 0); };
+  const marcas = [0, top / 2, top];
+  const grid = marcas.map(v => `<line x1="${pl}" x2="${W - 6}" y1="${Y(v * div).toFixed(1)}" y2="${Y(v * div).toFixed(1)}" class="gl${v === 0 ? ' g0' : ''}"/><text x="${pl - 6}" y="${(Y(v * div) + 4).toFixed(1)}" text-anchor="end" class="gt">${num(v, Math.abs(v) < 10 && v % 1 ? 1 : 0)}</text>`).join('');
+  const slot = iw / fs.length, bw = Math.min(34, slot * 0.62);
+  const bars = fs.map((f, i) => {
+    const cx = pl + slot * i + slot / 2; const v = vals[i]; const anio = `<text x="${cx.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="gt">${String(f.anio).slice(2)}</text>`;
+    if (v == null) return anio + `<text x="${cx.toFixed(1)}" y="${(y0 - 4).toFixed(1)}" text-anchor="middle" class="gv">\u2014</text>`;
+    const ya = Y(v), yt = Math.min(ya, y0), h = Math.max(1, Math.abs(ya - y0)); const ult = i === fs.length - 1;
+    return `<rect x="${(cx - bw / 2).toFixed(1)}" y="${yt.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" class="${v < 0 ? 'b-neg' : ult ? 'b-ult' : 'b'}"/>`
+      + `<text x="${cx.toFixed(1)}" y="${(v < 0 ? ya + 12 : ya - 5).toFixed(1)}" text-anchor="middle" class="gv${ult ? ' u' : ''}">${fmtV(v)}</text>` + anio;
+  }).join('');
+  const c = d.cagrDet && d.cagrDet[k];
+  const pie = `<div class="flg"><span>${c ? `CAGR 5 a\u00f1os <b>${pct1(c.v)}</b> \u00b7 FY${String(c.desde).slice(2)}\u2192${String(c.hasta).slice(2)}` : 'CAGR 5 a\u00f1os \u2014'}</span><span class="u">${u} \u00b7 a\u00f1o fiscal</span></div>`;
+  return seg + `<svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>` + pie;
 }
 /** refresca los fundamentales del ticker y repinta solo ese bloque */
 async function fundRefrescar(t, pos) {

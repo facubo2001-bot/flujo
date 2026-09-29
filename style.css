@@ -963,6 +963,13 @@ h2 .i-btn{vertical-align:3px}
 #modal.ficha .ft b.pos{color:var(--good-text)} #modal.ficha .ft b.mid{color:var(--warn-text)} #modal.ficha .ft b.neg{color:var(--crit-text)}
 #modal.ficha .ft .s{font-size:11px;color:var(--ink-3);line-height:1.25}
 .fchart .gl{stroke:rgba(255,255,255,.08)} .fchart .gt{font-size:10.5px;fill:var(--ink-3);font-family:var(--font-ui)}
+.fchart .g0{stroke:rgba(255,255,255,.28)}
+.fchart .b{fill:rgba(255,255,255,.55)} .fchart .b-ult{fill:var(--accent)} .fchart .b-neg{fill:var(--crit-text);opacity:.8}
+.fchart .gv{font-size:10.5px;font-weight:700;fill:var(--ink-2);font-family:var(--font-ui)} .fchart .gv.u{fill:var(--ink)}
+.fch-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface-3);border-radius:10px;padding:3px;margin:2px 0 8px}
+.fch-seg button{border:0;background:transparent;font:inherit;padding:7px 0;font-size:13px;font-weight:700;color:var(--ink-3);border-radius:8px;cursor:pointer}
+.fch-seg button.on{background:var(--surface-1,rgba(255,255,255,.12));color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.fch-vacio{font-size:13px;color:var(--ink-3);padding:24px 0;text-align:center}
 .flg{display:flex;gap:14px;font-size:12px;color:var(--ink-3);margin-top:4px;align-items:center}
 .flg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px} .flg .u{margin-left:auto}
 .fbal{margin-top:16px;font-size:14px;display:flex;align-items:center;gap:8px}

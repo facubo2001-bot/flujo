@@ -987,6 +987,13 @@ h2 .i-btn{vertical-align:3px}
 #modal.ficha .ft b.pos{color:var(--good-text)} #modal.ficha .ft b.mid{color:var(--warn-text)} #modal.ficha .ft b.neg{color:var(--crit-text)}
 #modal.ficha .ft .s{font-size:11px;color:var(--ink-3);line-height:1.25}
 .fchart .gl{stroke:rgba(255,255,255,.08)} .fchart .gt{font-size:10.5px;fill:var(--ink-3);font-family:var(--font-ui)}
+.fchart .g0{stroke:rgba(255,255,255,.28)}
+.fchart .b{fill:rgba(255,255,255,.55)} .fchart .b-ult{fill:var(--accent)} .fchart .b-neg{fill:var(--crit-text);opacity:.8}
+.fchart .gv{font-size:10.5px;font-weight:700;fill:var(--ink-2);font-family:var(--font-ui)} .fchart .gv.u{fill:var(--ink)}
+.fch-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface-3);border-radius:10px;padding:3px;margin:2px 0 8px}
+.fch-seg button{border:0;background:transparent;font:inherit;padding:7px 0;font-size:13px;font-weight:700;color:var(--ink-3);border-radius:8px;cursor:pointer}
+.fch-seg button.on{background:var(--surface-1,rgba(255,255,255,.12));color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.fch-vacio{font-size:13px;color:var(--ink-3);padding:24px 0;text-align:center}
 .flg{display:flex;gap:14px;font-size:12px;color:var(--ink-3);margin-top:4px;align-items:center}
 .flg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px} .flg .u{margin-left:auto}
 .fbal{margin-top:16px;font-size:14px;display:flex;align-items:center;gap:8px}
@@ -1483,7 +1490,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609291026';
+const BUILD = '202609292247';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2043,10 +2050,12 @@ const Sec = {
     const extra = b.filter(x => !aOk.some(y => cerca(x, y)));
     // mismo periodo en las dos: se usa el de Finnhub y se le agregan de la SEC los flujos que no trae (dividendos, recompras,
     // margen bruto, acciones). El balance (deuda) no se toca: es el que coincide con TradingView.
-    const RELLENO = /(PaymentsOfDividends|PaymentsForRepurchaseOfCommonStock|GrossProfit|CostOfRevenue|CostOfGoodsAndServicesSold|OperatingIncomeLoss|WeightedAverageNumberOf|NetCashProvidedByUsedInOperatingActivities|PaymentsToAcquirePropertyPlantAndEquipment)/;
-    const aFull = aOk.map(y => { const x = b.find(z => cerca(z, y)); if (!x || !x.report) return y; const ic = (y.report.ic || []).slice(), cf = (y.report.cf || []).slice(); const tiene = new Set([...ic, ...cf].map(c => Fund._c(c)));
+    const RELLENO = /(NetIncomeLossAvailableToCommonStockholders|CommonStockDividendsPerShare|PaymentsOfDividends|PaymentsForRepurchaseOfCommonStock|GrossProfit|CostOfRevenue|CostOfGoodsAndServicesSold|OperatingIncomeLoss|WeightedAverageNumberOf|NetCashProvidedByUsedInOperatingActivities|PaymentsToAcquirePropertyPlantAndEquipment)/;
+    const aFull = aOk.map(y => { const x = b.find(z => cerca(z, y)); if (!x || !x.report) return y; const ic = (y.report.ic || []).slice(), cf = (y.report.cf || []).slice(); const tiene = new Set([...ic, ...cf].filter(c => Number.isFinite(Number(c.value)) && c.value !== null && c.value !== '').map(c => Fund._c(c)));  // GOOGL 2020: Finnhub trae el concepto de acciones sin valor
       for (const c of (x.report.ic || [])) { const n = Fund._c(c); if (RELLENO.test(n) && !tiene.has(n)) { ic.push(c); cf.push(c); tiene.add(n); } }
-      return { ...y, report: { ...y.report, ic, cf } }; });
+      // sin ninguna cantidad de acciones (GOOGL 2020/2023: Finnhub no trae las ponderadas por clase): las en circulacion de la SEC
+      let bs = y.report.bs || []; if (Fund._v(ic, Fund.C.acciones) == null && Fund._v(bs, Fund.C.acciones) == null) bs = [...bs, ...((x.report.bs || []).filter(c => /SharesOutstanding/.test(Fund._c(c))))];
+      return { ...y, accSig: x.accSig, report: { ...y.report, ic, cf, bs } }; });
     return { data: [...aFull, ...extra], mezcla: extra.length };
   },
 };
@@ -2061,7 +2070,7 @@ const Fund = {
   _c(x) { return String((x && x.concept) || '').replace(/^[A-Za-z][A-Za-z0-9-]*_/, ''); },
   _v(arr, nombres) {
     if (!Array.isArray(arr)) return null;
-    for (const n of nombres) { const h = arr.find(x => Fund._c(x) === n); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
+    for (const n of nombres) { const h = arr.find(x => Fund._c(x) === n && x.value !== null && x.value !== '' && Number.isFinite(Number(x.value))); if (h) return Number(h.value); }
     // parcial: el concepto empieza con el nombre y lo que sigue no lo cambia de significado. Antes "NetIncomeLoss"
     // caia en NetIncomeLossAttributableToNoncontrollingInterest (PFE, CEG, PEP, GEV: caja libre / ganancia de 200x)
     for (const n of nombres) { const h = arr.find(x => { const c = Fund._c(x); return c.startsWith(n) && !/Noncontrolling|Minority|PerShare|Attributable|Other|Extraordinary/.test(c.slice(n.length)); }); if (h && Number.isFinite(Number(h.value))) return Number(h.value); }
@@ -2093,6 +2102,17 @@ const Fund = {
   },
   /** dividendo por accion pagado (o declarado) en el periodo */
   dps(ic, cf) { const k = ['CommonStockDividendsPerShareCashPaid', 'CommonStockDividendsPerShareDeclared']; const v = Fund._v(ic, k) ?? Fund._v(cf, k); return v != null ? Math.abs(v) : null; },
+  /** el "año fiscal" que viene en la SEC (fy) a veces esta mal: HON etiqueto su 10-K de 2021 como 2020 (pisaba al 2020 y el CAGR
+   *  a 5 anios usaba 2021), TJX cambio de convencion. Se rotula por la fecha de cierre, con la convencion del ultimo balance
+   *  (HD llama 2025 al anio que cierra en feb-26). 15 dias antes del cierre: un anio que cierra el 1-ene cuenta como el anterior */
+  rotular(filas) {
+    const E = f => { const d = D.parse(f.fin); return d ? new Date(d.getTime() - 15 * 86400000).getFullYear() : null; };
+    const conFin = filas.filter(f => f.fin && E(f)); if (!conFin.length) return filas;
+    const ult = conFin.reduce((m, f) => (f.fin > m.fin ? f : m)); const off = ult.anio - E(ult);
+    if (Math.abs(off) > 1) return filas;
+    for (const f of conFin) f.anio = E(f) + off;
+    return filas;
+  },
   /** una fila por año fiscal, de más viejo a más nuevo */
   anios(fin) {
     if (!fin || !Array.isArray(fin.data)) return [];
@@ -2106,7 +2126,7 @@ const Fund = {
       const invertido = pat != null ? pat + deu - caj : null;
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
-        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
+        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi,
         bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); if (v == null || cr == null) return null;
           // sin ganancia bruta presentada se arma ventas - costo; si el "costo" es una parte chica (UNH: solo productos, sin costos medicos)
           // el margen sale absurdo (88 % bruto con 4 % operativo) -> sin dato
@@ -2114,25 +2134,42 @@ const Fund = {
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), dps: Fund.dps(ic, cf), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
-        acciones: V(ic, C.acciones) || V(bs, C.acciones),
+        acciones: V(ic, C.acciones) || V(bs, C.acciones), accPond: V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']) != null,
         roicNopat: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
         capital: Fund.capitalTotal(bs), caja: V(bs, C.caja), invCorto: V(bs, C.invCorto),
       };
     }).filter(f => f.anio && (f.ventas || f.neto));
+    Fund.rotular(filas);
     const vistos = {}; for (const f of filas) if (!vistos[f.anio] || f.fin > vistos[f.anio].fin) vistos[f.anio] = f;
     const out = Object.values(vistos).sort((a, b) => a.anio - b.anio);
     // acciones: algunos 10-K vienen en millones (MCD 713) y los splits (NVDA 10:1 en 2024) rompen la serie. Se normaliza a unidades
     // y se ajustan los anios viejos por split, como hace TradingView.
     for (const f of out) if (f.acciones > 0 && f.acciones < 1e5) f.acciones *= 1e6;
+    // acciones en miles (COP 2021, GRMN 2022, TEM): el EPS presentado dice la escala real (ganancia / acciones da 1.000 veces el EPS)
+    for (const f of out) { const rep = f.epsRep, n = f.netoComun ?? f.neto; if (!(f.acciones > 0) || !n || !rep || Math.abs(rep) < 0.05) continue;
+      const r = (n / f.acciones) / rep; for (const k of [1e3, 1e6]) { if (Math.abs(r / k - 1) < 0.1) f.acciones *= k; else if (Math.abs(r * k - 1) < 0.1) f.acciones /= k; } }
     // JNJ, PFE no etiquetan el dividendo pagado en el flujo de caja: dividendo por accion x acciones (antes de ajustar por splits)
     for (const f of out) if (f.div == null && f.dps > 0 && f.acciones > 0) f.div = f.dps * f.acciones;
+    // splits: la prueba es el 10-K siguiente, que reexpresa las acciones del anio anterior (accSig). Si no la hay, se adivina por el salto.
+    const SPL = [1.5, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
+    const orig = out.map(f => f.acciones);  // accSig se compara con lo presentado, no con lo ya ajustado por splits posteriores
     for (let i = out.length - 1; i > 0; i--) {
-      const a1 = out[i].acciones, a0 = out[i - 1].acciones; if (!(a1 > 0 && a0 > 0)) continue;
-      const r = a1 / a0; const k = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50].find(x => Math.abs(r / x - 1) < 0.12) || [2, 3, 4, 5, 8, 10, 20].map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.12);
-      if (k) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
+      const a1 = orig[i], a0 = orig[i - 1]; if (!(a1 > 0 && a0 > 0)) continue;
+      let k = null; let sig = out[i - 1].accSig;
+      if (sig > 0 && out[i - 1].fin && out[i].fin && D.daysBetween(out[i - 1].fin, out[i].fin) < 400) {
+        if (sig < 1e5) sig *= 1e6;
+        let r = sig / a0; for (const u of [1e6, 1e3]) { if (Math.abs(r / u - 1) < 0.2) r /= u; else if (Math.abs(r * u - 1) < 0.2) r *= u; }
+        if (Math.abs(r - 1) < 0.03) k = 1;
+        else k = SPL.find(x => Math.abs(r / x - 1) < 0.04) || SPL.map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.04) || null;
+      }
+      if (k == null) { const r = a1 / a0; k = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50].find(x => Math.abs(r / x - 1) < 0.12) || [2, 3, 4, 5, 8, 10, 20].map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.12) || 1; }
+      if (k !== 1) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
     }
     // EPS: Finnhub redondea el de varios 10-K recientes a entero (HD 15, UNH 24, META 15). Se calcula ganancia / acciones diluidas.
-    for (const f of out) { f.epsCalc = false; if (f.neto != null && f.acciones > 0) { f.eps = f.neto / f.acciones; f.epsCalc = true; } }
+    // con acciones preferidas (bancos) el EPS es sobre la ganancia de los accionistas comunes, como lo presenta la empresa y TradingView
+    // sin acciones ponderadas (GOOGL 2020: solo las en circulacion al cierre) el EPS presentado, llevado a las acciones de hoy por los splits
+    out.forEach((f, i) => { f.epsPres = null; if (!f.accPond && f.epsRep != null && orig[i] > 0 && f.acciones > 0) f.epsPres = f.epsRep / (f.acciones / orig[i]); });
+    for (const f of out) { if (f.epsPres != null) { f.eps = f.epsPres; f.epsCalc = true; continue; } f.epsCalc = false; const n = f.netoComun != null && (f.neto == null || Math.sign(f.netoComun) === Math.sign(f.neto)) ? f.netoComun : f.neto; if (n != null && f.acciones > 0) { f.eps = n / f.acciones; f.epsCalc = true; } }
     // ROIC como lo publica TradingView: ganancia neta / promedio del capital total (patrimonio + deuda total) de dos periodos
     out.forEach((f, i) => { const prev = i ? out[i - 1] : null; f.roic = Fund.roicTV(f.neto, f.capital, prev && prev.anio === f.anio - 1 ? prev.capital : null); });
     return out;
@@ -2207,7 +2244,8 @@ const Fund = {
     const nTramo = q.filter(t => t.fin > ultAnual.fin && t.fin <= ult.fin).length;
     const ytd = ytdDesde(ultAnual.fin, ult.fin);
     // el mismo tramo del anio anterior: los cierres fiscales se corren unos dias (NVDA cierra 27/28 de julio), por eso el margen
-    const finPrev = (filasAnuales[filasAnuales.length - 2] || {}).fin; const hastaPrev = D.addDays(ult.fin, -365);
+    let finPrev = (filasAnuales[filasAnuales.length - 2] || {}).fin; const hastaPrev = D.addDays(ult.fin, -365);
+    if (finPrev && Math.abs(D.daysBetween(finPrev, D.addDays(ultAnual.fin, -365))) > 20) finPrev = null;  // falta el anual anterior (SPGI 2024): sin TTM
     const ytdPrev = finPrev ? ytdDesde(finPrev, D.addDays(hastaPrev, 20), nTramo) : null;
     if (ytd == null || ytdPrev == null || ultAnual.neto == null) return null;
     const neto = ultAnual.neto + ytd - ytdPrev;
@@ -2224,7 +2262,8 @@ const Fund = {
     if (!ult || ult.fin <= ua.fin) return { v: ua[campo], hasta: ua.fin, base: 'fy' };
     const ytdDesde = (cierre, hasta, nMax = 4) => { const tramo = q.filter(t => t.fin > cierre && t.fin <= hasta).slice(0, nMax); if (!tramo.length) return null; const u = tramo[tramo.length - 1]; if (u.meses != null && u.meses >= 5) return u[campo]; if (tramo.every(t => t.meses == null || t.meses <= 4)) return sum(tramo.map(t => t[campo])); return null; };
     const nTramo = q.filter(t => t.fin > ua.fin && t.fin <= ult.fin).length;
-    const ytd = ytdDesde(ua.fin, ult.fin); const pv = filasAnuales[filasAnuales.length - 2];
+    const ytd = ytdDesde(ua.fin, ult.fin); let pv = filasAnuales[filasAnuales.length - 2];
+    if (pv && pv.fin && Math.abs(D.daysBetween(pv.fin, D.addDays(ua.fin, -365))) > 20) pv = null;  // falta el anual anterior
     const ytdPrev = pv && pv.fin ? ytdDesde(pv.fin, D.addDays(D.addDays(ult.fin, -365), 20), nTramo) : null;
     if (ytd == null || ytdPrev == null) return { v: ua[campo], hasta: ua.fin, base: 'fy' };
     return { v: ua[campo] + ytd - ytdPrev, hasta: ult.fin, base: 'ttm' };
@@ -2470,7 +2509,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 9,
+  VERSION: 10,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -2920,16 +2959,16 @@ const E = {
     const flujos = []; let dividendos = 0, cajaUsada = 0, ventasEnCaja = 0;
     for (const o of ops) {
       const p = get(o.ticker); p.nOps++;
-      const q = Number(o.acciones) || 0, px = Number(o.precio) || 0;
+      const q = Number(o.acciones) || 0, px = Number(o.precio) || 0; let qFlujo = q;
       if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; const dc = Number(o.deCaja != null ? o.deCaja : o.deDividendos) || 0; if (dc > 0) cajaUsada += Math.min(dc, q * px); }
       else if (o.tipo === 'venta') {
-        let rest = Math.min(q, p.acciones); const qv = rest; let costoVendido = 0;
+        let rest = Math.min(q, p.acciones); const qv = rest; qFlujo = qv; let costoVendido = 0;  // si el CSV redondea y vende 0,0001 de mas, el flujo es lo que realmente habia
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
         p.realizado += qv * px - costoVendido; p.costo -= costoVendido; p.acciones -= qv;
         if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (las ventas anteriores a esta función no entran; las nuevas sí, salvo que se apague el switch)
         if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; p.lotes = []; }
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
-      const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -q * px);
+      const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -qFlujo * px);
       const spx = Number(o.spy) || Spy.at(o.fecha) || null;
       flujos.push({ fecha: o.fecha, monto, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
       if (spx && o.tipo !== 'dividendo') p.spyShares += monto / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
@@ -3108,6 +3147,21 @@ const E = {
     return { activos, grupos, total, mep, reserva, reservaPct: ced ? reserva / ced : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
   },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
+  /** costo (FIFO) de lo que se tenia al cierre de una fecha, con las operaciones de hoy */
+  costoAl(k, fecha) {
+    const m = k._costoAl || (k._costoAl = {}); if (m[fecha] != null) return m[fecha];
+    const lotes = {};
+    for (const o of k.ops) {
+      if (o.fecha > fecha) break; if (o.tipo === 'dividendo') continue;
+      const L = lotes[o.ticker] || (lotes[o.ticker] = []); const q = Number(o.acciones) || 0, px = Number(o.precio) || 0;
+      if (o.tipo === 'compra') L.push([q, px]);
+      else { let r = q; while (r > 1e-9 && L.length) { const t = Math.min(L[0][0], r); L[0][0] -= t; r -= t; if (L[0][0] <= 1e-9) L.shift(); } }
+    }
+    return (m[fecha] = sum(Object.values(lotes).map(L => L.reduce((a, [q, px]) => a + q * px, 0))));
+  },
+  /** una foto diaria sirve si lo que se tenia ese dia (su costo) coincide con las operaciones de hoy. Si despues se cargo o
+   *  corrigio una operacion con fecha anterior o igual, la foto quedo vieja: usarla mete la compra como ganancia o perdida */
+  fotoOk(k, f, h) { if (!h || h.v == null) return false; if (h.c == null) return true; const c = E.costoAl(k, f); return Math.abs(c - h.c) <= Math.max(1, Math.abs(c) * 0.002); },
   /** Valuación conocida más reciente ≤ fecha: seed (c.inicio, 31-dic) o snapshot diario. Devuelve {fecha, V, spy, tipo} o null */
   valuacionEn(k, fecha) {
     const c = state.cartera; const cands = [];
@@ -3118,14 +3172,14 @@ const E = {
       cands.push({ fecha: seed.fecha, V, spy: seed.spy, tipo: 'seed', esInicial });
     }
     const h = c.historial || {};
-    for (const f of Object.keys(h)) if (f <= fecha && h[f].spy && h[f].v != null) cands.push({ fecha: f, V: h[f].v, spy: h[f].spy, tipo: 'snapshot', esInicial: o => o.fecha <= f });
+    for (const f of Object.keys(h)) if (f <= fecha && h[f].spy && E.fotoOk(k, f, h[f])) cands.push({ fecha: f, V: h[f].v, spy: h[f].spy, tipo: 'snapshot', esInicial: o => o.fecha <= f });
     if (!cands.length) return null;
     cands.sort((a, b) => a.fecha.localeCompare(b.fecha)); return cands[cands.length - 1];
   },
   /** TWR desde la primera valuacion diaria real hasta hoy (encadenando Dietz entre valuaciones guardadas) */
   twrReal(k) {
     const h = state.cartera.historial || {}; const hoy = D.today(); if (k.valor == null) return null;
-    const vals = Object.keys(h).filter(f => h[f].v != null && f < hoy).sort().map(f => ({ fecha: f, V: h[f].v, spy: h[f].spy }));
+    const vals = Object.keys(h).filter(f => f < hoy && E.fotoOk(k, f, h[f])).sort().map(f => ({ fecha: f, V: h[f].v, spy: h[f].spy }));
     if (!vals.length) return null; const desde = vals[0].fecha;
     vals.push({ fecha: hoy, V: k.valor });
     const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && f.fecha > desde);
@@ -3192,7 +3246,7 @@ const E = {
         let ok = true; const V = sum(Object.entries(pos0).map(([t, q]) => { if (q <= 1e-9) return 0; if (!seed.precios[t]) ok = false; return q * (seed.precios[t] || 0); }));
         if (ok && V > 0) vals.push({ fecha: seed.fecha, V });
       }
-      for (const [f, h] of Object.entries(c.historial || {})) if (f > desde && f < hoy && h.v != null) vals.push({ fecha: f, V: h.v });
+      for (const [f, h] of Object.entries(c.historial || {})) if (f > desde && f < hoy && E.fotoOk(k, f, h)) vals.push({ fecha: f, V: h.v });
       vals.push({ fecha: hoy, V: k.valor }); vals.sort((a, b) => a.fecha.localeCompare(b.fecha));
       let acc = 1, ok = Vstart > 0;
       for (let i = 0; ok && i < vals.length - 1; i++) { const a = vals[i], b = vals[i + 1]; const sub = fl0.filter(f => f.fecha > a.fecha && f.fecha <= b.fecha); const r = E.dietz(a.V, b.V, sub, a.fecha, b.fecha); if (r == null) ok = false; else acc *= 1 + r; }
@@ -3231,7 +3285,7 @@ const E = {
       if (f === hoy) r = k.valor != null ? k.valor : null;
       else if (f === v.desde) r = modo === 'inicio' || v.desde === k.primeraOp ? 0 : v.V0;
       else if (seed && f === seed.fecha && seed.tipo === 'seed') r = seed.V;
-      else if (hist[f]) r = hist[f].v;
+      else if (hist[f] && E.fotoOk(k, f, hist[f])) r = hist[f].v;
       real.push(r);
     }
     // La cartera solo se conoce en los dias con foto (arranque, seed, snapshots diarios, hoy). Unir fotos
@@ -5234,20 +5288,8 @@ function fundHTML(t, pos) {
       tile('Interest cov.', d.interesCob != null ? num(d.interesCob, 0) + '\u00d7' : '\u2014', abs(d.interesCob, 8, 3), 'EBIT / inter\u00e9s'),
       tile('Beta', num(d.beta, 2), '', 'vs S&amp;P 500'),
     ]);
-    // Revenue · Net income · FCF por año, con escala
-    let chart = '';
-    const fs = (d.filas || []).filter(f => Number.isFinite(f.ventas) || Number.isFinite(f.neto)).slice(-7);
-    if (fs.length >= 3) {
-      const mx = Math.max(...fs.flatMap(f => [f.ventas, f.neto, f.fcf].filter(Number.isFinite).map(Math.abs)), 1);
-      const mon = d.moneda && d.moneda !== 'USD' ? d.moneda : 'US$'; const div = mx >= 5e9 ? 1e9 : 1e6, u = `${mon} ${div === 1e9 ? 'B' : 'M'}`;
-      const top = (() => { const raw = mx / div; const e = Math.pow(10, Math.floor(Math.log10(raw))); const n = Math.ceil(raw / e); return (n <= 2 ? 2 : n <= 3 ? 3 : n <= 5 ? 5 : 10) * e; })();
-      const W = 358, H = 170, pl = 34, pb = 22, pt = 10, iw = W - pl - 6, ih = H - pb - pt; const Y = v => pt + ih - Math.max(0, v) / div / top * ih;
-      const grid = [0, 1 / 3, 2 / 3, 1].map(f => { const v = top * f; return `<line x1="${pl}" x2="${W - 6}" y1="${Y(v * div).toFixed(1)}" y2="${Y(v * div).toFixed(1)}" class="gl"/><text x="${pl - 6}" y="${(Y(v * div) + 4).toFixed(1)}" text-anchor="end" class="gt">${num(v, v < 10 ? 1 : 0)}</text>`; }).join('');
-      const slot = iw / fs.length, bw = slot * 0.26;
-      const bars = fs.map((f, i) => { const x0 = pl + slot * i + slot * 0.1; return [[f.ventas, 'rgba(255,255,255,.28)'], [f.neto, 'rgba(255,255,255,.8)'], [f.fcf, 'var(--accent)']].map(([val, col], j) => Number.isFinite(val) && val > 0 ? `<rect x="${(x0 + j * bw).toFixed(1)}" y="${Y(val).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${(pt + ih - Y(val)).toFixed(1)}" rx="2" fill="${col}"/>` : '').join('') + `<text x="${(pl + slot * i + slot / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" class="gt">${String(f.anio).slice(2)}</text>`; }).join('');
-      chart = `<div class="fs"><div class="fs-t">Revenue \u00b7 Net income \u00b7 FCF</div><svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>
-        <div class="flg"><span><i style="background:rgba(255,255,255,.28)"></i>Revenue</span><span><i style="background:rgba(255,255,255,.8)"></i>Net income</span><span><i style="background:var(--accent)"></i>FCF</span><span class="u">${u}</span></div></div>`;
-    }
+    // Revenue · Net income · FCF por año: un gráfico a la vez, con selector (los 3 juntos no se leían)
+    const chart = `<div class="fs" id="fch-box" data-t="${esc(t)}">${fundChartHTML(d)}</div>`;
     const cuenta = d.roicCuenta && ui.fundCuenta === t ? `<div class="f-cuenta">ROIC: ganancia neta ${d.roicFuente === 'ttm' ? 'TTM' : 'del a\u00f1o'} al ${D.fmt(d.roicCuenta.hasta, { year: true })} <b>${d.moneda && d.moneda !== 'USD' ? `${d.moneda} ${num(d.roicCuenta.neto / 1e6, 0)}` : fmtU(d.roicCuenta.neto / 1e6, 0)} M</b> / ${d.roicCuenta.capitalPrev ? 'capital promedio' : 'capital'} (patrimonio + deuda y leases de largo plazo) <b>${d.moneda && d.moneda !== 'USD' ? `${d.moneda} ${num((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)}` : fmtU((d.roicCuenta.base || d.roicCuenta.capital) / 1e6, 0)} M</b>${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 a\u00f1o fiscal ${d.roicFYanio} ${pct1(d.roicFY)}` : ''}</div>` : '';
     const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
     const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
@@ -5255,6 +5297,38 @@ function fundHTML(t, pos) {
     pane = q + cuenta + g + v + bs + chart + bal + avisos + pie;
   }
   return `<div class="fund hoja" id="fund-box">${cab}${rango}${acciones}${tabs}<div class="fp fp-fund">${pane}</div></div>`;
+}
+const FCH = [['ventas', 'Revenue'], ['neto', 'Net income'], ['fcf', 'FCF']];
+/** barras por año de una serie (ui.fundChart), con escala propia, valor arriba de cada barra y negativos hacia abajo */
+function fundChartHTML(d) {
+  const k = FCH.some(([x]) => x === ui.fundChart) ? ui.fundChart : 'ventas';
+  const num = (v, n = 1) => MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+  const pct1 = v => `${v >= 0 ? '' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+  const fs = (d.filas || []).filter(f => Number.isFinite(f.ventas) || Number.isFinite(f.neto)).slice(-7);
+  if (fs.length < 3) return '';
+  const seg = `<div class="fch-seg">${FCH.map(([x, l]) => `<button type="button" class="${x === k ? 'on' : ''}" data-act="fund-chart" data-id="${x}">${l}</button>`).join('')}</div>`;
+  const vals = fs.map(f => Number.isFinite(f[k]) ? f[k] : null); const ok = vals.filter(v => v != null);
+  if (!ok.length) return seg + `<div class="fch-vacio">Sin datos de ${FCH.find(([x]) => x === k)[1]} en los balances.</div>`;
+  const mx = Math.max(...ok.map(Math.abs), 1); const neg = Math.min(0, ...ok);
+  const mon = d.moneda && d.moneda !== 'USD' ? d.moneda : 'US$'; const div = mx >= 5e9 ? 1e9 : 1e6, u = `${mon} ${div === 1e9 ? 'B' : 'M'}`;
+  const nice = raw => { if (raw <= 0) return 0; const e = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / e; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 3 ? 3 : n <= 5 ? 5 : 10) * e; };
+  const top = nice(Math.max(0, ...ok) / div) || nice(mx / div); const bot = neg < 0 ? -Math.max(nice(-neg / div), top * 0.18) : 0;  // lugar para el rotulo de la barra negativa
+  const W = 358, H = 190, pl = 36, pb = 22, pt = 20, iw = W - pl - 6, ih = H - pb - pt;
+  const Y = v => pt + (top - v / div) / (top - bot) * ih; const y0 = Y(0);
+  const fmtV = v => { const x = v / div; return num(x, Math.abs(x) < 10 ? 1 : 0); };
+  const marcas = [0, top / 2, top];
+  const grid = marcas.map(v => `<line x1="${pl}" x2="${W - 6}" y1="${Y(v * div).toFixed(1)}" y2="${Y(v * div).toFixed(1)}" class="gl${v === 0 ? ' g0' : ''}"/><text x="${pl - 6}" y="${(Y(v * div) + 4).toFixed(1)}" text-anchor="end" class="gt">${num(v, Math.abs(v) < 10 && v % 1 ? 1 : 0)}</text>`).join('');
+  const slot = iw / fs.length, bw = Math.min(34, slot * 0.62);
+  const bars = fs.map((f, i) => {
+    const cx = pl + slot * i + slot / 2; const v = vals[i]; const anio = `<text x="${cx.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="gt">${String(f.anio).slice(2)}</text>`;
+    if (v == null) return anio + `<text x="${cx.toFixed(1)}" y="${(y0 - 4).toFixed(1)}" text-anchor="middle" class="gv">\u2014</text>`;
+    const ya = Y(v), yt = Math.min(ya, y0), h = Math.max(1, Math.abs(ya - y0)); const ult = i === fs.length - 1;
+    return `<rect x="${(cx - bw / 2).toFixed(1)}" y="${yt.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" class="${v < 0 ? 'b-neg' : ult ? 'b-ult' : 'b'}"/>`
+      + `<text x="${cx.toFixed(1)}" y="${(v < 0 ? ya + 12 : ya - 5).toFixed(1)}" text-anchor="middle" class="gv${ult ? ' u' : ''}">${fmtV(v)}</text>` + anio;
+  }).join('');
+  const c = d.cagrDet && d.cagrDet[k];
+  const pie = `<div class="flg"><span>${c ? `CAGR 5 a\u00f1os <b>${pct1(c.v)}</b> \u00b7 FY${String(c.desde).slice(2)}\u2192${String(c.hasta).slice(2)}` : 'CAGR 5 a\u00f1os \u2014'}</span><span class="u">${u} \u00b7 a\u00f1o fiscal</span></div>`;
+  return seg + `<svg viewBox="0 0 ${W} ${H}" width="100%" class="fchart">${grid}${bars}</svg>` + pie;
 }
 /** refresca los fundamentales del ticker y repinta solo ese bloque */
 async function fundRefrescar(t, pos) {
@@ -6127,6 +6201,7 @@ const Actions = {
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
   'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
+  'fund-chart'(k) { ui.fundChart = k; const box = $('#fch-box'); const d = box && Fund.de(box.dataset.t); if (box && d) box.innerHTML = fundChartHTML(d); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
   'ga-grupo'(id) { ui.gaGrupo = ui.gaGrupo === id ? null : id; render(); },  // 1er toque abre, 2do cierra; los gastos se ven tocando una categoria
   'gastos-todas'() { ui.gastosTodas = !ui.gastosTodas; render(); },
