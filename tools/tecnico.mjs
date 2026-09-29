@@ -19,17 +19,19 @@ async function yahoo(t) {
   return filas.length > 250 ? filas : null;
 }
 function analizar(f) {
-  // EMA 200 y SMA 200 sobre cierres ajustados; "toques": veces que el cierre bajo a la EMA 200 (o por debajo) viniendo de
-  // al menos 5 % arriba. Un toque nuevo solo cuenta despues de volver a estar 5 % arriba.
+  // EMA 200 y SMA 200 sobre cierres ajustados; "toques": veces que el cierre bajo a la EMA 200 (o por debajo)
   const k = 2 / 201; let ema = null; const out = [];
   for (let i = 0; i < f.length; i++) { ema = ema == null ? f[i].c : f[i].c * k + ema * (1 - k); out.push(ema); }
   const n = f.length; const u = f[n - 1];
   const sma = f.slice(-200).reduce((a, x) => a + x.c, 0) / Math.min(200, n);
   const desde = new Date(Date.parse(u.d) - 10 * 365.25 * 864e5).toISOString().slice(0, 10);
-  let armado = false, toques = []; const ini = Math.max(200, f.findIndex(x => x.d >= desde));
+  // un toque = una bajada de verdad a la EMA: antes tuvo que estar al menos 60 ruedas seguidas arriba y llegar a 10 % arriba
+  // (asi los ida y vuelta de una misma correccion cuentan una sola vez). Calibrado: MSFT 5 en 10 anios, SPY 6, KO 4.
+  let armado = false, arriba = 0, toques = []; const ini = Math.max(200, f.findIndex(x => x.d >= desde));
   for (let i = ini; i < n; i++) {
     const r = f[i].c / out[i];
-    if (r >= 1.05) armado = true;
+    arriba = r > 1 ? arriba + 1 : 0;
+    if (r >= 1.10 && arriba >= 60) armado = true;
     else if (armado && r <= 1.0) { toques.push(f[i].d); armado = false; }
   }
   // cuanto estuvo por debajo en los ultimos 10 anios (% de dias)
@@ -41,7 +43,7 @@ function analizar(f) {
 const main = async () => {
   const ced = JSON.parse(fs.readFileSync('cedears.json', 'utf8')).cedears;
   const universo = [...new Set([...ced.filter(c => !c.sinUS).map(c => c.us || c.code), 'SPY', 'QQQ'])];
-  const series = {}; const out = {}; const dbg = { corrida: new Date().toISOString(), ok: 0, stooq: 0, yahoo: 0, falla: [] };
+  const out = {}; const dbg = { corrida: new Date().toISOString(), ok: 0, stooq: 0, yahoo: 0, falla: [] };
   // 4 a la vez, con tope de 20 minutos (si una fuente se cuelga no frena todo); Yahoo primero (trae 12 anios ajustados por splits)
   const t0 = Date.now(); let i = 0; let stooqMuerto = false;
   const uno = async t => {
@@ -49,7 +51,6 @@ const main = async () => {
     try { f = await yahoo(t); if (f) src = 'yahoo'; } catch (e) {}
     if (!f && !stooqMuerto) { try { f = await stooq(t); if (f) src = 'stooq'; } catch (e) { if (e.name === 'TimeoutError') stooqMuerto = true; } }
     if (!f) { dbg.falla.push(t); return; }
-    if (['MSFT','GOOGL','AAPL','KO','MELI','SPY','NVDA','MCD'].includes(t)) series[t] = f.map(x => [x.d, +x.c.toFixed(3)]);
     try { out[t] = analizar(f); dbg.ok++; dbg[src]++; } catch (e) { dbg.falla.push(t + ':' + e.message); }
   };
   await Promise.all([0, 1, 2, 3].map(async () => { while (i < universo.length && Date.now() - t0 < 20 * 60000) { const t = universo[i++]; await uno(t); await sleep(120); } }));
@@ -57,7 +58,6 @@ const main = async () => {
   fs.mkdirSync('sec', { recursive: true });
   fs.writeFileSync('sec/tecnico.json', JSON.stringify(out));
   fs.writeFileSync('sec/_tecnico_debug.json', JSON.stringify(dbg, null, 1));
-  fs.writeFileSync('sec/_series_debug.json', JSON.stringify(series));
   console.log(`ok ${dbg.ok} (stooq ${dbg.stooq}, yahoo ${dbg.yahoo}) · falla ${dbg.falla.length}`);
 };
 main().catch(e => { console.error(e); process.exit(1); });
