@@ -32,8 +32,16 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Revisión general (29-sep, build 202609290259)
+- Recorrido automático: 8 vistas, ~1.480 botones (y un nivel dentro de cada ventana) con Finnhub caído y con respuestas vacías: 0 errores, 0 textos "NaN/undefined/null". Flujos: gasto con tarjeta en 3 cuotas, comparador de a 4 + lupa, export, import v3, 47 fichas × 3 pestañas. Finnhub caído no borra fichas.
+- Arreglado: **mediana de P/E 10 años** contaba los años con pérdida como P/E 0 (Finnhub manda `v: null` y `Number(null)` = 0): AMZN 62→72,9, MU 7,5→11. Ahora solo P/E positivos de los últimos 10 ejercicios, mínimo 3 (lo mismo P/S, P/FCF).
+- **P/E de hoy** = propio (`Fund.pe`: precio de hoy × acciones diluidas / ganancia 12 meses SEC), coincide con TradingView (MSFT 28,8 vs 28,76; Finnhub decía 27,4). Solo si Finnhub también tiene P/E (así GLD no muestra 2,8). En ficha, comparador, baratas y export.
+- EMA 200: un toque = bajada de verdad (60 ruedas seguidas arriba y 10 % arriba antes de volver a tocarla). MSFT 5 en 10 años (dic-18, mar-20, ene-22, ago-24, nov-25), SPY 6, KO 4. Archivos de la tarea con guion (BRK-B): `Sec.clave(t)`; antes BRK-B no leía ni SEC ni EMA.
+- Comparador: una empresa que no seguís (UBER por la lupa) trae su precio (`Precios.quote`); antes quedaba "US$ x.xxx" y sin P/E, rango, EMA ni dividendo.
+- Payout de JNJ/PFE: sin dividendo pagado en el flujo → dividendo por acción × acciones (JNJ 61 % vs Finnhub 60 %). Margen bruto armado (ventas − costo) que da absurdo (UNH 88,7 % con 4 % operativo) → "—". Fund.VERSION 9 (rehace fichas).
+
 ### EMA 200 (28-sep, build 202609290129)
-- `tools/tecnico.mjs` en la tarea diaria: precios diarios ajustados (Yahoo chart 12 años; Stooq de respaldo), EMA 200 y SMA 200, "toques" en 10 años (cierre ≤ EMA viniendo de ≥5 % arriba; se rearma al volver a 5 % arriba), último toque, pendiente de la EMA (vs hace ~1 mes) → `sec/tecnico.json`.
+- `tools/tecnico.mjs` en la tarea diaria: precios diarios ajustados (Yahoo chart 12 años; Stooq de respaldo), EMA 200 y SMA 200, "toques" en 10 años (ver revisión 29-sep), último toque, pendiente de la EMA (vs hace ~1 mes) → `sec/tecnico.json`.
 - App `Tec`: carga una vez por día; `Tec.de(t)` compara con el precio de hoy (descarta si el cierre de la serie y el precio difieren >35 %). Ficha: línea "EMA 200 · +2,2 % · la tocó 5 veces en 10 años · última …" bajo el rango de 52 semanas. Novedades: chips con borde blanco si está entre +3 % y −5 % de la EMA 200. Comparador: fila "vs EMA 200". Export: línea "Cerca de su EMA 200".
 
 ### CAGR exacto + lupa quieta (28-sep, build 202609290125)

@@ -813,7 +813,7 @@ const Tec = {
   },
   /** EMA 200 de un ticker contra el precio de hoy: {ema, dist (precio/ema - 1), toques10, ultimoToque, fecha} */
   de(t) {
-    const x = Tec.datos && Tec.datos[Precios.simbolo(t)]; if (!x || !x.ema200) return null;
+    const x = Tec.datos && Tec.datos[Sec.clave(t)]; if (!x || !x.ema200) return null;
     const px = state.cartera.precios[t] && state.cartera.precios[t].c;
     // el precio de BYMA/Finnhub y el ajustado de la serie pueden diferir si hubo split reciente: si el cierre de la serie y el precio de hoy
     // estan a mas de 35 % se descarta
@@ -821,14 +821,19 @@ const Tec = {
     return { ema: x.ema200, sma: x.sma200, dist: px / x.ema200 - 1, toques10: x.toques10, ultimoToque: x.ultimoToque, anios: x.anios, fecha: x.fecha, sube: x.ema200 >= x.ema200hace30 };
   },
   /** cerca de la EMA 200: entre 3 % arriba y 5 % abajo */
+  /** "+16 %", "\u22123 %"; si redondea a 0 no lleva signo */
+  distTxt(v, sp = '') { const n = Math.round(Math.abs(v) * 100); return n === 0 ? `0${sp}%` : `${v > 0 ? '+' : '\u2212'}${n}${sp}%`; },
+  toquesTxt(e) { const a = Math.max(1, Math.min(10, Math.round(e.anios || 10))); return e.toques10 ? `la toc\u00f3 ${e.toques10} ${e.toques10 === 1 ? 'vez' : 'veces'} en ${a} a\u00f1os` : `no la toc\u00f3 en ${a} a\u00f1os`; },
   cerca(t) { const e = Tec.de(t); return e && e.dist <= 0.03 && e.dist >= -0.05 ? e : null; },
 };
 
 /* ---------- balances oficiales de la SEC, bajados por la tarea diaria del repo (tools/sec.mjs -> sec/<T>.json) ---------- */
 const Sec = {
   _cache: {},
+  /** nombre del archivo de la tarea diaria: usa el guion de Yahoo/SEC (BRK-B, AKO-B), no el punto de Finnhub */
+  clave(t) { return Precios.simbolo(t).replace('.', '-'); },
   async de(t) {
-    const sym = Precios.simbolo(t); const hoy = D.today();
+    const sym = Sec.clave(t); const hoy = D.today();
     const c = Sec._cache[sym]; if (c && c.dia === hoy) return c.doc;
     let doc = null;
     try {
@@ -901,6 +906,8 @@ const Fund = {
     capex: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets', 'PaymentsForCapitalImprovements', 'PaymentsToAcquireOtherPropertyPlantAndEquipment', 'PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets'],
     acciones: ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic', 'CommonStockSharesOutstanding'],
   },
+  /** dividendo por accion pagado (o declarado) en el periodo */
+  dps(ic, cf) { const k = ['CommonStockDividendsPerShareCashPaid', 'CommonStockDividendsPerShareDeclared']; const v = Fund._v(ic, k) ?? Fund._v(cf, k); return v != null ? Math.abs(v) : null; },
   /** una fila por año fiscal, de más viejo a más nuevo */
   anios(fin) {
     if (!fin || !Array.isArray(fin.data)) return [];
@@ -915,9 +922,12 @@ const Fund = {
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
         ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), operativo: opi,
-        bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); return v != null && cr != null ? v - cr : null; })(),
+        bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); if (v == null || cr == null) return null;
+          // sin ganancia bruta presentada se arma ventas - costo; si el "costo" es una parte chica (UNH: solo productos, sin costos medicos)
+          // el margen sale absurdo (88 % bruto con 4 % operativo) -> sin dato
+          const gb = v - cr; return v > 0 && opi != null && (gb - opi) / v > 0.6 ? null : gb; })(),
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
-        div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
+        div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), dps: Fund.dps(ic, cf), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
         acciones: V(ic, C.acciones) || V(bs, C.acciones),
         roicNopat: opi != null && invertido && invertido > 0 ? opi * (1 - tasa) / invertido : null,
@@ -929,6 +939,8 @@ const Fund = {
     // acciones: algunos 10-K vienen en millones (MCD 713) y los splits (NVDA 10:1 en 2024) rompen la serie. Se normaliza a unidades
     // y se ajustan los anios viejos por split, como hace TradingView.
     for (const f of out) if (f.acciones > 0 && f.acciones < 1e5) f.acciones *= 1e6;
+    // JNJ, PFE no etiquetan el dividendo pagado en el flujo de caja: dividendo por accion x acciones (antes de ajustar por splits)
+    for (const f of out) if (f.div == null && f.dps > 0 && f.acciones > 0) f.div = f.dps * f.acciones;
     for (let i = out.length - 1; i > 0; i--) {
       const a1 = out[i].acciones, a0 = out[i - 1].acciones; if (!(a1 > 0 && a0 > 0)) continue;
       const r = a1 / a0; const k = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50].find(x => Math.abs(r / x - 1) < 0.12) || [2, 3, 4, 5, 8, 10, 20].map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.12);
@@ -987,7 +999,7 @@ const Fund = {
       const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = V(cf, C.capex); const abs = v => v != null ? Math.abs(v) : null;
       let acc = V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']); if (acc > 0 && acc < 1e5) acc *= 1e6;
       return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), capital: Fund.capitalTotal(bs),
-        cfo, capex: abs(cpx), div: abs(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), recompra: abs(V(cf, ['PaymentsForRepurchaseOfCommonStock'])), acciones: acc };
+        cfo, capex: abs(cpx), div: abs(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])) ?? (Fund.dps(ic, cf) > 0 && acc > 0 ? Fund.dps(ic, cf) * acc : null), recompra: abs(V(cf, ['PaymentsForRepurchaseOfCommonStock'])), acciones: acc };
     }).sort((a, b) => a.fin.localeCompare(b.fin));
   },
   /** Ganancia neta de los ultimos 12 meses y capital promedio (hoy y hace un anio) a partir de 10-K + 10-Q.
@@ -1111,10 +1123,14 @@ const Fund = {
     // sin un 10-K de los ultimos 2 anios, los balances no representan a la empresa de hoy: se descartan (manda Finnhub)
     if (filas.length && filas[filas.length - 1].anio < Number(hoy.slice(0, 4)) - 2) filas = [];
     // las series de Finnhub vienen de la mas nueva a la mas vieja: se ordenan antes de cortar los ultimos N años
-    const hist = k => (Array.isArray(serie[k]) ? serie[k] : []).filter(x => x && x.period && Number.isFinite(Number(x.v))).sort((a, b) => String(a.period).localeCompare(String(b.period))).map(x => Number(x.v));
+    // ojo: Finnhub manda v: null en los anios con perdida (AMZN 2022, MU 2023) y Number(null) es 0: se descartan antes
+    const serieK = k => (Array.isArray(serie[k]) ? serie[k] : []).filter(x => x && x.period).sort((a, b) => String(a.period).localeCompare(String(b.period))).map(x => x.v == null || x.v === '' ? NaN : Number(x.v));
+    const hist = k => serieK(k).filter(Number.isFinite);
     const prom5 = k => { const xs = hist(k).slice(-5); return xs.length >= 3 ? sum(xs) / xs.length : null; };
-    const med10 = k => { const xs = hist(k).slice(-10); return xs.length >= 3 ? Fund.mediana(xs) : null; };
-    const peHist = hist('pe');
+    // multiplos: los ultimos 10 ejercicios, solo los positivos (un P/E negativo o sin dato no es un P/E); hacen falta 3
+    const pos10 = k => serieK(k).slice(-10).filter(v => Number.isFinite(v) && v > 0);
+    const med10 = k => { const xs = pos10(k); return xs.length >= 3 ? Fund.mediana(xs) : null; };
+    const peHist = pos10('pe');
     const bal = calGlobal ? Fund.calDe(t) : cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
     const d = {
       at: Date.now(), ticker: t, v: Fund.VERSION, fuenteBal: sec ? (fin0 && fin0.data && fin0.data.length ? 'finnhub+sec' : 'sec') : 'finnhub', moneda: sec && !(fin0 && fin0.data && fin0.data.length) ? sec.moneda || 'USD' : 'USD',
@@ -1122,7 +1138,7 @@ const Fund = {
       capUSD: perfil && perfil.marketCapitalization ? perfil.marketCapitalization * 1e6 : (m0 => Number(m0.marketCapitalization) ? Number(m0.marketCapitalization) * 1e6 : (previa0 ? previa0.capUSD : null))((met && met.metric) || {}),
       perfilAt: perfil && !perfil._viejo ? Date.now() : (previa0 ? previa0.perfilAt : null),
       max52: m['52WeekHigh'] != null ? Number(m['52WeekHigh']) : null, min52: m['52WeekLow'] != null ? Number(m['52WeekLow']) : null,
-      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: Fund.mediana(peHist.slice(-10)), peN: peHist.slice(-10).length,
+      pe: Number(m.peTTM ?? m.peBasicExclExtraTTM) || null, peMediana: peHist.length >= 3 ? Fund.mediana(peHist) : null, peN: peHist.length,
       pb: Number(m.pbQuarterly ?? m.pbAnnual) || null, peg: Number(m.pegTTM ?? m.pegRatio) || null,
       roe: Number(m.roeTTM ?? m.roeRfy) / 100 || null, roa: Number(m.roaTTM ?? m.roaRfy) / 100 || null,
       margenNeto: Number(m.netProfitMarginTTM) / 100 || null, margenNeto5: Number(m.netProfitMargin5Y) / 100 || null,
@@ -1244,9 +1260,17 @@ const Fund = {
   },
   /** Barata contra su propia historia (Facu: "GOOGL con P/E 17 contra su historia, como no lo vimos"):
    *  P/E de hoy al menos 20 % por debajo de su mediana de 10 anios, en una empresa de calidad (ROIC >= 12 % o ROE >= 15 %). */
+  /** P/E de hoy: el propio (precio de hoy x acciones diluidas / ganancia de los ultimos 12 meses de la SEC; coincide con
+   *  TradingView: MELI 47,7 vs 47,69, MSFT 28,8 vs 28,76) y si no se puede, el de Finnhub. Solo si Finnhub tambien tiene P/E:
+   *  asi un ETF o fideicomiso (GLD) que presenta 10-K no muestra un P/E sin sentido */
+  pe(t, d = Fund.de(t)) {
+    if (!d || !(d.pe > 0)) return null;
+    const m = Fund.mult(t, d); return m.pe > 0 ? m.pe : d.pe;
+  },
   barata(t, d = Fund.de(t)) {
-    if (!d || !(d.pe > 0) || !(d.peMediana > 0)) return null;
-    const desc = 1 - d.pe / d.peMediana; if (desc < 0.2) return null;
+    const pe = Fund.pe(t, d);
+    if (!d || !(pe > 0) || !(d.peMediana > 0)) return null;
+    const desc = 1 - pe / d.peMediana; if (desc < 0.2) return null;
     if (d.peN != null && d.peN < 7) return null;  // poca historia (GEV): la mediana no dice nada
     // confirmacion con ventas o caja libre: si el P/E baja por una ganancia extraordinaria (AMZN, inversiones) y P/S o P/FCF
     // no estan baratos contra su historia, no cuenta
@@ -1254,14 +1278,14 @@ const Fund = {
     if (otros.length && !otros.some(x => x >= 0.15)) return null;
     const calidad = (d.roicAct != null && d.roicAct >= 0.12) || (d.roe != null && d.roe >= 0.15);
     if (!calidad) return null;
-    return { pe: d.pe, med: d.peMediana, desc };
+    return { pe, med: d.peMediana, desc };
   },
   baratas(tickers) { return tickers.map(t => ({ t, b: Fund.barata(t) })).filter(x => x.b).sort((a, b) => b.b.desc - a.b.desc); },
   /** dividend yield con el precio de hoy */
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 8,
+  VERSION: 9,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)

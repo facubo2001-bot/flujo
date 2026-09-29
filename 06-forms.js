@@ -510,7 +510,7 @@ function fundHTML(t, pos) {
     rango = `<div class="rg"><div class="bar"><i style="left:${(p52 * 100).toFixed(1)}%"></i></div><div class="rl"><span>${num(d.min52, d.min52 < 100 ? 2 : 0)}</span><span>52W \u00b7 ${(p52 * 100).toFixed(0)} %</span><span>${num(d.max52, d.max52 < 100 ? 2 : 0)}</span></div></div>`;
   }
   { const e = Tec.de(t); if (e) { const pc = v => `${v >= 0 ? '+' : '\u2212'}${Math.abs(v * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
-    rango += `<div class="ema"><span><b>EMA 200</b> ${num(e.ema, e.ema < 100 ? 2 : 0)} <span class="${e.dist >= 0 ? 'up' : 'down'}">${pc(e.dist)}</span>${e.sube ? '' : ' <span class="soft">\u00b7 bajando</span>'}</span><span class="soft">${e.toques10 != null ? `la toc\u00f3 ${e.toques10} ${e.toques10 === 1 ? 'vez' : 'veces'} en ${Math.min(10, Math.round(e.anios))} a\u00f1os${e.ultimoToque ? ` \u00b7 \u00faltima ${D.fmt(e.ultimoToque, { year: true })}` : ''}` : ''}</span></div>`; } }
+    rango += `<div class="ema"><span><b>EMA 200</b> ${num(e.ema, e.ema < 100 ? 2 : 0)} <span class="${e.dist >= 0 ? 'up' : 'down'}">${pc(e.dist)}</span>${e.sube ? '' : ' <span class="soft">\u00b7 bajando</span>'}</span><span class="soft">${e.toques10 != null ? `${Tec.toquesTxt(e)}${e.ultimoToque ? ` \u00b7 \u00faltima ${D.fmt(e.ultimoToque, { year: true })}` : ''}` : ''}</span></div>`; } }
   const tieneAcc = pos && pos.acciones;
   const acciones = `<div class="acts"><button type="button" class="a p" data-act="op-para" data-id="${esc(t)}|compra">+ Comprar</button>${tieneAcc ? `<button type="button" class="a" data-act="op-para" data-id="${esc(t)}|venta">Vender</button><button type="button" class="a" data-act="op-para" data-id="${esc(t)}|dividendo">Dividendo</button>` : ''}<button type="button" class="a" data-act="comparar" data-id="${esc(t)}">Comparar</button></div>`;
   const tab = ui.fichaTab || 'fund';
@@ -539,7 +539,7 @@ function fundHTML(t, pos) {
     ]);
     const mu = Fund.mult(t, d);
     const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
-      tile('P/E', num(d.pe, 1), vsH(d.pe, d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''),
+      tile('P/E', num(Fund.pe(t, d), 1), vsH(Fund.pe(t, d), d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''),
       tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'),
       tile('P/S', num(mu.ps, 1), vsH(mu.ps, d.psMed, false), mu.ps != null ? (d.psMed ? `10Y med ${num(d.psMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
       tile('P/FCF', num(mu.pfcf, 1), vsH(mu.pfcf, d.pfcfMed, false), mu.pfcf != null ? (d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
@@ -635,12 +635,12 @@ const CMP_FILAS = [
   { k: 'Ganancia neta', v: d => d.cagrNeto5, f: cmpPct, mejor: 1 },
   { k: 'EPS', v: d => d.cagrEps5, f: cmpPct, mejor: 1 },
   { sec: 'Valuaci\u00f3n' },
-  { k: 'P/E', v: d => d.pe, f: cmpNum(1), mejor: -1, valido: v => v > 0 },
+  { k: 'P/E', v: d => Fund.pe(d.ticker, d), f: cmpNum(1), mejor: -1, valido: v => v > 0 },
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
-  { k: 'P/E vs su mediana', v: d => d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
+  { k: 'P/E vs su mediana', v: d => { const pe = Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
-  { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : `${v >= 0 ? '+' : '\u2212'}${Math.round(Math.abs(v) * 100)} %`, mejor: -1 },
+  { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : Tec.distTxt(v, ' '), mejor: -1 },
   { k: 'Dividendo', v: d => d.divAnual && (state.cartera.precios[d.ticker] || {}).c ? d.divAnual / state.cartera.precios[d.ticker].c : ((d.v || 1) >= 5 ? null : d.yieldDiv || null), f: cmpPct, mejor: 0 },
   { k: 'Capitalizaci\u00f3n', v: d => d.capUSD || null, f: v => v == null ? '\u2014' : v >= 1e12 ? `${cmpNum(1)(v / 1e12)} bill.` : `${cmpNum(0)(v / 1e9)} mil M`, mejor: 0 },
 ];
@@ -665,7 +665,9 @@ function cmpBody() {
     <div class="cmp-ir"><span id="cmp-n">${cmpCuenta(sel.length)}</span><button type="button" class="btn primary" data-act="cmp-ver" ${sel.length < 2 ? 'disabled' : ''}>Comparar</button></div>
   </div>`;
   const chips = `<div class="cmp-top"><span>${sel.map(esc).join(' \u00b7 ')}</span><button type="button" class="btn sm ghost" data-act="cmp-pick">Cambiar</button></div>`;
-  const datos = sel.map(t => ({ t, d: Fund.de(t), px: px[t] ? px[t].c : null, dp: px[t] ? px[t].dp : null, estado: px[t] ? px[t].estado : null }));
+  // una empresa que no seguis (UBER buscada en la lupa) no esta en la cartera: su precio lo trae cmpTraer
+  const pxDe = t => px[t] ? px[t].c : (state.cartera.precios[t] && state.cartera.precios[t].c) || null;
+  const datos = sel.map(t => ({ t, d: Fund.de(t), px: pxDe(t), dp: px[t] ? px[t].dp : null, estado: px[t] ? px[t].estado : null }));
   const cargando = datos.filter(x => !x.d).map(x => x.t);
   const lidera = Object.fromEntries(sel.map(t => [t, 0])); let filasConLider = 0;
 
@@ -685,8 +687,8 @@ function cmpBody() {
   }).join('');
 
   const maxL = Math.max(...Object.values(lidera));
-  const cab = `<tr class="cab"><th></th>${datos.map(x => `<th><b>${esc(x.t)}</b><span>${x.px != null ? fmtU(x.px) : 'US$ x.xxx'}</span>${x.estado ? `<span class="dot ${x.estado === 'urgente' ? 'crit' : 'warn'}" title="en zona de compra"></span>` : ''}</th>`).join('')}</tr>`;
-  const score = `<tr class="score"><td class="k">Lidera en</td>${sel.map(t => `<td class="${lidera[t] === maxL && maxL > 0 ? 'top' : ''}">${lidera[t]} de ${filasConLider}</td>`).join('')}</tr>`;
+  const cab = `<tr class="cab"><th></th>${datos.map(x => `<th><b>${esc(x.t)}</b><span>${x.px != null ? fmtU(x.px) : '\u2026'}</span>${x.estado ? `<span class="dot ${x.estado === 'urgente' ? 'crit' : 'warn'}" title="en zona de compra"></span>` : ''}</th>`).join('')}</tr>`;
+  const score = `<tr class="score"><td class="k">Lidera en</td>${sel.map(t => `<td class="${lidera[t] === maxL && maxL > 0 ? 'top' : ''}">${Fund.de(t) ? `${lidera[t]} de ${filasConLider}` : '\u2026'}</td>`).join('')}</tr>`;
   return `<div class="hoja">${chips}
     <div class="cmp-wrap"><table class="cmp-t n${sel.length}"><thead>${cab}</thead><tbody>${filas}${score}</tbody></table></div>
     <div class="f-pie">${cargando.length ? `Trayendo ${cargando.join(', ')} de Finnhub\u2026 \u00b7 ` : ''}Lidera: el mejor valor de la fila entre las elegidas, sin juzgar si es bueno en absoluto; eso lo dice la ficha de cada una. Rango 52 semanas: m\u00e1s bajo es m\u00e1s cerca del m\u00ednimo. Tachado: no compite, por patrimonio negativo o ROE arriba de 100 % (recompras que achican el patrimonio).</div>
@@ -698,8 +700,11 @@ async function cmpTraer() {
   const tok = ui.cmpTok = (ui.cmpTok || 0) + 1;
   const viejo = Date.now() - 6 * 86400000;
   for (const t of (ui.cmp || []).slice()) {
-    const d = Fund.de(t); if (d && d.at > viejo) continue;
-    try { await Fund.traer(t); } catch (e) {}
+    const q = state.cartera.precios[t];
+    const sinPx = !(q && q.c) || Date.now() - (q.t || 0) > 3600000;  // lo que no se sigue no lo actualiza el motor
+    const d = Fund.de(t); if (d && d.at > viejo && !sinPx) continue;
+    if (sinPx && !Precios.sinFuente(t)) { try { await Precios.quote(t); } catch (e) {} }
+    if (!(d && d.at > viejo)) { try { await Fund.traer(t); } catch (e) {} }
     if (ui.cmpTok !== tok) return;
     if (ui.cmpVer) { const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody(); }  // eligiendo no se redibuja
   }
@@ -942,7 +947,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(d.pe)} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.fcfY != null ? pc(mu.fcfY) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.fcfY != null ? pc(mu.fcfY) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -965,7 +970,7 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
       if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
       if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
       if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
-      { const ce = todas.map(p => [p.ticker, Tec.cerca(p.ticker)]).filter(([, e]) => e); if (ce.length) l.push(`- **Cerca de su EMA 200** (entre 3 % arriba y 5 % abajo; pasa pocas veces): ${ce.map(([t, e]) => `${t} ${e.dist >= 0 ? '+' : '\u2212'}${Math.abs(e.dist * 100).toFixed(1)} % (la toc\u00f3 ${e.toques10} veces en 10 a\u00f1os)`).join(' \u00b7 ')}`); }
+      { const ce = todas.map(p => [p.ticker, Tec.cerca(p.ticker)]).filter(([, e]) => e); if (ce.length) l.push(`- **Cerca de su EMA 200** (entre 3 % arriba y 5 % abajo; pasa pocas veces): ${ce.map(([t, e]) => `${t} ${e.dist >= 0 ? '+' : '\u2212'}${Math.abs(e.dist * 100).toFixed(1)} % (${Tec.toquesTxt(e)})`).join(' \u00b7 ')}`); }
       { const bz = Fund.baratas(todas.map(p => p.ticker)); if (bz.length) l.push(`- **Baratas contra su propia historia** (P/E de hoy \u2265 20 % por debajo de su mediana de 10 a\u00f1os, con ROIC \u2265 12 % o ROE \u2265 15 %): ${bz.map(x => `${x.t} ${x.b.pe.toFixed(1)} vs ${x.b.med.toFixed(1)} (\u2212${Math.round(x.b.desc * 100)} %)`).join(' \u00b7 ')}. Revis\u00e1 si es una oportunidad o si el mercado ve algo que la historia no.`); }
       { const av = todas.map(p => [p.ticker, (Fund.de(p.ticker) || {}).avisos || []]).filter(([, a]) => a.length); if (av.length) l.push(`- **Avisos del control autom\u00e1tico** (tomalos con pinzas): ${av.map(([t, a]) => `${t}: ${a.join('; ')}`).join(' \u00b7 ')}`); }
       return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
