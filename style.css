@@ -1109,3 +1109,8 @@ h2 .i-btn{vertical-align:3px}
 .cmp-ir .btn[disabled]{opacity:.4}
 .cmp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:800;font-size:14px}
 .cmp-top span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.cmp-grid button[data-dim]{opacity:.22}
+.cmp-hint{height:20px;line-height:20px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12.5px;color:var(--ink-3);margin:-4px 2px 0}
+.cmp-hint .link-btn{font-size:13px;font-weight:800;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
+#modal.cmp-modal{min-height:86vh;min-height:86dvh}

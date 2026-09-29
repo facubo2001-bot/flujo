@@ -3,7 +3,7 @@
 const Modal = {
   onSubmit: null,
   open({ title, body, submit = 'Guardar', extra = '', onSubmit, wide = false }) {
-    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal', 'ficha'); delete $('#modal').dataset.ftab;
+    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal', 'ficha', 'cmp-modal'); delete $('#modal').dataset.ftab;
     $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">${submit ? 'Cancelar' : 'Cerrar'}</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
     $('#modal').style.width = wide ? 'min(820px,100%)' : '';
     $('#overlay').classList.add('open');
@@ -525,13 +525,15 @@ function fundHTML(t, pos) {
       tile('Op. margin', pct1(d.margenOper), vsH(d.margenOper, d.margenOper5), d.margenOper5 ? `5Y avg ${pct1(d.margenOper5)}` : ''),
       tile('FCF / NI', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', d.fcfSobreNeto5 ? vsH(d.fcfSobreNeto, d.fcfSobreNeto5) : abs(d.fcfSobreNeto, 0.9, 0.6), d.fcfSobreNeto5 ? `5Y avg ${num(d.fcfSobreNeto5, 2)}\u00d7` : ''),
     ]);
-    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. EPS de Finnhub, ajustado por splits. Share count: si baja, la empresa recompra acciones.', [
-      tile('Revenue', pct1(d.cagrVentas5 ?? d.crecVentas5), abs(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), '5Y CAGR'),
-      tile('Net income', pct1(d.cagrNeto5), abs(d.cagrNeto5, 0.10, 0.04), '5Y CAGR'),
-      tile('EPS', pct1(d.cagrEps5), abs(d.cagrEps5, 0.10, 0.04), '5Y CAGR'),
-      tile('FCF', pct1(d.cagrFcf5), abs(d.cagrFcf5, 0.10, 0.04), '5Y CAGR'),
+    // periodo exacto del CAGR (FY20\u2192FY25); si no hay dato: 'con base negativa' o sin anios
+    const per = c => { const x = d.cagrDet && d.cagrDet[c]; return x ? `FY${String(x.desde).slice(2)}\u2192${String(x.hasta).slice(2)}` : '5Y CAGR'; };
+    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. Siempre del \u00faltimo a\u00f1o fiscal contra el de 5 a\u00f1os antes (se ve abajo de cada dato); si alguno de los dos es negativo o falta, \u201c\u2014\u201d. EPS = ganancia / acciones diluidas, ajustado por splits. Share count: si baja, la empresa recompra acciones.', [
+      tile('Revenue', pct1(d.cagrVentas5 ?? d.crecVentas5), abs(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), per('ventas')),
+      tile('Net income', pct1(d.cagrNeto5), abs(d.cagrNeto5, 0.10, 0.04), per('neto')),
+      tile('EPS', pct1(d.cagrEps5), abs(d.cagrEps5, 0.10, 0.04), per('eps')),
+      tile('FCF', pct1(d.cagrFcf5), abs(d.cagrFcf5, 0.10, 0.04), per('fcf')),
       tile('Dividend', d.divCrec5 != null ? pct1(d.divCrec5) : '\u2014', abs(d.divCrec5, 0.06, 0.02), d.divCrec5 != null ? '5Y CAGR' : 'no paga'),
-      tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', '5Y CAGR'),
+      tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', per('acciones')),
     ]);
     const mu = Fund.mult(t, d);
     const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
@@ -652,10 +654,11 @@ function cmpBody() {
   const { tickers, watch, px } = cmpUniverso();
   // dos pantallas (Facu): 1) elegir: lupa + grilla fija de 4 columnas, tocar solo marca (nada se mueve); 2) comparar, al tocar "Comparar"
   const q = (ui.cmpQ || '').toUpperCase();
-  const orden = [...tickers.filter(t => !watch.includes(t)), ...watch.slice().sort()];
+  const orden = [...tickers.filter(t => !watch.includes(t)), ...watch.slice().sort(), ...sel.filter(t => !tickers.includes(t))];
   if (!ui.cmpVer || sel.length < 2) return `<div class="hoja cmp-pick">
     <label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Buscar ticker" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
-    <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' hidden' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>
+    <div class="cmp-hint" id="cmp-hint"></div>
+    <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' data-dim="1"' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>
     <div class="cmp-ir"><span id="cmp-n">${cmpCuenta(sel.length)}</span><button type="button" class="btn primary" data-act="cmp-ver" ${sel.length < 2 ? 'disabled' : ''}>Comparar</button></div>
   </div>`;
   const chips = `<div class="cmp-top"><span>${sel.map(esc).join(' \u00b7 ')}</span><button type="button" class="btn sm ghost" data-act="cmp-pick">Cambiar</button></div>`;
@@ -699,6 +702,14 @@ async function cmpTraer() {
   }
   Persist.save();
 }
+function cmpFiltrar() {
+  const q = (ui.cmpQ || '').trim().toUpperCase(); let n = 0;
+  $$('#modal .cmp-grid button').forEach(b => { const ok = !q || b.dataset.id.startsWith(q); if (ok) { delete b.dataset.dim; n++; } else b.dataset.dim = '1'; });
+  const h = $('#cmp-hint'); if (!h) return;
+  if (!q) { h.innerHTML = ''; return; }
+  const c = Cedears.de(q); const t = c ? Cedears.ticker(c) : null;
+  h.innerHTML = n ? `${n} coincide${n > 1 ? 'n' : ''}` : t ? `<button type="button" class="link-btn" data-act="cmp-toggle" data-id="${esc(t)}">${(ui.cmp || []).includes(t) ? `${esc(t)} elegida \u2713` : `+ Comparar ${esc(t)} (no est\u00e1 en tu lista)`}</button>` : 'No hay un CEDEAR con ese ticker';
+}
 function cmpCuenta(n) { return n ? `${n} elegida${n > 1 ? 's' : ''} (m\u00e1x. ${CMP_MAX})` : `Eleg\u00ed de 2 a ${CMP_MAX} (w = watchlist)`; }
 function cmpToggle(t) {
   const sel = ui.cmp || (ui.cmp = []);
@@ -709,15 +720,18 @@ function cmpToggle(t) {
   // elegir no redibuja: solo prende o apaga el boton y actualiza la cuenta (nada se mueve)
   const btn = $(`#modal .cmp-grid button[data-id="${CSS.escape(t)}"]`); if (btn) btn.classList.toggle('on', sel.includes(t));
   const n = $('#cmp-n'); if (n) n.textContent = cmpCuenta(sel.length);
+  if ($('#cmp-hint') && !btn) cmpFiltrar();
   const ir = $('#modal [data-act="cmp-ver"]'); if (ir) ir.disabled = sel.length < 2;
   cmpTraer();
 }
 function formComparar(t) {
   ui.cmp = t ? [t] : (ui.cmp || []).slice(0, CMP_MAX); ui.cmpVer = false; ui.cmpQ = '';
   Modal.open({ title: 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: '' });
+  $('#modal').classList.add('cmp-modal');
   // la lupa filtra la grilla sin redibujar (no se cierra el teclado); Enter elige la primera que quede
-  $('#modal').oninput = e => { if (e.target.id !== 'cmp-q') return; ui.cmpQ = e.target.value; const q = e.target.value.trim().toUpperCase(); $$('#modal .cmp-grid button').forEach(b => { b.hidden = !!q && !b.dataset.id.startsWith(q); }); };
-  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.hidden); if (b) cmpToggle(b.dataset.id); };
+  // tipear no mueve nada: las que no coinciden se atenuan en su lugar (Facu: "escribo y explota todo")
+  $('#modal').oninput = e => { if (e.target.id !== 'cmp-q') return; ui.cmpQ = e.target.value; cmpFiltrar(); };
+  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.dataset.dim); if (b) cmpToggle(b.dataset.id); else { const q = e.target.value.trim().toUpperCase(); if (q && Cedears.de(q)) cmpToggle(Cedears.ticker(Cedears.de(q))); } };
   cmpTraer();
 }
 function formWatch() {

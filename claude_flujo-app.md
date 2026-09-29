@@ -32,6 +32,12 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### CAGR exacto + lupa quieta (28-sep, build 202609290125)
+- Facu: el CAGR es lo que más mira al comparar; tiene que estar perfecto. `Fund.cagrDet(filas, campo, n)`: último ejercicio contra el de exactamente n años antes; si falta un año, el último FY no tiene el dato, o alguno es ≤ 0 → null ("—"). Antes tomaba los primeros positivos (podía saltar años). EPS = ganancia / acciones diluidas ajustadas por split en ambos extremos (`epsCalc`); ya no se usa el crecimiento de EPS de Finnhub. `d.cagrDet` guarda desde/hasta/valores; la ficha muestra "FY20→25" bajo cada dato.
+- Resultados reales: MSFT FY21→26 ventas 14,6 %, EPS 17,4 %; NVDA EPS 95,3 % (0,17→4,90 ajustado por splits); META EPS 18,4 %; MELI ganancia/EPS "—" (2020 negativo); GOOGL EPS "—" (faltan acciones en 2020); NVDA FCF "—" (capex de 2021 con etiqueta propia, no está en la SEC).
+- Página "Chequeo CAGR" con los extremos para contrastar con TradingView.
+- Comparador: la lupa ya no esconde ni reacomoda: atenúa las que no coinciden; línea fija que dice cuántas coinciden o "+ Comparar UBER (no está en tu lista)" si es un CEDEAR que no seguís; el sheet tiene alto fijo (86 dvh).
+
 ### Comparador sin scroll horizontal (28-sep, build 202609290114)
 - Hasta 4 empresas (tabla `.n4` más angosta). Selector nuevo: lupa (filtra por inicio del ticker sin redibujar; Enter elige la primera) + grilla de 4 columnas (3 si la pantalla < 340 px), tenencias primero y watchlist (w) en orden alfabético. Dos pantallas (Facu: "toco y se me mueve todo"): elegir (tocar solo prende/apaga el botón en su lugar, sin redibujar; cuenta "3 elegidas") y recién con **Comparar** muestra la tabla (`ui.cmpVer`); arriba de la tabla, "Cambiar" vuelve a la grilla.
 

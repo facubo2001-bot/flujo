@@ -1134,6 +1134,11 @@ h2 .i-btn{vertical-align:3px}
 .cmp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:800;font-size:14px}
 .cmp-top span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+.cmp-grid button[data-dim]{opacity:.22}
+.cmp-hint{height:20px;line-height:20px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12.5px;color:var(--ink-3);margin:-4px 2px 0}
+.cmp-hint .link-btn{font-size:13px;font-weight:800;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
+#modal.cmp-modal{min-height:86vh;min-height:86dvh}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1473,7 +1478,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609290119';
+const BUILD = '202609290125';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2089,7 +2094,7 @@ const Fund = {
       if (k) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
     }
     // EPS: Finnhub redondea el de varios 10-K recientes a entero (HD 15, UNH 24, META 15). Se calcula ganancia / acciones diluidas.
-    for (const f of out) if (f.neto != null && f.acciones > 0) f.eps = f.neto / f.acciones;
+    for (const f of out) { f.epsCalc = false; if (f.neto != null && f.acciones > 0) { f.eps = f.neto / f.acciones; f.epsCalc = true; } }
     // ROIC como lo publica TradingView: ganancia neta / promedio del capital total (patrimonio + deuda total) de dos periodos
     out.forEach((f, i) => { const prev = i ? out[i - 1] : null; f.roic = Fund.roicTV(f.neto, f.capital, prev && prev.anio === f.anio - 1 ? prev.capital : null); });
     return out;
@@ -2203,12 +2208,16 @@ const Fund = {
     return o;
   },
   /** CAGR entre el primero y el último valor positivo de la serie (n años) */
-  cagr(filas, campo, n) {
-    const xs = filas.filter(f => Number.isFinite(f[campo]) && f[campo] > 0).slice(-(n + 1));
-    if (xs.length < 2) return null;
-    const a = xs[0][campo], b = xs[xs.length - 1][campo], t = xs[xs.length - 1].anio - xs[0].anio;
-    return t > 0 && t >= n - 1 ? Math.pow(b / a, 1 / t) - 1 : null;
+  /** CAGR exacto a n anios: del ultimo ejercicio (FY) contra el de n anios antes. Sin atajos: si falta alguno de los dos anios,
+   *  si el ultimo ejercicio no tiene el dato o si alguno es <= 0 (no hay tasa de crecimiento con base negativa) -> null ("—") */
+  cagrDet(filas, campo, n) {
+    const ult = filas[filas.length - 1]; if (!ult) return null;
+    const b = ult[campo]; const f0 = filas.find(f => f.anio === ult.anio - n); const a = f0 ? f0[campo] : null;
+    if (campo === 'eps' && (!ult.epsCalc || !(f0 && f0.epsCalc))) return null;  // EPS solo si ambos salen de ganancia / acciones (ajustado por splits)
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
+    return { v: Math.pow(b / a, 1 / n) - 1, desde: f0.anio, hasta: ult.anio, a, b };
   },
+  cagr(filas, campo, n) { const x = Fund.cagrDet(filas, campo, n); return x ? x.v : null; },
   prom(filas, campo, n) { const xs = filas.slice(-n).map(f => f[campo]).filter(Number.isFinite); return xs.length ? sum(xs) / xs.length : null; },
   mediana(xs) { const s = xs.filter(Number.isFinite).slice().sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; },
   /** trae todo de Finnhub y lo guarda; devuelve los datos o null */
@@ -2299,12 +2308,11 @@ const Fund = {
     d.cagrFcf5 = Fund.cagr(filas, 'fcf', 5); d.cagrAcc5 = Fund.cagr(filas, 'acciones', 5);
     { const xs = filas.slice(-5).filter(f => f.neto > 0 && Number.isFinite(f.fcf)).map(f => f.fcf / f.neto).filter(x => Math.abs(x) <= 15); d.fcfSobreNeto5 = xs.length >= 3 ? sum(xs) / xs.length : null; }
     { const u = filas[filas.length - 1]; d.netCash = u && u.capital && (u.caja != null || u.invCorto != null) ? (u.caja || 0) + (u.invCorto || 0) - (u.capital.deudaTotal != null ? u.capital.deudaTotal : u.capital.deuda) : null; }
-    // EPS: el de los balances no esta ajustado por splits (NVDA, GOOGL, AMZN daban negativo). Manda el de Finnhub;
-    // el propio solo si Finnhub no lo da y ademas es coherente con la ganancia neta
-    const epsPropio = Fund.cagr(filas, 'eps', 5);
-    d.cagrEps5 = d.crecEps5 != null ? d.crecEps5 : (epsPropio != null && d.cagrNeto5 != null && Math.abs(epsPropio - d.cagrNeto5) <= 0.25 ? epsPropio : null);
-    d.epsFuente = d.crecEps5 != null ? 'finnhub' : (d.cagrEps5 != null ? 'sec' : null);
-    if (epsPropio != null && d.cagrEps5 == null) d.avisos.push('EPS: la serie de la SEC no esta ajustada por splits; sin dato confiable');
+    // EPS: ganancia / acciones diluidas de cada 10-K, con las acciones ajustadas por splits (Fund.anios). El de Finnhub no se usa:
+    // no se puede verificar y mezcla periodos. Si no hay acciones en alguno de los dos anios -> "—"
+    d.cagrEps5 = Fund.cagr(filas, 'eps', 5); d.epsFuente = d.cagrEps5 != null ? 'balances' : null;
+    d.cagrEps10 = Fund.cagr(filas, 'eps', 10);
+    d.cagrDet = Object.fromEntries(['ventas', 'neto', 'eps', 'fcf', 'acciones'].map(c => [c, Fund.cagrDet(filas, c, 5)]));
     // ROIC (formula de TradingView): ganancia neta / capital total promedio. Actual = ultimos 12 meses (10-K + 10-Q),
     // si no el ultimo anual, si no el ROI que calcula Finnhub. Promedio 5 anios con la misma formula.
     const trims = Fund.trimestres(finQ); const ttm = Fund.ttm(filas, trims);
@@ -2412,7 +2420,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 7,
+  VERSION: 8,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -4623,7 +4631,7 @@ function renderReservaCard(pt) {
 const Modal = {
   onSubmit: null,
   open({ title, body, submit = 'Guardar', extra = '', onSubmit, wide = false }) {
-    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal', 'ficha'); delete $('#modal').dataset.ftab;
+    Modal.onSubmit = onSubmit; $('#modal').onchange = null; $('#modal').oninput = null; $('#modal').classList.remove('rs-modal', 'ficha', 'cmp-modal'); delete $('#modal').dataset.ftab;
     $('#modal').innerHTML = `<div class="grabber"></div><div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close" style="border:0" aria-label="Cerrar">${ICONS.x}</button></div><div class="m-body">${body}</div><div class="m-foot">${extra}<div class="right"><button class="btn" data-act="close">${submit ? 'Cancelar' : 'Cerrar'}</button>${submit ? `<button class="btn primary" data-act="submit">${submit}</button>` : ''}</div></div>`;
     $('#modal').style.width = wide ? 'min(820px,100%)' : '';
     $('#overlay').classList.add('open');
@@ -5145,13 +5153,15 @@ function fundHTML(t, pos) {
       tile('Op. margin', pct1(d.margenOper), vsH(d.margenOper, d.margenOper5), d.margenOper5 ? `5Y avg ${pct1(d.margenOper5)}` : ''),
       tile('FCF / NI', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', d.fcfSobreNeto5 ? vsH(d.fcfSobreNeto, d.fcfSobreNeto5) : abs(d.fcfSobreNeto, 0.9, 0.6), d.fcfSobreNeto5 ? `5Y avg ${num(d.fcfSobreNeto5, 2)}\u00d7` : ''),
     ]);
-    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. EPS de Finnhub, ajustado por splits. Share count: si baja, la empresa recompra acciones.', [
-      tile('Revenue', pct1(d.cagrVentas5 ?? d.crecVentas5), abs(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), '5Y CAGR'),
-      tile('Net income', pct1(d.cagrNeto5), abs(d.cagrNeto5, 0.10, 0.04), '5Y CAGR'),
-      tile('EPS', pct1(d.cagrEps5), abs(d.cagrEps5, 0.10, 0.04), '5Y CAGR'),
-      tile('FCF', pct1(d.cagrFcf5), abs(d.cagrFcf5, 0.10, 0.04), '5Y CAGR'),
+    // periodo exacto del CAGR (FY20\u2192FY25); si no hay dato: 'con base negativa' o sin anios
+    const per = c => { const x = d.cagrDet && d.cagrDet[c]; return x ? `FY${String(x.desde).slice(2)}\u2192${String(x.hasta).slice(2)}` : '5Y CAGR'; };
+    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. Siempre del \u00faltimo a\u00f1o fiscal contra el de 5 a\u00f1os antes (se ve abajo de cada dato); si alguno de los dos es negativo o falta, \u201c\u2014\u201d. EPS = ganancia / acciones diluidas, ajustado por splits. Share count: si baja, la empresa recompra acciones.', [
+      tile('Revenue', pct1(d.cagrVentas5 ?? d.crecVentas5), abs(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), per('ventas')),
+      tile('Net income', pct1(d.cagrNeto5), abs(d.cagrNeto5, 0.10, 0.04), per('neto')),
+      tile('EPS', pct1(d.cagrEps5), abs(d.cagrEps5, 0.10, 0.04), per('eps')),
+      tile('FCF', pct1(d.cagrFcf5), abs(d.cagrFcf5, 0.10, 0.04), per('fcf')),
       tile('Dividend', d.divCrec5 != null ? pct1(d.divCrec5) : '\u2014', abs(d.divCrec5, 0.06, 0.02), d.divCrec5 != null ? '5Y CAGR' : 'no paga'),
-      tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', '5Y CAGR'),
+      tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', per('acciones')),
     ]);
     const mu = Fund.mult(t, d);
     const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
@@ -5272,10 +5282,11 @@ function cmpBody() {
   const { tickers, watch, px } = cmpUniverso();
   // dos pantallas (Facu): 1) elegir: lupa + grilla fija de 4 columnas, tocar solo marca (nada se mueve); 2) comparar, al tocar "Comparar"
   const q = (ui.cmpQ || '').toUpperCase();
-  const orden = [...tickers.filter(t => !watch.includes(t)), ...watch.slice().sort()];
+  const orden = [...tickers.filter(t => !watch.includes(t)), ...watch.slice().sort(), ...sel.filter(t => !tickers.includes(t))];
   if (!ui.cmpVer || sel.length < 2) return `<div class="hoja cmp-pick">
     <label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Buscar ticker" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
-    <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' hidden' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>
+    <div class="cmp-hint" id="cmp-hint"></div>
+    <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' data-dim="1"' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>
     <div class="cmp-ir"><span id="cmp-n">${cmpCuenta(sel.length)}</span><button type="button" class="btn primary" data-act="cmp-ver" ${sel.length < 2 ? 'disabled' : ''}>Comparar</button></div>
   </div>`;
   const chips = `<div class="cmp-top"><span>${sel.map(esc).join(' \u00b7 ')}</span><button type="button" class="btn sm ghost" data-act="cmp-pick">Cambiar</button></div>`;
@@ -5319,6 +5330,14 @@ async function cmpTraer() {
   }
   Persist.save();
 }
+function cmpFiltrar() {
+  const q = (ui.cmpQ || '').trim().toUpperCase(); let n = 0;
+  $$('#modal .cmp-grid button').forEach(b => { const ok = !q || b.dataset.id.startsWith(q); if (ok) { delete b.dataset.dim; n++; } else b.dataset.dim = '1'; });
+  const h = $('#cmp-hint'); if (!h) return;
+  if (!q) { h.innerHTML = ''; return; }
+  const c = Cedears.de(q); const t = c ? Cedears.ticker(c) : null;
+  h.innerHTML = n ? `${n} coincide${n > 1 ? 'n' : ''}` : t ? `<button type="button" class="link-btn" data-act="cmp-toggle" data-id="${esc(t)}">${(ui.cmp || []).includes(t) ? `${esc(t)} elegida \u2713` : `+ Comparar ${esc(t)} (no est\u00e1 en tu lista)`}</button>` : 'No hay un CEDEAR con ese ticker';
+}
 function cmpCuenta(n) { return n ? `${n} elegida${n > 1 ? 's' : ''} (m\u00e1x. ${CMP_MAX})` : `Eleg\u00ed de 2 a ${CMP_MAX} (w = watchlist)`; }
 function cmpToggle(t) {
   const sel = ui.cmp || (ui.cmp = []);
@@ -5329,15 +5348,18 @@ function cmpToggle(t) {
   // elegir no redibuja: solo prende o apaga el boton y actualiza la cuenta (nada se mueve)
   const btn = $(`#modal .cmp-grid button[data-id="${CSS.escape(t)}"]`); if (btn) btn.classList.toggle('on', sel.includes(t));
   const n = $('#cmp-n'); if (n) n.textContent = cmpCuenta(sel.length);
+  if ($('#cmp-hint') && !btn) cmpFiltrar();
   const ir = $('#modal [data-act="cmp-ver"]'); if (ir) ir.disabled = sel.length < 2;
   cmpTraer();
 }
 function formComparar(t) {
   ui.cmp = t ? [t] : (ui.cmp || []).slice(0, CMP_MAX); ui.cmpVer = false; ui.cmpQ = '';
   Modal.open({ title: 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: '' });
+  $('#modal').classList.add('cmp-modal');
   // la lupa filtra la grilla sin redibujar (no se cierra el teclado); Enter elige la primera que quede
-  $('#modal').oninput = e => { if (e.target.id !== 'cmp-q') return; ui.cmpQ = e.target.value; const q = e.target.value.trim().toUpperCase(); $$('#modal .cmp-grid button').forEach(b => { b.hidden = !!q && !b.dataset.id.startsWith(q); }); };
-  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.hidden); if (b) cmpToggle(b.dataset.id); };
+  // tipear no mueve nada: las que no coinciden se atenuan en su lugar (Facu: "escribo y explota todo")
+  $('#modal').oninput = e => { if (e.target.id !== 'cmp-q') return; ui.cmpQ = e.target.value; cmpFiltrar(); };
+  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.dataset.dim); if (b) cmpToggle(b.dataset.id); else { const q = e.target.value.trim().toUpperCase(); if (q && Cedears.de(q)) cmpToggle(Cedears.ticker(Cedears.de(q))); } };
   cmpTraer();
 }
 function formWatch() {

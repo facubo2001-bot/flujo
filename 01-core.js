@@ -914,7 +914,7 @@ const Fund = {
       if (k) for (let j = 0; j < i; j++) if (out[j].acciones) out[j].acciones *= k;
     }
     // EPS: Finnhub redondea el de varios 10-K recientes a entero (HD 15, UNH 24, META 15). Se calcula ganancia / acciones diluidas.
-    for (const f of out) if (f.neto != null && f.acciones > 0) f.eps = f.neto / f.acciones;
+    for (const f of out) { f.epsCalc = false; if (f.neto != null && f.acciones > 0) { f.eps = f.neto / f.acciones; f.epsCalc = true; } }
     // ROIC como lo publica TradingView: ganancia neta / promedio del capital total (patrimonio + deuda total) de dos periodos
     out.forEach((f, i) => { const prev = i ? out[i - 1] : null; f.roic = Fund.roicTV(f.neto, f.capital, prev && prev.anio === f.anio - 1 ? prev.capital : null); });
     return out;
@@ -1028,12 +1028,16 @@ const Fund = {
     return o;
   },
   /** CAGR entre el primero y el último valor positivo de la serie (n años) */
-  cagr(filas, campo, n) {
-    const xs = filas.filter(f => Number.isFinite(f[campo]) && f[campo] > 0).slice(-(n + 1));
-    if (xs.length < 2) return null;
-    const a = xs[0][campo], b = xs[xs.length - 1][campo], t = xs[xs.length - 1].anio - xs[0].anio;
-    return t > 0 && t >= n - 1 ? Math.pow(b / a, 1 / t) - 1 : null;
+  /** CAGR exacto a n anios: del ultimo ejercicio (FY) contra el de n anios antes. Sin atajos: si falta alguno de los dos anios,
+   *  si el ultimo ejercicio no tiene el dato o si alguno es <= 0 (no hay tasa de crecimiento con base negativa) -> null ("—") */
+  cagrDet(filas, campo, n) {
+    const ult = filas[filas.length - 1]; if (!ult) return null;
+    const b = ult[campo]; const f0 = filas.find(f => f.anio === ult.anio - n); const a = f0 ? f0[campo] : null;
+    if (campo === 'eps' && (!ult.epsCalc || !(f0 && f0.epsCalc))) return null;  // EPS solo si ambos salen de ganancia / acciones (ajustado por splits)
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
+    return { v: Math.pow(b / a, 1 / n) - 1, desde: f0.anio, hasta: ult.anio, a, b };
   },
+  cagr(filas, campo, n) { const x = Fund.cagrDet(filas, campo, n); return x ? x.v : null; },
   prom(filas, campo, n) { const xs = filas.slice(-n).map(f => f[campo]).filter(Number.isFinite); return xs.length ? sum(xs) / xs.length : null; },
   mediana(xs) { const s = xs.filter(Number.isFinite).slice().sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; },
   /** trae todo de Finnhub y lo guarda; devuelve los datos o null */
@@ -1124,12 +1128,11 @@ const Fund = {
     d.cagrFcf5 = Fund.cagr(filas, 'fcf', 5); d.cagrAcc5 = Fund.cagr(filas, 'acciones', 5);
     { const xs = filas.slice(-5).filter(f => f.neto > 0 && Number.isFinite(f.fcf)).map(f => f.fcf / f.neto).filter(x => Math.abs(x) <= 15); d.fcfSobreNeto5 = xs.length >= 3 ? sum(xs) / xs.length : null; }
     { const u = filas[filas.length - 1]; d.netCash = u && u.capital && (u.caja != null || u.invCorto != null) ? (u.caja || 0) + (u.invCorto || 0) - (u.capital.deudaTotal != null ? u.capital.deudaTotal : u.capital.deuda) : null; }
-    // EPS: el de los balances no esta ajustado por splits (NVDA, GOOGL, AMZN daban negativo). Manda el de Finnhub;
-    // el propio solo si Finnhub no lo da y ademas es coherente con la ganancia neta
-    const epsPropio = Fund.cagr(filas, 'eps', 5);
-    d.cagrEps5 = d.crecEps5 != null ? d.crecEps5 : (epsPropio != null && d.cagrNeto5 != null && Math.abs(epsPropio - d.cagrNeto5) <= 0.25 ? epsPropio : null);
-    d.epsFuente = d.crecEps5 != null ? 'finnhub' : (d.cagrEps5 != null ? 'sec' : null);
-    if (epsPropio != null && d.cagrEps5 == null) d.avisos.push('EPS: la serie de la SEC no esta ajustada por splits; sin dato confiable');
+    // EPS: ganancia / acciones diluidas de cada 10-K, con las acciones ajustadas por splits (Fund.anios). El de Finnhub no se usa:
+    // no se puede verificar y mezcla periodos. Si no hay acciones en alguno de los dos anios -> "—"
+    d.cagrEps5 = Fund.cagr(filas, 'eps', 5); d.epsFuente = d.cagrEps5 != null ? 'balances' : null;
+    d.cagrEps10 = Fund.cagr(filas, 'eps', 10);
+    d.cagrDet = Object.fromEntries(['ventas', 'neto', 'eps', 'fcf', 'acciones'].map(c => [c, Fund.cagrDet(filas, c, 5)]));
     // ROIC (formula de TradingView): ganancia neta / capital total promedio. Actual = ultimos 12 meses (10-K + 10-Q),
     // si no el ultimo anual, si no el ROI que calcula Finnhub. Promedio 5 anios con la misma formula.
     const trims = Fund.trimestres(finQ); const ttm = Fund.ttm(filas, trims);
@@ -1237,7 +1240,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 7,
+  VERSION: 8,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
