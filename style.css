@@ -1104,3 +1104,8 @@ h2 .i-btn{vertical-align:3px}
 .cmp-t.n4 th,.cmp-t.n4 td{padding:7px 2px;font-size:12px}
 .cmp-t.n4 .cab b{font-size:13px}
 .cmp-t.n4 .cab span{font-size:10px}
+
+.cmp-ir{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0 2px;background:var(--surface,var(--bg));font-size:13px;color:var(--ink-2)}
+.cmp-ir .btn[disabled]{opacity:.4}
+.cmp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:800;font-size:14px}
+.cmp-top span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -650,15 +650,15 @@ function cmpUniverso() {
 function cmpBody() {
   const sel = ui.cmp || [];
   const { tickers, watch, px } = cmpUniverso();
-  // selector: lupa + grilla de 4 columnas (Facu: nada de deslizar para el costado). Con 2 o mas elegidas se pliega.
-  const abierto = sel.length < 2 || ui.cmpPick; const q = (ui.cmpQ || '').toUpperCase();
+  // dos pantallas (Facu): 1) elegir: lupa + grilla fija de 4 columnas, tocar solo marca (nada se mueve); 2) comparar, al tocar "Comparar"
+  const q = (ui.cmpQ || '').toUpperCase();
   const orden = [...tickers.filter(t => !watch.includes(t)), ...watch.slice().sort()];
-  const elegidas = sel.length ? `<div class="cmp-sel">${sel.map(t => `<button type="button" class="on" data-act="cmp-toggle" data-id="${esc(t)}">${esc(t)}<span class="x">\u00d7</span></button>`).join('')}${sel.length >= 2 ? `<button type="button" class="cmp-mas" data-act="cmp-pick">${abierto ? 'Listo' : '+ Cambiar'}</button>` : ''}</div>` : '';
-  const grilla = abierto ? `<label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Buscar ticker" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
-    <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' hidden' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>` : '';
-  const chips = `<div class="cmp-pick">${elegidas}${grilla}</div>`;
-  if (sel.length < 2) return `<div class="hoja"><p class="small muted" style="margin:0 0 8px">${sel.length ? 'Eleg\u00ed otra para comparar' : 'Eleg\u00ed de dos a cuatro empresas'} (w = watchlist).</p>${chips}</div>`;
-
+  if (!ui.cmpVer || sel.length < 2) return `<div class="hoja cmp-pick">
+    <label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Buscar ticker" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
+    <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' hidden' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>
+    <div class="cmp-ir"><span id="cmp-n">${cmpCuenta(sel.length)}</span><button type="button" class="btn primary" data-act="cmp-ver" ${sel.length < 2 ? 'disabled' : ''}>Comparar</button></div>
+  </div>`;
+  const chips = `<div class="cmp-top"><span>${sel.map(esc).join(' \u00b7 ')}</span><button type="button" class="btn sm ghost" data-act="cmp-pick">Cambiar</button></div>`;
   const datos = sel.map(t => ({ t, d: Fund.de(t), px: px[t] ? px[t].c : null, dp: px[t] ? px[t].dp : null, estado: px[t] ? px[t].estado : null }));
   const cargando = datos.filter(x => !x.d).map(x => x.t);
   const lidera = Object.fromEntries(sel.map(t => [t, 0])); let filasConLider = 0;
@@ -695,25 +695,29 @@ async function cmpTraer() {
     const d = Fund.de(t); if (d && d.at > viejo) continue;
     try { await Fund.traer(t); } catch (e) {}
     if (ui.cmpTok !== tok) return;
-    const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody();
+    if (ui.cmpVer) { const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody(); }  // eligiendo no se redibuja
   }
   Persist.save();
 }
+function cmpCuenta(n) { return n ? `${n} elegida${n > 1 ? 's' : ''} (m\u00e1x. ${CMP_MAX})` : `Eleg\u00ed de 2 a ${CMP_MAX} (w = watchlist)`; }
 function cmpToggle(t) {
   const sel = ui.cmp || (ui.cmp = []);
   const i = sel.indexOf(t);
   if (i >= 0) sel.splice(i, 1);
   else if (sel.length >= CMP_MAX) { toast(`Hasta ${CMP_MAX} a la vez: sac\u00e1 una primero`); return; }
   else sel.push(t);
-  const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody();
+  // elegir no redibuja: solo prende o apaga el boton y actualiza la cuenta (nada se mueve)
+  const btn = $(`#modal .cmp-grid button[data-id="${CSS.escape(t)}"]`); if (btn) btn.classList.toggle('on', sel.includes(t));
+  const n = $('#cmp-n'); if (n) n.textContent = cmpCuenta(sel.length);
+  const ir = $('#modal [data-act="cmp-ver"]'); if (ir) ir.disabled = sel.length < 2;
   cmpTraer();
 }
 function formComparar(t) {
-  ui.cmp = t ? [t] : (ui.cmp || []).slice(0, CMP_MAX);
-  Modal.open({ title: 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: 'Listo', onSubmit: () => {} });
+  ui.cmp = t ? [t] : (ui.cmp || []).slice(0, CMP_MAX); ui.cmpVer = false; ui.cmpQ = '';
+  Modal.open({ title: 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: '' });
   // la lupa filtra la grilla sin redibujar (no se cierra el teclado); Enter elige la primera que quede
   $('#modal').oninput = e => { if (e.target.id !== 'cmp-q') return; ui.cmpQ = e.target.value; const q = e.target.value.trim().toUpperCase(); $$('#modal .cmp-grid button').forEach(b => { b.hidden = !!q && !b.dataset.id.startsWith(q); }); };
-  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.hidden); if (b) { ui.cmpQ = ''; cmpToggle(b.dataset.id); } };
+  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.hidden); if (b) cmpToggle(b.dataset.id); };
   cmpTraer();
 }
 function formWatch() {
