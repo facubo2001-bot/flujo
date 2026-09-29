@@ -32,6 +32,10 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### EMA 200 (28-sep, build 202609290129)
+- `tools/tecnico.mjs` en la tarea diaria: precios diarios ajustados (Yahoo chart 12 años; Stooq de respaldo), EMA 200 y SMA 200, "toques" en 10 años (cierre ≤ EMA viniendo de ≥5 % arriba; se rearma al volver a 5 % arriba), último toque, pendiente de la EMA (vs hace ~1 mes) → `sec/tecnico.json`.
+- App `Tec`: carga una vez por día; `Tec.de(t)` compara con el precio de hoy (descarta si el cierre de la serie y el precio difieren >35 %). Ficha: línea "EMA 200 · +2,2 % · la tocó 5 veces en 10 años · última …" bajo el rango de 52 semanas. Novedades: chips con borde blanco si está entre +3 % y −5 % de la EMA 200. Comparador: fila "vs EMA 200". Export: línea "Cerca de su EMA 200".
+
 ### CAGR exacto + lupa quieta (28-sep, build 202609290125)
 - Facu: el CAGR es lo que más mira al comparar; tiene que estar perfecto. `Fund.cagrDet(filas, campo, n)`: último ejercicio contra el de exactamente n años antes; si falta un año, el último FY no tiene el dato, o alguno es ≤ 0 → null ("—"). Antes tomaba los primeros positivos (podía saltar años). EPS = ganancia / acciones diluidas ajustadas por split en ambos extremos (`epsCalc`); ya no se usa el crecimiento de EPS de Finnhub. `d.cagrDet` guarda desde/hasta/valores; la ficha muestra "FY20→25" bajo cada dato.
 - Resultados reales: MSFT FY21→26 ventas 14,6 %, EPS 17,4 %; NVDA EPS 95,3 % (0,17→4,90 ajustado por splits); META EPS 18,4 %; MELI ganancia/EPS "—" (2020 negativo); GOOGL EPS "—" (faltan acciones en 2020); NVDA FCF "—" (capex de 2021 con etiqueta propia, no está en la SEC).

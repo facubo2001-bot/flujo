@@ -803,6 +803,27 @@ const Precios = {
   },
 };
 
+/* ---------- EMA 200 (la baja la tarea diaria del repo: tools/tecnico.mjs -> sec/tecnico.json) ---------- */
+const Tec = {
+  datos: null, dia: null,
+  async cargar() {
+    const hoy = D.today(); if (Tec.dia === hoy) return;
+    try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/tecnico.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) Tec.datos = await r.json(); } } catch (e) {}
+    Tec.dia = hoy;
+  },
+  /** EMA 200 de un ticker contra el precio de hoy: {ema, dist (precio/ema - 1), toques10, ultimoToque, fecha} */
+  de(t) {
+    const x = Tec.datos && Tec.datos[Precios.simbolo(t)]; if (!x || !x.ema200) return null;
+    const px = state.cartera.precios[t] && state.cartera.precios[t].c;
+    // el precio de BYMA/Finnhub y el ajustado de la serie pueden diferir si hubo split reciente: si el cierre de la serie y el precio de hoy
+    // estan a mas de 35 % se descarta
+    if (!px || Math.abs(px / x.cierre - 1) > 0.35) return null;
+    return { ema: x.ema200, sma: x.sma200, dist: px / x.ema200 - 1, toques10: x.toques10, ultimoToque: x.ultimoToque, anios: x.anios, fecha: x.fecha, sube: x.ema200 >= x.ema200hace30 };
+  },
+  /** cerca de la EMA 200: entre 3 % arriba y 5 % abajo */
+  cerca(t) { const e = Tec.de(t); return e && e.dist <= 0.03 && e.dist >= -0.05 ? e : null; },
+};
+
 /* ---------- balances oficiales de la SEC, bajados por la tarea diaria del repo (tools/sec.mjs -> sec/<T>.json) ---------- */
 const Sec = {
   _cache: {},
@@ -1299,6 +1320,7 @@ const Motor = {
   arrancar() {
     if (Motor._run) return Motor._run;
     Motor._run = (async () => {
+      if (Tec.dia !== D.today()) { await Tec.cargar(); Motor.pintar(); }
       for (;;) {
         if (document.hidden || !(state.settings.finnhubKey || '').trim() || window.claude) break;
         const venc = Precios.vencidos();

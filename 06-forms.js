@@ -509,6 +509,8 @@ function fundHTML(t, pos) {
     const p52 = clamp((precio - d.min52) / (d.max52 - d.min52), 0, 1);
     rango = `<div class="rg"><div class="bar"><i style="left:${(p52 * 100).toFixed(1)}%"></i></div><div class="rl"><span>${num(d.min52, d.min52 < 100 ? 2 : 0)}</span><span>52W \u00b7 ${(p52 * 100).toFixed(0)} %</span><span>${num(d.max52, d.max52 < 100 ? 2 : 0)}</span></div></div>`;
   }
+  { const e = Tec.de(t); if (e) { const pc = v => `${v >= 0 ? '+' : '\u2212'}${Math.abs(v * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+    rango += `<div class="ema"><span><b>EMA 200</b> ${num(e.ema, e.ema < 100 ? 2 : 0)} <span class="${e.dist >= 0 ? 'up' : 'down'}">${pc(e.dist)}</span>${e.sube ? '' : ' <span class="soft">\u00b7 bajando</span>'}</span><span class="soft">${e.toques10 != null ? `la toc\u00f3 ${e.toques10} ${e.toques10 === 1 ? 'vez' : 'veces'} en ${Math.min(10, Math.round(e.anios))} a\u00f1os${e.ultimoToque ? ` \u00b7 \u00faltima ${D.fmt(e.ultimoToque, { year: true })}` : ''}` : ''}</span></div>`; } }
   const tieneAcc = pos && pos.acciones;
   const acciones = `<div class="acts"><button type="button" class="a p" data-act="op-para" data-id="${esc(t)}|compra">+ Comprar</button>${tieneAcc ? `<button type="button" class="a" data-act="op-para" data-id="${esc(t)}|venta">Vender</button><button type="button" class="a" data-act="op-para" data-id="${esc(t)}|dividendo">Dividendo</button>` : ''}<button type="button" class="a" data-act="comparar" data-id="${esc(t)}">Comparar</button></div>`;
   const tab = ui.fichaTab || 'fund';
@@ -638,6 +640,7 @@ const CMP_FILAS = [
   { k: 'P/E vs su mediana', v: d => d.pe && d.peMediana ? d.pe / d.peMediana - 1 : null, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
+  { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : `${v >= 0 ? '+' : '\u2212'}${Math.round(Math.abs(v) * 100)} %`, mejor: -1 },
   { k: 'Dividendo', v: d => d.divAnual && (state.cartera.precios[d.ticker] || {}).c ? d.divAnual / state.cartera.precios[d.ticker].c : ((d.v || 1) >= 5 ? null : d.yieldDiv || null), f: cmpPct, mejor: 0 },
   { k: 'Capitalizaci\u00f3n', v: d => d.capUSD || null, f: v => v == null ? '\u2014' : v >= 1e12 ? `${cmpNum(1)(v / 1e12)} bill.` : `${cmpNum(0)(v / 1e9)} mil M`, mejor: 0 },
 ];
@@ -962,6 +965,7 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
       if (viejas.length) l.push(`- **Fundamentales por actualizar** (los de arriba son de la \u00faltima ficha guardada): ${viejas.join(', ')}`);
       if (pg.sinDatos.length) l.push(`- **Finnhub no tiene fundamentales** (OTC o Brasil): ${pg.sinDatos.join(', ')}`);
       if (pg.sinFuente.length) l.push(`- **Sin precio en Finnhub** (OTC o Brasil; se reintenta una vez por mes): ${pg.sinFuente.join(', ')}`);
+      { const ce = todas.map(p => [p.ticker, Tec.cerca(p.ticker)]).filter(([, e]) => e); if (ce.length) l.push(`- **Cerca de su EMA 200** (entre 3 % arriba y 5 % abajo; pasa pocas veces): ${ce.map(([t, e]) => `${t} ${e.dist >= 0 ? '+' : '\u2212'}${Math.abs(e.dist * 100).toFixed(1)} % (la toc\u00f3 ${e.toques10} veces en 10 a\u00f1os)`).join(' \u00b7 ')}`); }
       { const bz = Fund.baratas(todas.map(p => p.ticker)); if (bz.length) l.push(`- **Baratas contra su propia historia** (P/E de hoy \u2265 20 % por debajo de su mediana de 10 a\u00f1os, con ROIC \u2265 12 % o ROE \u2265 15 %): ${bz.map(x => `${x.t} ${x.b.pe.toFixed(1)} vs ${x.b.med.toFixed(1)} (\u2212${Math.round(x.b.desc * 100)} %)`).join(' \u00b7 ')}. Revis\u00e1 si es una oportunidad o si el mercado ve algo que la historia no.`); }
       { const av = todas.map(p => [p.ticker, (Fund.de(p.ticker) || {}).avisos || []]).filter(([, a]) => a.length); if (av.length) l.push(`- **Avisos del control autom\u00e1tico** (tomalos con pinzas): ${av.map(([t, a]) => `${t}: ${a.join('; ')}`).join(' \u00b7 ')}`); }
       return l.length ? `\n\n## Datos que faltan\n${l.join('\n')}\nSi para analizar alguno necesit\u00e1s el dato, ped\u00edmelo.` : ''; })()}`,
