@@ -908,6 +908,13 @@ const Fund = {
     capex: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets', 'PaymentsForCapitalImprovements', 'PaymentsToAcquireOtherPropertyPlantAndEquipment', 'PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets'],
     acciones: ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic', 'CommonStockSharesOutstanding'],
   },
+  /** ganancia bruta: la presentada, o ventas - costo. Sin ganancia bruta presentada, si el "costo" es una parte chica
+   *  (UNH: solo productos, sin costos medicos) el margen sale absurdo (88 % bruto con 4 % operativo) -> sin dato */
+  bruto(ic, opi) {
+    const V = Fund._v; const g = V(ic, ['GrossProfit']); if (g != null) return g;
+    const v = V(ic, Fund.C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); if (v == null || cr == null) return null;
+    const gb = v - cr; return v > 0 && opi != null && (gb - opi) / v > 0.6 ? null : gb;
+  },
   /** dividendo por accion pagado (o declarado) en el periodo */
   dps(ic, cf) { const k = ['CommonStockDividendsPerShareCashPaid', 'CommonStockDividendsPerShareDeclared']; const v = Fund._v(ic, k) ?? Fund._v(cf, k); return v != null ? Math.abs(v) : null; },
   /** el "año fiscal" que viene en la SEC (fy) a veces esta mal: HON etiqueto su 10-K de 2021 como 2020 (pisaba al 2020 y el CAGR
@@ -935,10 +942,7 @@ const Fund = {
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
         ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi,
-        bruto: (() => { const g = V(ic, ['GrossProfit']); if (g != null) return g; const v = V(ic, C.ventas), cr = V(ic, ['CostOfRevenue', 'CostOfGoodsAndServicesSold']); if (v == null || cr == null) return null;
-          // sin ganancia bruta presentada se arma ventas - costo; si el "costo" es una parte chica (UNH: solo productos, sin costos medicos)
-          // el margen sale absurdo (88 % bruto con 4 % operativo) -> sin dato
-          const gb = v - cr; return v > 0 && opi != null && (gb - opi) / v > 0.6 ? null : gb; })(),
+        bruto: Fund.bruto(ic, opi),
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), dps: Fund.dps(ic, cf), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
         fcf: cfo != null && cpx != null ? cfo - Math.abs(cpx) : null,
@@ -1028,7 +1032,8 @@ const Fund = {
       const meses = ini && D.parse(ini) ? Math.round((D.parse(fin) - D.parse(ini)) / (30.4 * 86400000)) : null;
       const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = V(cf, C.capex); const abs = v => v != null ? Math.abs(v) : null;
       let acc = V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']); if (acc > 0 && acc < 1e5) acc *= 1e6;
-      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), capital: Fund.capitalTotal(bs),
+      const opi = V(ic, C.operativo);
+      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), operativo: opi, bruto: Fund.bruto(ic, opi), capital: Fund.capitalTotal(bs),
         cfo, capex: abs(cpx), div: abs(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])) ?? (Fund.dps(ic, cf) > 0 && acc > 0 ? Fund.dps(ic, cf) * acc : null), recompra: abs(V(cf, ['PaymentsForRepurchaseOfCommonStock'])), acciones: acc };
     }).sort((a, b) => a.fin.localeCompare(b.fin));
   },
@@ -1079,7 +1084,7 @@ const Fund = {
   /** multiplos con el precio de hoy y los ultimos 12 meses de la SEC/Finnhub. Solo si el balance esta en dolares y el valor de
    *  mercado propio coincide con el de Finnhub (+-25 %): si no (ADR con otra relacion de acciones, otra moneda) -> sin dato */
   mult(t, d = Fund.de(t)) {
-    const o = { pe: null, ps: null, pfcf: null, fcfY: null, eps: null, payout: null, recompras: null, base: null };
+    const o = { pe: null, ps: null, pfcf: null, pcf: null, fcfY: null, eps: null, payout: null, recompras: null, base: null };
     if (!d || !d.ttm || d.moneda && d.moneda !== 'USD') return o;
     // sin 10-Q (20-F) o con el ultimo anual de hace mas de 13 meses no hay "ultimos 12 meses" -> sin dato (NU, VIST: 2024)
     if (d.solo20F || (d.ttm.base === 'fy' && d.ttm.hasta && D.daysBetween(d.ttm.hasta, D.today()) > 400)) return o;
@@ -1088,7 +1093,7 @@ const Fund = {
     if (d.capUSD && d.pxCap && Math.abs((d.capUSD / d.pxCap * px) / mcap - 1) > 0.25) return o;
     o.base = x.base; o.eps = x.neto != null ? x.neto / x.acciones : null;
     o.pe = x.neto > 0 ? mcap / x.neto : null; o.ps = x.ventas > 0 ? mcap / x.ventas : null;
-    o.pfcf = x.fcf > 0 ? mcap / x.fcf : null; o.fcfY = x.fcf != null ? x.fcf / mcap : null;
+    o.pfcf = x.fcf > 0 ? mcap / x.fcf : null; o.pcf = x.cfo > 0 ? mcap / x.cfo : null; o.fcfY = x.fcf != null ? x.fcf / mcap : null;
     o.payout = x.div != null && x.neto > 0 ? x.div / x.neto : null; o.recompras = x.recompra != null ? x.recompra / mcap : null;
     return o;
   },
@@ -1222,7 +1227,7 @@ const Fund = {
     // ultimos 12 meses para los multiplos propios (Fund.mult)
     if (u) { const T = c => Fund.ttmCampo(filas, trims, c); const ve = T('ventas'), ne = T('neto'), cfo = T('cfo'), cpx = T('capex'), dv = T('div'), rc = T('recompra');
       const qa = trims.filter(q => q.acciones > 0 && q.fin > u.fin); const acc = qa.length ? qa[qa.length - 1].acciones : u.acciones;
-      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null }; }
+      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, cfo: cfo ? cfo.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null }; }
     d.pxCap = state.cartera.precios[t] && state.cartera.precios[t].c || null;
     // deuda / patrimonio como TradingView: deuda total (corto + largo + leases) / patrimonio del ultimo balance (trimestral si hay)
     { const qs = trims.filter(q => q.capital && q.capital.deudaTotal != null); const ultQ = qs[qs.length - 1];
@@ -1251,7 +1256,13 @@ const Fund = {
     // margen bruto y operativo del ultimo ejercicio, con la misma cuenta que TradingView (columna del anio). Si el balance no los trae, el TTM de Finnhub
     { const pr = (campo) => { const xs = filas.filter(f => f.ventas > 0 && f[campo] != null); const uu = xs[xs.length - 1]; if (!uu || uu.anio !== (u && u.anio)) return null; const ult5 = xs.slice(-5).map(f => f[campo] / f.ventas); return { v: uu[campo] / uu.ventas, p5: ult5.length >= 3 ? sum(ult5) / ult5.length : null }; };
       const mb = pr('bruto'); if (mb) { d.margenBruto = mb.v; d.margenBruto5 = mb.p5; d.margenBrutoFY = true; }
-      const mo = pr('operativo'); if (mo) { d.margenOper = mo.v; d.margenOper5 = mo.p5; d.margenOperFY = true; } }
+      const mo = pr('operativo'); if (mo) { d.margenOper = mo.v; d.margenOper5 = mo.p5; d.margenOperFY = true; }
+      // el margen de hoy es el de los ultimos 12 meses (como lo muestra TradingView arriba de todo); el promedio de 5 anios sigue por ejercicio.
+      // Facu, chequeo 2: MU 39,8 % (FY25) vs 84,6 % (12 m), META operativo 41,4 vs 30,9
+      const T = c => Fund.ttmCampo(filas, trims, c); const ve = T('ventas');
+      if (ve && ve.base === 'ttm' && ve.v > 0) for (const [c, k] of [['bruto', 'margenBruto'], ['operativo', 'margenOper'], ['neto', 'margenNeto']]) {
+        const x = T(c); if (x && x.base === 'ttm' && x.hasta === ve.hasta) { d[k] = x.v / ve.v; d[k + 'FY'] = false; d.margenHasta = ve.hasta; if (k === 'margenNeto') d.margenNetoAnio = null; }
+      } }
     // Empresas con 20-F (solo balances de la SEC, sin Finnhub ni 10-Q): TradingView calcula ROIC y ROE distinto (ASML 43 vs 51, ROE 50 vs 54)
     // -> no se muestran; ventas, ganancia, margenes y crecimiento si (son cuentas directas del balance)
     d.solo20F = !!(sec && !(fin0 && fin0.data && fin0.data.length) && !trims.length);
@@ -1314,7 +1325,7 @@ const Fund = {
   },
   baratas(tickers) { return tickers.map(t => ({ t, b: Fund.barata(t) })).filter(x => x.b).sort((a, b) => b.b.desc - a.b.desc); },
   /** dividend yield con el precio de hoy */
-  yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) return d.divAnual && px ? d.divAnual / px : null; return d.yieldDiv || null; },
+  yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
   VERSION: 10,

@@ -519,12 +519,16 @@ function fundHTML(t, pos) {
   let pane;
   if (!d) pane = `<div class="n" style="padding:14px 0">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes para ver los fundamentales.'}</div>`;
   else {
+    // margenes: "12 m" = ultimos 12 meses (como el numero grande de TradingView); si no hay 10-Q, el del ultimo anio fiscal
+    const msub = (fy, p5, anio) => [fy === false ? '12 m' : anio ? `FY${String(anio).slice(2)}` : '', p5 != null ? `5Y ${pct1(p5)}` : ''].filter(Boolean).join(' \u00b7 ');
     const q = grupo('Quality', 'Contra su propio promedio de 5 a\u00f1os: verde si hoy est\u00e1 mejor, amarillo si est\u00e1 parecido, rojo si est\u00e1 peor. ROIC al estilo TradingView (ganancia neta / patrimonio + deuda). FCF / NI: cu\u00e1nto de la ganancia se convierte en caja.', [
       tile('ROIC', pct1(d.roicAct), d.roicProm5 ? vsH(d.roicAct, d.roicProm5) : abs(d.roicAct, 0.15, 0.10), d.roicProm5 ? `5Y avg ${pct1(d.roicProm5)}` : (d.roicFuente === 'ttm' ? 'TTM' : ''), `data-act="fund-cuenta" data-id="${esc(t)}"`),
       tile('ROE', d.roe != null && d.roe > 1 ? '>100 %' : pct1(d.roe), d.roe5 ? vsH(d.roe, d.roe5) : abs(d.roe, 0.15, 0.10), d.roe5 ? `5Y avg ${pct1(d.roe5)}` : ''),
-      tile('Net margin', pct1(d.margenNeto), vsH(d.margenNeto, d.margenNeto5), d.margenNetoAnio ? `FY${String(d.margenNetoAnio).slice(2)}${d.margenNeto5 ? ` \u00b7 5Y ${pct1(d.margenNeto5)}` : ''}` : (d.margenNeto5 ? `5Y avg ${pct1(d.margenNeto5)}` : '')),
-      tile('Gross margin', pct1(d.margenBruto), vsH(d.margenBruto, d.margenBruto5), d.margenBruto5 ? `5Y avg ${pct1(d.margenBruto5)}` : ''),
-      tile('Op. margin', pct1(d.margenOper), vsH(d.margenOper, d.margenOper5), d.margenOper5 ? `5Y avg ${pct1(d.margenOper5)}` : ''),
+      tile('Net margin', pct1(d.margenNeto), vsH(d.margenNeto, d.margenNeto5), msub(d.margenNetoFY, d.margenNeto5, d.margenNetoAnio)),
+      tile('Gross margin', pct1(d.margenBruto), vsH(d.margenBruto, d.margenBruto5), msub(d.margenBrutoFY, d.margenBruto5)),
+      // margen operativo fuera: cada empresa define "operativo" distinto y no coincidia con TradingView (META 38 vs 31, IBM 15 vs 19).
+      // En su lugar, el ROIC del ultimo anio fiscal, que si coincide (MELI 18,82, HD 21,77, MCD 17,15...)
+      tile('ROIC FY', pct1(d.roicFY), d.roicProm5 ? vsH(d.roicFY, d.roicProm5) : abs(d.roicFY, 0.15, 0.10), (() => { const u = (d.filas || [])[(d.filas || []).length - 1]; return u ? `FY${String(u.anio).slice(2)}` : ''; })()),
       tile('FCF / NI', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', d.fcfSobreNeto5 ? vsH(d.fcfSobreNeto, d.fcfSobreNeto5) : abs(d.fcfSobreNeto, 0.9, 0.6), d.fcfSobreNeto5 ? `5Y avg ${num(d.fcfSobreNeto5, 2)}\u00d7` : ''),
     ]);
     // periodo exacto del CAGR (FY20\u2192FY25); si no hay dato: 'con base negativa' o sin anios
@@ -543,7 +547,8 @@ function fundHTML(t, pos) {
       tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'),
       tile('P/S', num(mu.ps, 1), vsH(mu.ps, d.psMed, false), mu.ps != null ? (d.psMed ? `10Y med ${num(d.psMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
       tile('P/FCF', num(mu.pfcf, 1), vsH(mu.pfcf, d.pfcfMed, false), mu.pfcf != null ? (d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
-      tile('FCF yield', mu.fcfY != null ? pct1(mu.fcfY) : '\u2014', abs(mu.fcfY, 0.05, 0.025), 'caja libre / valor'),
+      // P/CF = precio / flujo de caja operativo (el "Price to cash flow" de TradingView); P/FCF descuenta ademas las inversiones (capex)
+      tile('P/CF', num(mu.pcf, 1), '', mu.pcf != null ? 'caja operativa' : ''),
       tile('Div. yield', Fund.yieldDe(t, d) ? pct1(Fund.yieldDe(t, d)) : '\u2014', '', [mu.payout != null ? `payout ${pct1(mu.payout)}` : '', mu.recompras ? `recompra ${pct1(mu.recompras)}` : ''].filter(Boolean).join(' \u00b7 ')),
     ]);
     const bs = grupo('Balance sheet', 'Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana.', [
@@ -967,7 +972,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.fcfY != null ? pc(mu.fcfY) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -981,7 +986,7 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 FCF yield (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto del \u00faltimo a\u00f1o fiscal (prom. 5 a\u00f1os) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
+| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));

@@ -32,6 +32,14 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Chequeo 2 vs TradingView (29-sep, build 202609292326)
+- Facu comparó P/FCF contra el "Price to cash flow" de TV (caja OPERATIVA): MSFT 57,4 vs 20,7. Nuestro P/FCF está bien (MSFT FCF 67 B con capex 116 B). Se agregó **P/CF** (precio / caja operativa 12 m, `Fund.mult().pcf`) en lugar de FCF yield (era 1/P/FCF): coincide en 12 de 13 (MSFT 21,0/20,7 · META 14,8/14,1 · GOOGL 22,7/22,7 · MCD 14,9/14,6 · HD 15,6/15,4 · PEP 13,1/13,1 · UNH 12,7/12,7 · AMZN 16,8/16,6 · CEG 22,4/22,3 · IBM 14,4/14,1 · NVDA 40,8/41,4). MELI 6,4 vs 8,45: la caja operativa de la SEC (13,9 B en 12 m) no es la de TV.
+- Márgenes bruto y neto: ahora de los últimos 12 meses (TTM, "12 m" en la ficha), el promedio 5 años sigue por ejercicio. MU queda atrás hasta su 10-K (TV ya tiene el trimestre de agosto por el comunicado). CEG bruto 43,9 vs 17,4: TV cuenta más costos (definición).
+- **Margen operativo sacado**: cada empresa define "operativo" distinto (META 38 vs 31, IBM 15 vs 19, UNH 4,8 vs 7,1). En su lugar, **ROIC FY** (ya verificado contra TV).
+- Div. yield sin dato de Finnhub: dividendo 12 m / acciones de la SEC.
+- Pendiente sin explicación: CEG EPS 12 m 9,71 vs TV 7,39 (la ganancia de la SEC y la de Finnhub coinciden con la nuestra).
+- Recompras (12 m): en TV está en Financials → Cash flow → "Repurchase of common stock".
+
 ### Gráfico de a uno + auditoría de rendimiento y fundamentales (29-sep, build 202609292247)
 - Ficha: Revenue · Net income · FCF ahora es un gráfico por vez con selector (`fundChartHTML`, acción `fund-chart`, `ui.fundChart`); valor arriba de cada barra, negativos en rojo hacia abajo, último año en celeste, pie con el CAGR 5 años del dato elegido.
 - **Rendimiento (auditado contra un cálculo independiente en Python: costo, realizado, dividendos, caja, TIR Todo/YTD con y sin dividendos: todo igual)**. Escenario sintético compra → venta a caja → recompra con caja → dividendo → plata nueva: cuadra (1.400 puestos, 1.640 hoy, ganancia 240 = no realizado 120 + realizado 100 + dividendo 20).
