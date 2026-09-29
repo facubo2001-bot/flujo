@@ -614,7 +614,7 @@ function formPosicion(ticker) {
  * Hasta tres tickers de la cartera o la watchlist, las mismas metricas que la ficha, una al lado de la otra.
  * La pregunta aca es "cual es mejor", no "esta es buena": por eso no hay semaforo. Los valores van en gris
  * y el que lidera cada fila va en blanco con un punto. Al pie, en cuantas filas lidera cada una. */
-const CMP_MAX = 3;
+const CMP_MAX = 4;
 const cmpPct = v => v == null ? '\u2014' : `${v < 0 ? '\u2212' : ''}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
 const cmpNum = n => v => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
 const CMP_FILAS = [
@@ -657,7 +657,7 @@ function cmpBody() {
   const grilla = abierto ? `<label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Buscar ticker" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
     <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' hidden' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>` : '';
   const chips = `<div class="cmp-pick">${elegidas}${grilla}</div>`;
-  if (sel.length < 2) return `<div class="hoja"><p class="small muted" style="margin:0 0 8px">${sel.length ? 'Eleg\u00ed otra para comparar' : 'Eleg\u00ed dos o tres empresas'} (w = watchlist).</p>${chips}</div>`;
+  if (sel.length < 2) return `<div class="hoja"><p class="small muted" style="margin:0 0 8px">${sel.length ? 'Eleg\u00ed otra para comparar' : 'Eleg\u00ed de dos a cuatro empresas'} (w = watchlist).</p>${chips}</div>`;
 
   const datos = sel.map(t => ({ t, d: Fund.de(t), px: px[t] ? px[t].c : null, dp: px[t] ? px[t].dp : null, estado: px[t] ? px[t].estado : null }));
   const cargando = datos.filter(x => !x.d).map(x => x.t);
@@ -682,7 +682,7 @@ function cmpBody() {
   const cab = `<tr class="cab"><th></th>${datos.map(x => `<th><b>${esc(x.t)}</b><span>${x.px != null ? fmtU(x.px) : 'US$ x.xxx'}</span>${x.estado ? `<span class="dot ${x.estado === 'urgente' ? 'crit' : 'warn'}" title="en zona de compra"></span>` : ''}</th>`).join('')}</tr>`;
   const score = `<tr class="score"><td class="k">Lidera en</td>${sel.map(t => `<td class="${lidera[t] === maxL && maxL > 0 ? 'top' : ''}">${lidera[t]} de ${filasConLider}</td>`).join('')}</tr>`;
   return `<div class="hoja">${chips}
-    <div class="cmp-wrap"><table class="cmp-t"><thead>${cab}</thead><tbody>${filas}${score}</tbody></table></div>
+    <div class="cmp-wrap"><table class="cmp-t n${sel.length}"><thead>${cab}</thead><tbody>${filas}${score}</tbody></table></div>
     <div class="f-pie">${cargando.length ? `Trayendo ${cargando.join(', ')} de Finnhub\u2026 \u00b7 ` : ''}Lidera: el mejor valor de la fila entre las elegidas, sin juzgar si es bueno en absoluto; eso lo dice la ficha de cada una. Rango 52 semanas: m\u00e1s bajo es m\u00e1s cerca del m\u00ednimo. Tachado: no compite, por patrimonio negativo o ROE arriba de 100 % (recompras que achican el patrimonio).</div>
   </div>`;
 }

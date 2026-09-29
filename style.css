@@ -1099,3 +1099,8 @@ h2 .i-btn{vertical-align:3px}
 .cmp-q .input{border:0;background:transparent;height:40px;min-height:40px;padding:0;flex:1;min-width:0;text-transform:uppercase}
 .cmp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 @media (max-width:340px){.cmp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* comparador con 4: mas angosto */
+.cmp-t.n4 th:first-child,.cmp-t.n4 td.k{width:26%;font-size:11.5px}
+.cmp-t.n4 th,.cmp-t.n4 td{padding:7px 2px;font-size:12px}
+.cmp-t.n4 .cab b{font-size:13px}
+.cmp-t.n4 .cab span{font-size:10px}
