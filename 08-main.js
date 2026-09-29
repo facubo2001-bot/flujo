@@ -174,6 +174,7 @@ const Actions = {
   pos(t) { formPosicion(t); },
   comparar(t) { formComparar(t); },
   'cmp-toggle'(t) { cmpToggle(t); },
+  'cmp-pick'() { ui.cmpPick = !ui.cmpPick; const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody(); },
   'new-watch'() { formWatch(); },
   'del-alerta'(t) { delete state.cartera.alertas[t]; Persist.save(); Modal.close(); render(); toast(`Alerta de ${t} quitada`); },
   'precios-update'() { const b = $('[data-act="precios-update"]'); if (b) b.classList.add('girando'); Precios.actualizar(false).finally(() => { const x = $('[data-act="precios-update"]'); if (x) x.classList.remove('girando'); }); },

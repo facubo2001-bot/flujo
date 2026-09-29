@@ -32,6 +32,9 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Comparador sin scroll horizontal (28-sep, build 202609290114)
+- Selector nuevo: lupa (filtra por inicio del ticker sin redibujar; Enter elige la primera) + grilla de 4 columnas (3 si la pantalla < 340 px), tenencias primero y watchlist (w) en orden alfabético. Con 2+ elegidas la grilla se pliega en chips con × y "+ Cambiar" (`ui.cmpPick`).
+
 ### Múltiplos propios con la SEC + precio (28-sep, build 202609282351)
 - `Fund.ttmCampo`: últimos 12 meses de cualquier flujo (ventas, neto, cfo, capex, dividendos, recompras) = anual + YTD − YTD del año anterior. `d.ttm` con acciones diluidas del último trimestre.
 - `Fund.mult(t)`: con el precio de hoy → P/E, P/S, P/FCF, FCF yield, EPS 12 m, payout, recompras/valor. Sin dato ("—") si el balance no está en USD, si es 20-F o el anual tiene >13 meses (NU, VIST), o si el valor de mercado propio difiere >25 % del de Finnhub (ADR con otra relación).
