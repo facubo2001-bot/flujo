@@ -108,7 +108,38 @@ function extraer(j) {
   }
   // una presentacion por periodo (la ultima, por si hubo enmiendas); de la mas nueva a la mas vieja
   const uno = arr => { const m = new Map(); for (const r of arr) { const p = m.get(r.endDate); if (!p || r.filedDate > p.filedDate) m.set(r.endDate, r); } return [...m.values()].sort((a, b) => b.endDate.localeCompare(a.endDate)); };
-  out.annual = uno(out.annual).filter(r => r.report.ic.length).slice(0, 13);
+  let anuales = uno(out.annual).filter(r => r.report.ic.length);
+  // comparativos de cada 10-K (los anios anteriores que vuelve a presentar): sirven para
+  //  1) un anio cuyo 10-K no esta en los datos de la SEC (SPGI 2024): se arma con los comparativos del 10-K siguiente
+  //  2) detectar splits sin adivinar: el 10-K siguiente reexpresa las acciones del anio anterior (NVDA x10); una fusion no las reexpresa
+  const anualesF = [...filings.values()].filter(f => FORMS_A.has(f.form)).sort((a, b) => a.filed.localeCompare(b.filed));
+  const esAnual = x => x.start && !x.c.startsWith('dei_') && dias(x.start, x.end) >= 330 && dias(x.start, x.end) <= 400;
+  const propios = new Set(anuales.map(r => r.endDate));
+  const finDe = new Map(anuales.map(r => [r.endDate, r]));
+  const ACC = ['us-gaap_WeightedAverageNumberOfDilutedSharesOutstanding', 'us-gaap_WeightedAverageNumberOfSharesOutstandingBasic'];
+  for (const f of anualesF) {
+    const finF = f.items.filter(esAnual).reduce((m, x) => (x.end > m ? x.end : m), ''); if (!finF) continue;
+    const previos = [...new Set(f.items.filter(x => esAnual(x) && x.end < finF).map(x => x.end))];
+    for (const e of previos) {
+      const r = finDe.get(e);
+      // acciones del anio e segun este 10-K posterior (el primero que lo reexpresa manda)
+      if (r && r.accSig == null) { for (const c of ACC) { const x = f.items.find(y => y.c === c && y.end === e && esAnual(y)); if (x) { r.accSig = x.val; r.accSigFiled = f.filed; break; } } }
+      if (propios.has(e)) continue;
+      // anio sin 10-K propio: se arma con los comparativos (resultado y flujos del anio + balance al cierre)
+      const porC = {}; const bs = [];
+      for (const x of f.items) {
+        if (x.end !== e || x.c.startsWith('dei_')) continue;
+        if (x.start) { if (!esAnual(x)) continue; const p = porC[x.c]; if (!p || x.filed > p.filed) porC[x.c] = x; }
+        else if (!bs.find(y => y.concept === x.c)) bs.push({ concept: x.c, value: x.val, unit: x.u });
+      }
+      const ic = Object.values(porC).map(x => ({ concept: x.c, value: x.val, unit: x.u })); if (!ic.length) continue;
+      const inicio = Object.values(porC).filter(x => /Revenue|NetIncomeLoss/.test(x.c)).map(x => x.start).sort()[0] || '';
+      const rep = { year: (f.fy || Number(e.slice(0, 4))) - 1, quarter: 0, form: f.form, startDate: inicio, endDate: e, filedDate: f.filed, comparativo: true, report: { ic, bs } };
+      anuales.push(rep); propios.add(e); finDe.set(e, rep);
+    }
+  }
+  anuales = anuales.sort((a, b) => b.endDate.localeCompare(a.endDate));
+  out.annual = anuales.slice(0, 13);
   out.quarterly = uno(out.quarterly).slice(0, 10);
   return { moneda: moneda || 'USD', ...out };
 }
@@ -129,7 +160,6 @@ const main = async () => {
       const j = await get(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(c).padStart(10, '0')}.json`);
       if (!j) { dbg.sinDatos.push(t); continue; }
       const x = extraer(j);
-      if (['SPGI', 'TJX', 'HON', 'CRM', 'MSFT'].includes(t)) { const g = (j.facts['us-gaap'] || {}); dbg.hechos = dbg.hechos || {}; dbg.hechos[t] = ['NetIncomeLoss', 'Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax'].filter(k => g[k]).map(k => [k, Object.values(g[k].units)[0].filter(it => /10-K/.test(it.form)).map(it => [it.accn, it.fy, it.fp, it.form, it.start, it.end, it.filed, it.val, it.frame || ''])]); }
       if (!x.annual.length) { const formas = {}; for (const tx of Object.values(j.facts || {})) for (const o of Object.values(tx)) for (const arr of Object.values(o.units || {})) for (const it of arr) formas[it.form] = (formas[it.form] || 0) + 1; dbg.sinDatos.push(`${t} (${Object.entries(formas).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([f, n]) => f + ':' + n).join(' ')})`); continue; }
       if (j.facts && j.facts['ifrs-full']) dbg.ifrs[t] = Object.keys(j.facts['ifrs-full']).filter(k => /Revenue|Profit|Equity|Borrow|Lease|Cash|Share/.test(k)).slice(0, 80);
       const doc = { t, cik: c, nombre: j.entityName, moneda: x.moneda, annual: { data: x.annual }, quarterly: { data: x.quarterly } };
