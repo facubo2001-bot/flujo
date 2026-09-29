@@ -129,6 +129,7 @@ const main = async () => {
       const j = await get(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(c).padStart(10, '0')}.json`);
       if (!j) { dbg.sinDatos.push(t); continue; }
       const x = extraer(j);
+      if (['SPGI', 'TJX', 'HON', 'CRM', 'MSFT'].includes(t)) { const g = (j.facts['us-gaap'] || {}); dbg.hechos = dbg.hechos || {}; dbg.hechos[t] = ['NetIncomeLoss', 'Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax'].filter(k => g[k]).map(k => [k, Object.values(g[k].units)[0].filter(it => /10-K/.test(it.form)).map(it => [it.accn, it.fy, it.fp, it.form, it.start, it.end, it.filed, it.val, it.frame || ''])]); }
       if (!x.annual.length) { const formas = {}; for (const tx of Object.values(j.facts || {})) for (const o of Object.values(tx)) for (const arr of Object.values(o.units || {})) for (const it of arr) formas[it.form] = (formas[it.form] || 0) + 1; dbg.sinDatos.push(`${t} (${Object.entries(formas).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([f, n]) => f + ':' + n).join(' ')})`); continue; }
       if (j.facts && j.facts['ifrs-full']) dbg.ifrs[t] = Object.keys(j.facts['ifrs-full']).filter(k => /Revenue|Profit|Equity|Borrow|Lease|Cash|Share/.test(k)).slice(0, 80);
       const doc = { t, cik: c, nombre: j.entityName, moneda: x.moneda, annual: { data: x.annual }, quarterly: { data: x.quarterly } };
