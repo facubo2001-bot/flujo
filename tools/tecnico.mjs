@@ -5,14 +5,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const UA = 'Mozilla/5.0 (flujo-app)';
 async function stooq(t) {
   const s = t.toLowerCase().replace('.', '-') + '.us';
-  const r = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(s)}&i=d`, { headers: { 'User-Agent': UA } });
+  const r = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(s)}&i=d`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
   if (!r.ok) return null; const txt = await r.text(); if (!/^Date,/.test(txt)) return null;
   const filas = txt.trim().split('\n').slice(1).map(l => l.split(',')).map(c => ({ d: c[0], c: Number(c[4]) })).filter(x => x.d && Number.isFinite(x.c) && x.c > 0);
   return filas.length > 250 ? filas : null;
 }
 async function yahoo(t) {
   const s = t.replace('.', '-');
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=12y&interval=1d&events=split`, { headers: { 'User-Agent': UA } });
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=12y&interval=1d&events=split`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
   if (!r.ok) return null; const j = await r.json(); const res = j && j.chart && j.chart.result && j.chart.result[0]; if (!res) return null;
   const ts = res.timestamp || [], adj = (res.indicators.adjclose && res.indicators.adjclose[0].adjclose) || res.indicators.quote[0].close;
   const filas = ts.map((x, i) => ({ d: new Date(x * 1000).toISOString().slice(0, 10), c: Number(adj[i]) })).filter(x => Number.isFinite(x.c) && x.c > 0);
@@ -42,14 +42,17 @@ const main = async () => {
   const ced = JSON.parse(fs.readFileSync('cedears.json', 'utf8')).cedears;
   const universo = [...new Set([...ced.filter(c => !c.sinUS).map(c => c.us || c.code), 'SPY', 'QQQ'])];
   const out = {}; const dbg = { corrida: new Date().toISOString(), ok: 0, stooq: 0, yahoo: 0, falla: [] };
-  for (const t of universo) {
+  // 4 a la vez, con tope de 20 minutos (si una fuente se cuelga no frena todo); Yahoo primero (trae 12 anios ajustados por splits)
+  const t0 = Date.now(); let i = 0; let stooqMuerto = false;
+  const uno = async t => {
     let f = null, src = null;
-    try { f = await stooq(t); if (f) src = 'stooq'; } catch (e) {}
-    if (!f) { try { f = await yahoo(t); if (f) src = 'yahoo'; } catch (e) {} }
-    if (!f) { dbg.falla.push(t); await sleep(150); continue; }
+    try { f = await yahoo(t); if (f) src = 'yahoo'; } catch (e) {}
+    if (!f && !stooqMuerto) { try { f = await stooq(t); if (f) src = 'stooq'; } catch (e) { if (e.name === 'TimeoutError') stooqMuerto = true; } }
+    if (!f) { dbg.falla.push(t); return; }
     try { out[t] = analizar(f); dbg.ok++; dbg[src]++; } catch (e) { dbg.falla.push(t + ':' + e.message); }
-    await sleep(250);
-  }
+  };
+  await Promise.all([0, 1, 2, 3].map(async () => { while (i < universo.length && Date.now() - t0 < 20 * 60000) { const t = universo[i++]; await uno(t); await sleep(120); } }));
+  dbg.segundos = Math.round((Date.now() - t0) / 1000);
   fs.mkdirSync('sec', { recursive: true });
   fs.writeFileSync('sec/tecnico.json', JSON.stringify(out));
   fs.writeFileSync('sec/_tecnico_debug.json', JSON.stringify(dbg, null, 1));
