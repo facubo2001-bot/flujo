@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - 'tools/sec.mjs'
+      - 'tools/tecnico.mjs'
       - '.github/workflows/sec.yml'
 permissions:
   contents: write
@@ -17,13 +18,15 @@ concurrency:
 jobs:
   sec:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
       - run: node tools/sec.mjs
+      - run: node tools/tecnico.mjs
+        continue-on-error: true
       - name: Guardar cambios
         run: |
           git config user.name "flujo-bot"
