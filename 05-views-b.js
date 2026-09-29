@@ -253,7 +253,7 @@ function viewCartera() {
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
   const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 8);
   const emaCerca = [...k.posiciones, ...k.watch].map(p => ({ t: p.ticker, e: Tec.cerca(p.ticker) })).filter(x => x.e).sort((a, b) => a.e.dist - b.e.dist).slice(0, 8);
-  const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip ema" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}">${esc(x.t)}<i>EMA200 ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
+  const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip tec" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}">${esc(x.t)}<i>EMA ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
   const barLinea = baratas.length ? `<div class="nov-l nov-z"><span class="nov-chips">${baratas.map(x => `<span class="nov-chip val" data-act="pos" data-id="${esc(x.t)}" title="P/E ${x.b.pe.toFixed(1)} vs mediana 10 a\u00f1os ${x.b.med.toFixed(1)}">${esc(x.t)}<i>P/E \u2212${Math.round(x.b.desc * 100)}%</i></span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">

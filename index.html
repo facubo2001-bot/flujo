@@ -1139,7 +1139,7 @@ h2 .i-btn{vertical-align:3px}
 .cmp-hint .link-btn{font-size:13px;font-weight:800;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
 #modal.cmp-modal{min-height:86vh;min-height:86dvh}
 
-.nov-chip.ema{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
+.nov-chip.tec{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
 .ema{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;margin-top:8px;color:var(--ink-2)}
 .ema b{color:var(--ink);font-weight:800;margin-right:4px}
 
@@ -1482,7 +1482,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609290317';
+const BUILD = '202609290943';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -4345,7 +4345,7 @@ function viewCartera() {
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
   const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 8);
   const emaCerca = [...k.posiciones, ...k.watch].map(p => ({ t: p.ticker, e: Tec.cerca(p.ticker) })).filter(x => x.e).sort((a, b) => a.e.dist - b.e.dist).slice(0, 8);
-  const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip ema" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}">${esc(x.t)}<i>EMA200 ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
+  const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip tec" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}">${esc(x.t)}<i>EMA ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
   const barLinea = baratas.length ? `<div class="nov-l nov-z"><span class="nov-chips">${baratas.map(x => `<span class="nov-chip val" data-act="pos" data-id="${esc(x.t)}" title="P/E ${x.b.pe.toFixed(1)} vs mediana 10 a\u00f1os ${x.b.med.toFixed(1)}">${esc(x.t)}<i>P/E \u2212${Math.round(x.b.desc * 100)}%</i></span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
   html += `<div class="grid g-kpi">
