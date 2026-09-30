@@ -32,6 +32,11 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Actualizaciones que no llegaban (30-sep, build 202609302347)
+- Facu no veía los cambios aunque se publicaban. Causa: el service worker era "cache primero" y al instalarse bajaba index.html de la cache HTTP del navegador (GitHub Pages la guarda 10 min): una actualización justo después de publicar quedaba con el index viejo bajo la versión nueva, trabada hasta la próxima publicación.
+- Ahora (`pwa/sw.js`): instalación con `cache: 'reload'`; la app (index.html) y los datos (`sec/*.json`) van **red primero** sin cache HTTP (la app con 4 s de espera máxima), y si no hay red, lo guardado. Íconos y manifest siguen cache primero. Probado: recargar trae la versión nueva aunque el service worker no se haya actualizado, y offline sigue andando.
+- Beneficio extra: los balances de la SEC y la EMA del día ya no pueden quedar viejos por la cache (antes buscaba con ignoreSearch y podía devolver el archivo de otro día).
+
 ### Gastos: vista Año (30-sep, build 202609302049)
 - Arriba de Gastos, selector **Mes | Año** (`ui.gAnio`, acción `g-modo`); en Año el encabezado cambia a "‹ 2026 ›" (`data-anio`, no pasa del año actual).
 - `E.anual(anio)`: total (meses + viajes), en US$ con el CCL de cada mes (con la inflación, comparar años en pesos no sirve), gráfico mes a mes (gasto + viajes), en qué se fue (categorías, sin viajes) y viajes del año. El promedio por mes usa solo meses cargados completos (5 gastos o más): antes de jul-26 solo había cuotas sueltas. Compara el promedio en US$ contra el año anterior.

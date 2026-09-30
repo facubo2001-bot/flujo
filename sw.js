@@ -1,11 +1,13 @@
 /* Flujo — service worker: la app funciona offline. Cambiar VERSION al publicar una versión nueva. */
-const VERSION = '202609302103';
+const VERSION = '202609302347';
 const SHELL = `flujo-shell-${VERSION}`;
 const RUNTIME = 'flujo-runtime';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
+// cache: 'reload' = pedirlo al servidor, no a la cache HTTP del navegador (GitHub Pages la guarda 10 min): si no, una
+// actualizacion hecha justo despues de publicar se quedaba con el index.html viejo bajo la version nueva (Facu, 30-sep)
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(SHELL).then(c => Promise.all(ASSETS.map(u => fetch(new Request(u, { cache: 'reload' })).then(r => { if (r.ok) return c.put(u, r); })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('message', e => { if (e.data === 'skip') self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -26,11 +28,22 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).then(r => { if (r.ok) caches.open(RUNTIME).then(c => c.put(e.request, r.clone())); return r; }).catch(() => caches.match(e.request, { ignoreSearch: true })));
     return;
   }
-  // app: cache primero, red como respaldo (y actualiza el cache)
-  if (url.origin === location.origin) {
-    e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(hit => {
-      const net = fetch(e.request).then(r => { if (r.ok) caches.open(SHELL).then(c => c.put(e.request, r.clone())); return r; }).catch(() => hit);
-      return hit || net;
-    }));
+  if (url.origin !== location.origin) return;
+  // la app (index.html) y los datos (sec/*.json: balances y EMA del dia): red primero, sin cache HTTP; si no hay red o tarda, lo guardado
+  const esApp = e.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html');
+  if (esApp || url.pathname.endsWith('.json')) {
+    const cache = esApp ? SHELL : RUNTIME; const clave = esApp ? './index.html' : e.request;
+    e.respondWith((async () => {
+      const guardado = () => caches.match(clave).then(h => h || caches.match(e.request, { ignoreSearch: true }));
+      try {
+        const net = fetch(url.href, { cache: 'no-cache', credentials: 'same-origin' });
+        const r = await (esApp ? Promise.race([net, new Promise((_, no) => setTimeout(() => no(new Error('lento')), 4000))]) : net);
+        if (r && r.ok) { const cp = r.clone(); caches.open(cache).then(c => c.put(clave, cp)); return r; }
+        return (await guardado()) || r;
+      } catch (err) { const h = await guardado(); if (h) return h; return fetch(e.request); }
+    })());
+    return;
   }
+  // iconos y manifest: cache primero, red como respaldo
+  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(hit => hit || fetch(e.request).then(r => { if (r.ok) { const cp = r.clone(); caches.open(SHELL).then(c => c.put(e.request, cp)); } return r; })));
 });
