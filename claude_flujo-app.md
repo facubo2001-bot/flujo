@@ -32,6 +32,12 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Gastos: vista Año (30-sep, build 202609302049)
+- Arriba de Gastos, selector **Mes | Año** (`ui.gAnio`, acción `g-modo`); en Año el encabezado cambia a "‹ 2026 ›" (`data-anio`, no pasa del año actual).
+- `E.anual(anio)`: total (meses + viajes), en US$ con el CCL de cada mes (con la inflación, comparar años en pesos no sirve), gráfico mes a mes (gasto + viajes), en qué se fue (categorías, sin viajes) y viajes del año. El promedio por mes usa solo meses cargados completos (5 gastos o más): antes de jul-26 solo había cuotas sueltas. Compara el promedio en US$ contra el año anterior.
+- `E.build()` ahora arranca en el primer gasto cargado (antes 18 meses atrás), para poder ver 2025 entero.
+- La tarjeta Viajes del mes quedó solo con la lista de viajes (el total del año vive en Año).
+
 ### Viajes fuera del gasto del mes (30-sep, build 202609301023)
 - Facu: las vacaciones son puntuales y distorsionan el mes; que cuenten en el año y quede registro de cuánto se gastó en cada viaje.
 - `state.viajes = [{id, nombre, desde, hasta, nota}]`; un gasto con `viajeId` sale de `E.consumo` (total, categorías, presupuesto, ritmo, promedios) y va a `c.viaje` / `c.viajeMovs`. Tarjetas y pagos no cambian (se pagan igual). Las cuotas de un viaje sí cuentan en lo comprometido de cada mes (`c.viajeCuotas` en `E.horizonte`).

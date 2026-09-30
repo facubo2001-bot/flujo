@@ -11,7 +11,7 @@ function renderNav() {
 function renderTopbar() {
   const [t, sub] = VIEW_TITLES[ui.view]; const withMonth = ['resumen', 'movimientos', 'tarjetas', 'plan', 'tendencias'].includes(ui.view);
   return `<div class="topbar"><div class="title"><h1>${t}</h1><small>${sub}${state.settings.nombre && ui.view === 'resumen' ? ` · ${esc(state.settings.nombre)}` : ''}</small></div><div class="tools">
-    ${withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
+    ${ui.view === 'movimientos' && ui.gAnio ? `<div class="month-nav"><button data-anio="-1" aria-label="A\u00f1o anterior">\u2039</button><span class="label" data-anio="0">${ui.gAnio}</span><button data-anio="1" aria-label="A\u00f1o siguiente" ${Number(ui.gAnio) >= Number(D.thisMonth().slice(0, 4)) ? 'disabled' : ''}>\u203a</button></div>` : withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
     <div class="seg" id="cur-seg">${['ARS', 'USD'].map(c => `<button class="${ui.cur === c ? 'on' : ''}" data-cur="${c}">${c === 'ARS' ? '$ ARS' : 'US$'}</button>`).join('')}</div>
     <button class="btn primary" data-act="new" style="display:none" id="btn-new-desktop">${ICONS.plus} Gasto</button>
   </div></div>`;
@@ -91,6 +91,7 @@ const Actions = {
   'del-ing'(id) { state.ingresos = state.ingresos.filter(x => x.id !== id); Persist.save(); render(); },
   'new-cat'() { formCat(); },
   viaje(id) { formViaje(id); },
+  'g-modo'(id) { ui.gAnio = id === 'anio' ? (ui.gAnio || ui.mes.slice(0, 4)) : null; render(); },
   'del-viaje'(id) { const v = L.viaje(id); if (!v) return; const n = state.movimientos.filter(m => m.viajeId === id).length; confirmar(`¿Borrar el viaje ${v.nombre}? ${n === 1 ? 'Su gasto queda como gasto normal' : n ? `Sus ${n} gastos quedan como gastos normales` : 'No tiene gastos cargados'}${n ? ' del mes' : ''}.`, () => { state.viajes = state.viajes.filter(x => x.id !== id); for (const m of state.movimientos) if (m.viajeId === id) delete m.viajeId; E._cache = null; Persist.save(); Modal.close(); render(); toast('Viaje borrado'); }, 'Borrar'); },
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
@@ -235,6 +236,7 @@ const Actions = {
 document.addEventListener('click', e => {
   const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === 'movimientos' && (Object.values(ui.filtros || {}).some(Boolean) || ui.gaGrupo)) { ui.filtros = {}; ui.gaGrupo = null; if (ui.view === 'movimientos') { render(); arriba(); return; } }  // tocar Gastos abajo vuelve a la vista sin filtros
     if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
+  const an = e.target.closest('[data-anio]'); if (an) { const n = Number(an.dataset.anio); ui.gAnio = n === 0 ? D.thisMonth().slice(0, 4) : String(Number(ui.gAnio) + n); render(); return; }
   const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); lastView = null; render(); return; }
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }

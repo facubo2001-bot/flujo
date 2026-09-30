@@ -1170,6 +1170,7 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 
 /* el atributo hidden tiene que ganarle a display:flex/grid de .field y .form-grid (el campo Viaje se veia siempre en el iPhone) */
 [hidden]{display:none!important}
+.gm-seg{width:fit-content;margin:0 auto 12px}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1510,7 +1511,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609301601';
+const BUILD = '202609302103';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2809,7 +2810,9 @@ const E = {
   /** cache per render */
   _cache: null,
   build() {
-    const from = D.addMonths(D.thisMonth(), -18), to = D.addMonths(D.thisMonth(), 14);
+    // desde el primer gasto cargado (la vista Año puede mirar 2025 entero), como minimo 18 meses para atras
+    const primero = state.movimientos.reduce((mn, m) => (m.fecha && D.ym(m.fecha) < mn ? D.ym(m.fecha) : mn), D.addMonths(D.thisMonth(), -18));
+    const from = primero < D.addMonths(D.thisMonth(), -18) ? primero : D.addMonths(D.thisMonth(), -18), to = D.addMonths(D.thisMonth(), 14);
     const movs = E.movs(from, to);
     const pieces = movs.flatMap(E.expand);
     E._cache = { movs, pieces, from, to };
@@ -2976,10 +2979,22 @@ const E = {
   /** gasto de un anio: meses (sin viajes) + viajes, por fecha de gasto (devengado) */
   anual(anio) {
     const meses = D.range(`${anio}-01`, 12).filter(ym => ym <= D.thisMonth());
-    const cs = meses.map(ym => ({ ym, c: E.consumo(ym) }));
+    const cs = meses.map(ym => ({ ym, c: E.consumo(ym) })).filter(x => x.c.count || x.c.viaje || x.ym >= (E.primerMes() || x.ym));
     const mensual = sum(cs.map(x => x.c.total)), viajes = sum(cs.map(x => x.c.viaje));
-    return { anio, meses: cs.length, mensual, viajes, total: mensual + viajes, promMes: cs.length ? mensual / cs.length : 0 };
+    // en dolares: cada mes a su CCL (con la inflacion, comparar anios en pesos no dice nada)
+    const cclMes = ym => (typeof AD !== 'undefined' && AD.cclEn && AD.cclEn(D.dateIn(ym, Math.min(15, D.daysIn(ym))))) || Number(state.settings.ccl) || Number(state.settings.tc) || 0;
+    const usd = v => ym => { const c = cclMes(ym); return c ? v / c : 0; };
+    const porMes = cs.map(x => ({ ym: x.ym, mes: x.c.total, viaje: x.c.viaje, usd: cclMes(x.ym) ? (x.c.total + x.c.viaje) / cclMes(x.ym) : null, byCat: x.c.byCat, byGrupo: x.c.byGrupo }));
+    const byCat = {}; for (const x of cs) for (const [k, v] of Object.entries(x.c.byCat)) byCat[k] = (byCat[k] || 0) + v;
+    const totalUSD = porMes.every(x => x.usd != null) ? sum(porMes.map(x => x.usd)) : null;
+    // el promedio solo con meses cargados de verdad (5 gastos o mas): antes de empezar a anotar (jul-26) solo habia cuotas sueltas
+    const reg = cs.filter(x => x.c.count >= 5);
+    return { anio, meses: cs.length, mesesReg: reg.length, mensual, viajes, total: mensual + viajes, promMes: reg.length ? sum(reg.map(x => x.c.total)) / reg.length : 0, porMes, byCat, totalUSD,
+      promMesUSD: reg.length && reg.every(x => cclMes(x.ym)) ? sum(reg.map(x => x.c.total / cclMes(x.ym))) / reg.length : null };
   },
+  primerMes() { const f = state.movimientos.map(m => m.fecha).filter(Boolean).sort()[0]; return f ? D.ym(f) : null; },
+  /** anios con gastos cargados, del mas nuevo al mas viejo */
+  aniosConGastos() { const p = E.primerMes(); const hoy = Number(D.thisMonth().slice(0, 4)); const a0 = p ? Number(p.slice(0, 4)) : hoy; const out = []; for (let y = hoy; y >= a0; y--) out.push(String(y)); return out; },
   /** Cuotas que se PAGAN en el mes ym (entran en el resumen que vence ese mes): cuota k de N */
   pagosCuotas(ym) {
     return E.data().pieces.filter(p => p.n > 1 && p.mesPago === ym).map(p => ({ m: p.m, idx: p.idx, n: p.n, cuota: p.montoARS })).sort((a, b) => b.cuota - a.cuota);
@@ -4143,7 +4158,29 @@ function gastosAnalisis(c) {
     ${resto.length > 6 ? `<button type="button" class="dv-mas" data-act="gastos-todas">${todas ? 'ver menos' : `ver las ${resto.length}`}</button>` : ''}</div>`;
   return `<div class="ga">${macro}<div class="ga-t ga-sep">Por categoría</div>${top3}${donde}${neces}</div>`;
 }
+/** Mes | Año arriba de Gastos */
+function gastosModo() { return `<div class="seg gm-seg"><button type="button" class="${ui.gAnio ? '' : 'on'}" data-act="g-modo" data-id="mes">Mes</button><button type="button" class="${ui.gAnio ? 'on' : ''}" data-act="g-modo" data-id="anio">Año</button></div>`; }
+/** Gastos del año entero (Facu: ver el año junto, y 2025, 2026, 2027...) */
+function viewGastosAnio() {
+  const anio = ui.gAnio; const a = E.anual(anio); const prev = E.anual(String(Number(anio) - 1));
+  const usd = x => x != null ? fmtU(x, 0) : '\u2014';
+  if (!a.meses) return gastosModo() + `<div class="card">${empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${anio}`, sub: 'Cambiá de año con las flechas de arriba.' })}</div>`;
+  const vsPrev = prev.meses && prev.promMesUSD && a.promMesUSD ? a.promMesUSD / prev.promMesUSD - 1 : null;
+  const labels = a.porMes.map(x => D.monthName(x.ym, true));
+  const chart = ChartQ.reg(w => Charts.stacked({ w, h: 220, labels, series: [{ name: 'Gasto del mes', color: 'var(--accent)', values: a.porMes.map(x => x.mes) }, ...(a.viajes ? [{ name: 'Viajes', color: 'var(--c4)', values: a.porMes.map(x => x.viaje) }] : [])] }), 220)
+    + Charts.legend([{ name: 'Gasto del mes', color: 'var(--accent)' }, ...(a.viajes ? [{ name: 'Viajes', color: 'var(--c4)' }] : [])]);
+  const cats = Object.entries(a.byCat).sort((x, y) => y[1] - x[1]); const tot = a.mensual || 1;
+  const catRows = cats.slice(0, 12).map(([k, v]) => `<div class="list-item"><div><b style="font-weight:500">${esc(L.cat(k).nombre)}</b><span class="sub small muted">${M.pct(v / tot)} del a\u00f1o</span></div><span class="amount">${M.f(v)}</span></div>`).join('');
+  const vjs = E.viajes().filter(v => v.anio === anio);
+  return gastosModo() + `<div class="gh-top"><div class="gh-big">${M.f(a.total)}</div><div class="gh-sub">${anio} \u00b7 ${a.meses} mes${a.meses === 1 ? '' : 'es'}${a.totalUSD != null ? ` \u00b7 ${usd(a.totalUSD)}` : ''}</div>
+      <div class="gh-stats"><div><span>Meses</span><b>$ ${abrevARS(a.mensual)}</b></div><div><span>Viajes</span><b>$ ${abrevARS(a.viajes)}</b></div><div><span>Por mes</span><b>${a.mesesReg ? `$ ${abrevARS(a.promMes)}` : '\u2014'}</b></div></div>
+      <div class="small muted" style="margin-top:6px">${a.mesesReg ? `Promedio por mes sin viajes: ${M.f(a.promMes)}${a.promMesUSD != null ? ` (${usd(a.promMesUSD)})` : ''} \u00b7 con ${a.mesesReg} mes${a.mesesReg === 1 ? '' : 'es'} cargado${a.mesesReg === 1 ? '' : 's'} completo${a.mesesReg === 1 ? '' : 's'}` : 'Todav\u00eda no hay meses cargados completos (5 gastos o m\u00e1s) para sacar un promedio'}${vsPrev != null ? ` \u00b7 <span class="${vsPrev > 0 ? 'neg' : 'pos'}">${vsPrev > 0 ? '+' : '\u2212'}${M.pct(Math.abs(vsPrev))} en d\u00f3lares vs ${Number(anio) - 1}</span>` : ''}</div></div>
+    <div class="card section"><div class="card-head"><h2>Mes a mes</h2><span class="hint">tocá Mes arriba para ver el detalle</span></div>${chart}</div>
+    <div class="card section"><div class="card-head"><h2>En qué se fue</h2><span class="hint">sin viajes</span></div>${catRows}</div>
+    ${vjs.length ? `<div class="card section"><div class="card-head"><h2>Viajes de ${anio}</h2></div>${vjs.map(viajeItem).join('')}</div>` : ''}`;
+}
 function viewMovimientos() {
+  if (ui.gAnio) return viewGastosAnio();
   const ym = ui.mes; const f = ui.filtros; const c = E.consumo(ym);
   let movs = c.movs;
   if (f.q) { const q = norm(f.q); movs = movs.filter(m => norm(m.desc).includes(q) || norm(m.notas || '').includes(q)); }
@@ -4158,7 +4195,7 @@ function viewMovimientos() {
   const cuotas = sum(movs.filter(m => m.cuotaRow || (m.cuotas || 1) > 1).map(E.rowAmount));
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
-  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
+  return `${gastosModo()}<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
     ${(() => { // filtro activo: se ve arriba y se saca con un toque (antes habia que bajar hasta los chips)
       const et = []; if (f.grupo) et.push(L.grupo(f.grupo).nombre); if (f.cat) et.push(L.cat(f.cat).nombre); if (f.q) et.push(`"${f.q}"`); if (f.tipo) et.push({ fijos: 'Fijos', variables: 'Compras', cuotas: 'Cuotas' }[f.tipo] || f.tipo); if (f.medio) et.push(f.medio.startsWith('t:') ? (L.tarjeta(f.medio.slice(2)) || {}).nombre || 'Tarjeta' : (MEDIOS[f.medio] || f.medio)); if (f.nec) et.push(NECESIDAD[f.nec] || '');
       return et.length ? `<div class="gh-filtro"><span>${et.map(esc).join(' \u00b7 ')}</span><button type="button" data-act="clear-filters">Ver todo</button></div>` : ''; })()}
@@ -4393,18 +4430,20 @@ function viewPlan() {
 }
 
 /* ---------- TENDENCIAS ---------- */
+/** un viaje: destino, fechas, total en pesos y dolares, por dia y en que se fue */
+function viajeItem(v) {
+  const usd = x => x != null ? fmtU(x, 0) : '\u2014'; const cats = Object.entries(v.byCat).sort((x, y) => y[1] - x[1]);
+  const fechas = v.desde ? `${D.fmt(v.desde, { year: true })}${v.hasta && v.hasta !== v.desde ? ` al ${D.fmt(v.hasta, { year: true })}` : ''}` : 'sin fechas';
+  return `<div class="vj-item" data-act="viaje" data-id="${v.id}"><div class="vj-h"><span><b>\u2708 ${esc(v.nombre)}</b></span><span class="mono">${M.f(v.total)}</span></div>
+    <div class="vj-sub">${fechas}${v.dias ? ` \u00b7 ${v.dias} d\u00eda${v.dias > 1 ? 's' : ''}` : ''} \u00b7 ${usd(v.usd)}${v.porDia ? ` \u00b7 ${usd(v.porDiaUSD)} por d\u00eda` : ''}</div>
+    ${cats.length > 1 ? `<div class="vj-cats">${cats.map(([k, x]) => `<span>${esc(L.cat(k).nombre)} <b>${M.pct(x / (v.total || 1), 0)}</b></span>`).join('')}</div>` : ''}${v.nota ? `<div class="vj-sub">${esc(v.nota)}</div>` : ''}</div>`;
+}
 /** Viajes: cada uno con total, por dia y en que se fue la plata; y el gasto del año = meses + viajes */
 function viajesCard() {
-  const vs = E.viajes(); const anio = D.thisMonth().slice(0, 4); const a = E.anual(anio);
-  const usd = x => x != null ? fmtU(x, 0) : '\u2014';
-  const anual = `<div class="vj-anio"><div><span class="small muted">Gasto ${anio} (${a.meses} meses)</span><b>${M.f(a.total)}</b></div><div class="small muted">meses ${M.f(a.mensual)} \u00b7 viajes ${M.f(a.viajes)} \u00b7 promedio por mes sin viajes ${M.f(a.promMes)}</div></div>`;
-  const lista = vs.length ? vs.map(v => { const cats = Object.entries(v.byCat).sort((x, y) => y[1] - x[1]);
-    return `<div class="vj-item" data-act="viaje" data-id="${v.id}"><div class="vj-h"><span><b>${esc(v.nombre)}</b>${v.desde ? ` \u00b7 ${D.fmt(v.desde, { year: true })}` : ''}${v.dias ? ` \u00b7 ${v.dias} d\u00eda${v.dias > 1 ? 's' : ''}` : ''}</span><span class="mono">${M.f(v.total)}</span></div>
-      <div class="vj-sub">${usd(v.usd)}${v.porDia ? ` \u00b7 ${M.f(v.porDia)} por d\u00eda${v.porDiaUSD != null ? ` (${usd(v.porDiaUSD)})` : ''}` : ''} \u00b7 ${v.movs.length} gasto${v.movs.length === 1 ? '' : 's'}</div>
-      ${cats.length ? `<div class="vj-cats">${cats.map(([k, x]) => `<span>${esc(L.cat(k).nombre)} <b>${M.pct(x / (v.total || 1), 0)}</b></span>`).join('')}</div>` : ''}${v.nota ? `<div class="vj-sub">${esc(v.nota)}</div>` : ''}</div>`; }).join('')
-    : `<div class="small muted" style="padding:6px 0">Todav\u00eda no hay viajes. Al cargar un gasto de la categor\u00eda Viajes (o con fecha dentro de un viaje) aparece el campo Viaje: eleg\u00ed "+ Nuevo viaje".</div>`;
-  return `<div class="card section"><div class="card-head"><h2>Viajes ${infoBtn('Lo que cargues en un viaje (pasajes, hospedaje, comida, lo que sea) no suma al gasto del mes, porque es puntual y lo distorsiona. S\u00ed suma al gasto del a\u00f1o. Los pesos se pasan a d\u00f3lares al CCL del d\u00eda de cada gasto, para comparar viajes de a\u00f1os distintos. Las cuotas del viaje igual cuentan en lo comprometido de cada mes, porque se pagan con el sueldo.')}</h2></div>${anual}${lista}</div>`;
+  const vs = E.viajes(); if (!vs.length) return '';
+  return `<div class="card section"><div class="card-head"><h2>Viajes ${infoBtn('Lo que cargues en un viaje (categor\u00eda Viajes y escapadas) no suma al gasto del mes, porque es puntual y lo distorsiona; s\u00ed suma al del a\u00f1o (toc\u00e1 A\u00f1o arriba). Los pesos se pasan a d\u00f3lares al CCL del d\u00eda de cada gasto, para comparar viajes de a\u00f1os distintos. Las cuotas del viaje igual cuentan en lo comprometido de cada mes, porque se pagan con el sueldo. Toc\u00e1 un viaje para corregirlo o borrarlo.')}</h2><span class="hint">toc\u00e1 uno para editarlo</span></div>${vs.map(viajeItem).join('')}</div>`;
 }
+
 function viewTendencias() {
   const n = ui.trendRange || 6; const ym = ui.mes;
   const months = D.range(D.addMonths(ym, -(n - 1)), n);
@@ -6277,7 +6316,7 @@ function renderNav() {
 function renderTopbar() {
   const [t, sub] = VIEW_TITLES[ui.view]; const withMonth = ['resumen', 'movimientos', 'tarjetas', 'plan', 'tendencias'].includes(ui.view);
   return `<div class="topbar"><div class="title"><h1>${t}</h1><small>${sub}${state.settings.nombre && ui.view === 'resumen' ? ` · ${esc(state.settings.nombre)}` : ''}</small></div><div class="tools">
-    ${withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
+    ${ui.view === 'movimientos' && ui.gAnio ? `<div class="month-nav"><button data-anio="-1" aria-label="A\u00f1o anterior">\u2039</button><span class="label" data-anio="0">${ui.gAnio}</span><button data-anio="1" aria-label="A\u00f1o siguiente" ${Number(ui.gAnio) >= Number(D.thisMonth().slice(0, 4)) ? 'disabled' : ''}>\u203a</button></div>` : withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
     <div class="seg" id="cur-seg">${['ARS', 'USD'].map(c => `<button class="${ui.cur === c ? 'on' : ''}" data-cur="${c}">${c === 'ARS' ? '$ ARS' : 'US$'}</button>`).join('')}</div>
     <button class="btn primary" data-act="new" style="display:none" id="btn-new-desktop">${ICONS.plus} Gasto</button>
   </div></div>`;
@@ -6357,6 +6396,7 @@ const Actions = {
   'del-ing'(id) { state.ingresos = state.ingresos.filter(x => x.id !== id); Persist.save(); render(); },
   'new-cat'() { formCat(); },
   viaje(id) { formViaje(id); },
+  'g-modo'(id) { ui.gAnio = id === 'anio' ? (ui.gAnio || ui.mes.slice(0, 4)) : null; render(); },
   'del-viaje'(id) { const v = L.viaje(id); if (!v) return; const n = state.movimientos.filter(m => m.viajeId === id).length; confirmar(`¿Borrar el viaje ${v.nombre}? ${n === 1 ? 'Su gasto queda como gasto normal' : n ? `Sus ${n} gastos quedan como gastos normales` : 'No tiene gastos cargados'}${n ? ' del mes' : ''}.`, () => { state.viajes = state.viajes.filter(x => x.id !== id); for (const m of state.movimientos) if (m.viajeId === id) delete m.viajeId; E._cache = null; Persist.save(); Modal.close(); render(); toast('Viaje borrado'); }, 'Borrar'); },
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
@@ -6501,6 +6541,7 @@ const Actions = {
 document.addEventListener('click', e => {
   const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === 'movimientos' && (Object.values(ui.filtros || {}).some(Boolean) || ui.gaGrupo)) { ui.filtros = {}; ui.gaGrupo = null; if (ui.view === 'movimientos') { render(); arriba(); return; } }  // tocar Gastos abajo vuelve a la vista sin filtros
     if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }
+  const an = e.target.closest('[data-anio]'); if (an) { const n = Number(an.dataset.anio); ui.gAnio = n === 0 ? D.thisMonth().slice(0, 4) : String(Number(ui.gAnio) + n); render(); return; }
   const mes = e.target.closest('[data-mes]'); if (mes) { const n = Number(mes.dataset.mes); ui.mes = n === 0 ? D.thisMonth() : D.addMonths(ui.mes, n); lastView = null; render(); return; }
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }

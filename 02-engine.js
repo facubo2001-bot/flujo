@@ -88,7 +88,9 @@ const E = {
   /** cache per render */
   _cache: null,
   build() {
-    const from = D.addMonths(D.thisMonth(), -18), to = D.addMonths(D.thisMonth(), 14);
+    // desde el primer gasto cargado (la vista Año puede mirar 2025 entero), como minimo 18 meses para atras
+    const primero = state.movimientos.reduce((mn, m) => (m.fecha && D.ym(m.fecha) < mn ? D.ym(m.fecha) : mn), D.addMonths(D.thisMonth(), -18));
+    const from = primero < D.addMonths(D.thisMonth(), -18) ? primero : D.addMonths(D.thisMonth(), -18), to = D.addMonths(D.thisMonth(), 14);
     const movs = E.movs(from, to);
     const pieces = movs.flatMap(E.expand);
     E._cache = { movs, pieces, from, to };
@@ -255,10 +257,22 @@ const E = {
   /** gasto de un anio: meses (sin viajes) + viajes, por fecha de gasto (devengado) */
   anual(anio) {
     const meses = D.range(`${anio}-01`, 12).filter(ym => ym <= D.thisMonth());
-    const cs = meses.map(ym => ({ ym, c: E.consumo(ym) }));
+    const cs = meses.map(ym => ({ ym, c: E.consumo(ym) })).filter(x => x.c.count || x.c.viaje || x.ym >= (E.primerMes() || x.ym));
     const mensual = sum(cs.map(x => x.c.total)), viajes = sum(cs.map(x => x.c.viaje));
-    return { anio, meses: cs.length, mensual, viajes, total: mensual + viajes, promMes: cs.length ? mensual / cs.length : 0 };
+    // en dolares: cada mes a su CCL (con la inflacion, comparar anios en pesos no dice nada)
+    const cclMes = ym => (typeof AD !== 'undefined' && AD.cclEn && AD.cclEn(D.dateIn(ym, Math.min(15, D.daysIn(ym))))) || Number(state.settings.ccl) || Number(state.settings.tc) || 0;
+    const usd = v => ym => { const c = cclMes(ym); return c ? v / c : 0; };
+    const porMes = cs.map(x => ({ ym: x.ym, mes: x.c.total, viaje: x.c.viaje, usd: cclMes(x.ym) ? (x.c.total + x.c.viaje) / cclMes(x.ym) : null, byCat: x.c.byCat, byGrupo: x.c.byGrupo }));
+    const byCat = {}; for (const x of cs) for (const [k, v] of Object.entries(x.c.byCat)) byCat[k] = (byCat[k] || 0) + v;
+    const totalUSD = porMes.every(x => x.usd != null) ? sum(porMes.map(x => x.usd)) : null;
+    // el promedio solo con meses cargados de verdad (5 gastos o mas): antes de empezar a anotar (jul-26) solo habia cuotas sueltas
+    const reg = cs.filter(x => x.c.count >= 5);
+    return { anio, meses: cs.length, mesesReg: reg.length, mensual, viajes, total: mensual + viajes, promMes: reg.length ? sum(reg.map(x => x.c.total)) / reg.length : 0, porMes, byCat, totalUSD,
+      promMesUSD: reg.length && reg.every(x => cclMes(x.ym)) ? sum(reg.map(x => x.c.total / cclMes(x.ym))) / reg.length : null };
   },
+  primerMes() { const f = state.movimientos.map(m => m.fecha).filter(Boolean).sort()[0]; return f ? D.ym(f) : null; },
+  /** anios con gastos cargados, del mas nuevo al mas viejo */
+  aniosConGastos() { const p = E.primerMes(); const hoy = Number(D.thisMonth().slice(0, 4)); const a0 = p ? Number(p.slice(0, 4)) : hoy; const out = []; for (let y = hoy; y >= a0; y--) out.push(String(y)); return out; },
   /** Cuotas que se PAGAN en el mes ym (entran en el resumen que vence ese mes): cuota k de N */
   pagosCuotas(ym) {
     return E.data().pieces.filter(p => p.n > 1 && p.mesPago === ym).map(p => ({ m: p.m, idx: p.idx, n: p.n, cuota: p.montoARS })).sort((a, b) => b.cuota - a.cuota);

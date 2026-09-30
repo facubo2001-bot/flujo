@@ -1146,3 +1146,4 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 
 /* el atributo hidden tiene que ganarle a display:flex/grid de .field y .form-grid (el campo Viaje se veia siempre en el iPhone) */
 [hidden]{display:none!important}
+.gm-seg{width:fit-content;margin:0 auto 12px}

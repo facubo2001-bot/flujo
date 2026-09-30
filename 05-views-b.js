@@ -138,18 +138,20 @@ function viewPlan() {
 }
 
 /* ---------- TENDENCIAS ---------- */
+/** un viaje: destino, fechas, total en pesos y dolares, por dia y en que se fue */
+function viajeItem(v) {
+  const usd = x => x != null ? fmtU(x, 0) : '\u2014'; const cats = Object.entries(v.byCat).sort((x, y) => y[1] - x[1]);
+  const fechas = v.desde ? `${D.fmt(v.desde, { year: true })}${v.hasta && v.hasta !== v.desde ? ` al ${D.fmt(v.hasta, { year: true })}` : ''}` : 'sin fechas';
+  return `<div class="vj-item" data-act="viaje" data-id="${v.id}"><div class="vj-h"><span><b>\u2708 ${esc(v.nombre)}</b></span><span class="mono">${M.f(v.total)}</span></div>
+    <div class="vj-sub">${fechas}${v.dias ? ` \u00b7 ${v.dias} d\u00eda${v.dias > 1 ? 's' : ''}` : ''} \u00b7 ${usd(v.usd)}${v.porDia ? ` \u00b7 ${usd(v.porDiaUSD)} por d\u00eda` : ''}</div>
+    ${cats.length > 1 ? `<div class="vj-cats">${cats.map(([k, x]) => `<span>${esc(L.cat(k).nombre)} <b>${M.pct(x / (v.total || 1), 0)}</b></span>`).join('')}</div>` : ''}${v.nota ? `<div class="vj-sub">${esc(v.nota)}</div>` : ''}</div>`;
+}
 /** Viajes: cada uno con total, por dia y en que se fue la plata; y el gasto del año = meses + viajes */
 function viajesCard() {
-  const vs = E.viajes(); const anio = D.thisMonth().slice(0, 4); const a = E.anual(anio);
-  const usd = x => x != null ? fmtU(x, 0) : '\u2014';
-  const anual = `<div class="vj-anio"><div><span class="small muted">Gasto ${anio} (${a.meses} meses)</span><b>${M.f(a.total)}</b></div><div class="small muted">meses ${M.f(a.mensual)} \u00b7 viajes ${M.f(a.viajes)} \u00b7 promedio por mes sin viajes ${M.f(a.promMes)}</div></div>`;
-  const lista = vs.length ? vs.map(v => { const cats = Object.entries(v.byCat).sort((x, y) => y[1] - x[1]);
-    return `<div class="vj-item" data-act="viaje" data-id="${v.id}"><div class="vj-h"><span><b>${esc(v.nombre)}</b>${v.desde ? ` \u00b7 ${D.fmt(v.desde, { year: true })}` : ''}${v.dias ? ` \u00b7 ${v.dias} d\u00eda${v.dias > 1 ? 's' : ''}` : ''}</span><span class="mono">${M.f(v.total)}</span></div>
-      <div class="vj-sub">${usd(v.usd)}${v.porDia ? ` \u00b7 ${M.f(v.porDia)} por d\u00eda${v.porDiaUSD != null ? ` (${usd(v.porDiaUSD)})` : ''}` : ''} \u00b7 ${v.movs.length} gasto${v.movs.length === 1 ? '' : 's'}</div>
-      ${cats.length ? `<div class="vj-cats">${cats.map(([k, x]) => `<span>${esc(L.cat(k).nombre)} <b>${M.pct(x / (v.total || 1), 0)}</b></span>`).join('')}</div>` : ''}${v.nota ? `<div class="vj-sub">${esc(v.nota)}</div>` : ''}</div>`; }).join('')
-    : `<div class="small muted" style="padding:6px 0">Todav\u00eda no hay viajes. Al cargar un gasto de la categor\u00eda Viajes (o con fecha dentro de un viaje) aparece el campo Viaje: eleg\u00ed "+ Nuevo viaje".</div>`;
-  return `<div class="card section"><div class="card-head"><h2>Viajes ${infoBtn('Lo que cargues en un viaje (pasajes, hospedaje, comida, lo que sea) no suma al gasto del mes, porque es puntual y lo distorsiona. S\u00ed suma al gasto del a\u00f1o. Los pesos se pasan a d\u00f3lares al CCL del d\u00eda de cada gasto, para comparar viajes de a\u00f1os distintos. Las cuotas del viaje igual cuentan en lo comprometido de cada mes, porque se pagan con el sueldo.')}</h2></div>${anual}${lista}</div>`;
+  const vs = E.viajes(); if (!vs.length) return '';
+  return `<div class="card section"><div class="card-head"><h2>Viajes ${infoBtn('Lo que cargues en un viaje (categor\u00eda Viajes y escapadas) no suma al gasto del mes, porque es puntual y lo distorsiona; s\u00ed suma al del a\u00f1o (toc\u00e1 A\u00f1o arriba). Los pesos se pasan a d\u00f3lares al CCL del d\u00eda de cada gasto, para comparar viajes de a\u00f1os distintos. Las cuotas del viaje igual cuentan en lo comprometido de cada mes, porque se pagan con el sueldo. Toc\u00e1 un viaje para corregirlo o borrarlo.')}</h2><span class="hint">toc\u00e1 uno para editarlo</span></div>${vs.map(viajeItem).join('')}</div>`;
 }
+
 function viewTendencias() {
   const n = ui.trendRange || 6; const ym = ui.mes;
   const months = D.range(D.addMonths(ym, -(n - 1)), n);

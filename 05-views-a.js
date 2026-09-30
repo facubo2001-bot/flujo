@@ -399,7 +399,29 @@ function gastosAnalisis(c) {
     ${resto.length > 6 ? `<button type="button" class="dv-mas" data-act="gastos-todas">${todas ? 'ver menos' : `ver las ${resto.length}`}</button>` : ''}</div>`;
   return `<div class="ga">${macro}<div class="ga-t ga-sep">Por categoría</div>${top3}${donde}${neces}</div>`;
 }
+/** Mes | Año arriba de Gastos */
+function gastosModo() { return `<div class="seg gm-seg"><button type="button" class="${ui.gAnio ? '' : 'on'}" data-act="g-modo" data-id="mes">Mes</button><button type="button" class="${ui.gAnio ? 'on' : ''}" data-act="g-modo" data-id="anio">Año</button></div>`; }
+/** Gastos del año entero (Facu: ver el año junto, y 2025, 2026, 2027...) */
+function viewGastosAnio() {
+  const anio = ui.gAnio; const a = E.anual(anio); const prev = E.anual(String(Number(anio) - 1));
+  const usd = x => x != null ? fmtU(x, 0) : '\u2014';
+  if (!a.meses) return gastosModo() + `<div class="card">${empty({ kind: 'periodo', icon: 'cal', head: `Sin gastos en ${anio}`, sub: 'Cambiá de año con las flechas de arriba.' })}</div>`;
+  const vsPrev = prev.meses && prev.promMesUSD && a.promMesUSD ? a.promMesUSD / prev.promMesUSD - 1 : null;
+  const labels = a.porMes.map(x => D.monthName(x.ym, true));
+  const chart = ChartQ.reg(w => Charts.stacked({ w, h: 220, labels, series: [{ name: 'Gasto del mes', color: 'var(--accent)', values: a.porMes.map(x => x.mes) }, ...(a.viajes ? [{ name: 'Viajes', color: 'var(--c4)', values: a.porMes.map(x => x.viaje) }] : [])] }), 220)
+    + Charts.legend([{ name: 'Gasto del mes', color: 'var(--accent)' }, ...(a.viajes ? [{ name: 'Viajes', color: 'var(--c4)' }] : [])]);
+  const cats = Object.entries(a.byCat).sort((x, y) => y[1] - x[1]); const tot = a.mensual || 1;
+  const catRows = cats.slice(0, 12).map(([k, v]) => `<div class="list-item"><div><b style="font-weight:500">${esc(L.cat(k).nombre)}</b><span class="sub small muted">${M.pct(v / tot)} del a\u00f1o</span></div><span class="amount">${M.f(v)}</span></div>`).join('');
+  const vjs = E.viajes().filter(v => v.anio === anio);
+  return gastosModo() + `<div class="gh-top"><div class="gh-big">${M.f(a.total)}</div><div class="gh-sub">${anio} \u00b7 ${a.meses} mes${a.meses === 1 ? '' : 'es'}${a.totalUSD != null ? ` \u00b7 ${usd(a.totalUSD)}` : ''}</div>
+      <div class="gh-stats"><div><span>Meses</span><b>$ ${abrevARS(a.mensual)}</b></div><div><span>Viajes</span><b>$ ${abrevARS(a.viajes)}</b></div><div><span>Por mes</span><b>${a.mesesReg ? `$ ${abrevARS(a.promMes)}` : '\u2014'}</b></div></div>
+      <div class="small muted" style="margin-top:6px">${a.mesesReg ? `Promedio por mes sin viajes: ${M.f(a.promMes)}${a.promMesUSD != null ? ` (${usd(a.promMesUSD)})` : ''} \u00b7 con ${a.mesesReg} mes${a.mesesReg === 1 ? '' : 'es'} cargado${a.mesesReg === 1 ? '' : 's'} completo${a.mesesReg === 1 ? '' : 's'}` : 'Todav\u00eda no hay meses cargados completos (5 gastos o m\u00e1s) para sacar un promedio'}${vsPrev != null ? ` \u00b7 <span class="${vsPrev > 0 ? 'neg' : 'pos'}">${vsPrev > 0 ? '+' : '\u2212'}${M.pct(Math.abs(vsPrev))} en d\u00f3lares vs ${Number(anio) - 1}</span>` : ''}</div></div>
+    <div class="card section"><div class="card-head"><h2>Mes a mes</h2><span class="hint">tocá Mes arriba para ver el detalle</span></div>${chart}</div>
+    <div class="card section"><div class="card-head"><h2>En qué se fue</h2><span class="hint">sin viajes</span></div>${catRows}</div>
+    ${vjs.length ? `<div class="card section"><div class="card-head"><h2>Viajes de ${anio}</h2></div>${vjs.map(viajeItem).join('')}</div>` : ''}`;
+}
 function viewMovimientos() {
+  if (ui.gAnio) return viewGastosAnio();
   const ym = ui.mes; const f = ui.filtros; const c = E.consumo(ym);
   let movs = c.movs;
   if (f.q) { const q = norm(f.q); movs = movs.filter(m => norm(m.desc).includes(q) || norm(m.notas || '').includes(q)); }
@@ -414,7 +436,7 @@ function viewMovimientos() {
   const cuotas = sum(movs.filter(m => m.cuotaRow || (m.cuotas || 1) > 1).map(E.rowAmount));
   const fijos = sum(movs.filter(m => m.recId).map(E.rowAmount));
   const kARS = v => `$ ${abrevARS(v)}`;
-  return `<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
+  return `${gastosModo()}<div class="gh-top"><div class="gh-big">${M.f(total)}</div><div class="gh-sub">${movs.length} movimiento${movs.length === 1 ? '' : 's'}${Object.values(f).some(Boolean) ? ' con los filtros' : ` en ${D.monthName(ym).split(' ')[0]}`} ${infoBtn('Cada mes muestra sus compras, sus fijos y las cuotas de compras anteriores que caen en \u00e9l (el monto de la cuota, no el total). Los montos con \u2248 en amarillo son fijos estimados: tocalos para confirmar el monto real.')}</div></div>
     ${(() => { // filtro activo: se ve arriba y se saca con un toque (antes habia que bajar hasta los chips)
       const et = []; if (f.grupo) et.push(L.grupo(f.grupo).nombre); if (f.cat) et.push(L.cat(f.cat).nombre); if (f.q) et.push(`"${f.q}"`); if (f.tipo) et.push({ fijos: 'Fijos', variables: 'Compras', cuotas: 'Cuotas' }[f.tipo] || f.tipo); if (f.medio) et.push(f.medio.startsWith('t:') ? (L.tarjeta(f.medio.slice(2)) || {}).nombre || 'Tarjeta' : (MEDIOS[f.medio] || f.medio)); if (f.nec) et.push(NECESIDAD[f.nec] || '');
       return et.length ? `<div class="gh-filtro"><span>${et.map(esc).join(' \u00b7 ')}</span><button type="button" data-act="clear-filters">Ver todo</button></div>` : ''; })()}
