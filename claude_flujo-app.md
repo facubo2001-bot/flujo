@@ -32,6 +32,10 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Proyección del patrimonio (29-sep, build 202609300139)
+- Cartera, debajo de "Toda mi plata": `proyeccionCard()`. Parte del patrimonio total de hoy (CEDEARs + fondo + BTC + caja) y suma el aporte mensual (`E.aporteMensual`: plata nueva de los últimos 6 meses = compras − ventas de CEDEARs + depósitos − rescates del fondo al CCL del día; hoy ~US$ 405/mes). Editable (`state.settings.proyAporte`; vacío = automático).
+- `E.proyectar(v0, aporte, tasa, años)` capitaliza por mes. Tres ritmos: 6 % prudente, 10 % S&P histórico (el destacado), tu TIR de CEDEARs con dividendos (20,5 %, avisado como difícil de sostener). Tabla a 1, 2, 3, 5, 10 y 20 años con "sin rendir" (hoy + aportes), gráfico a 10 años y renta al 4 % a 10 años. En dólares nominales, sin inflación de EE.UU. ni impuestos (dicho en el ⓘ).
+
 ### Caja de la cartera real (29-sep, build 202609300050)
 - Facu: "esa caja no está; lo que vendo lo reinvierto; los dividendos quedan ahí". Antes la app mostraba US$ 394 de caja fantasma (ventas marcadas "a caja" sin compras marcadas "con caja", y una venta de PFE el mismo día que las compras de HD y PEP, procesada después de ellas).
 - Ahora: el cobro de una venta lo usa sola la compra siguiente, y también las compras del mismo día (`sinCubrir`). Los dividendos solo se usan si la compra dice "pagada con dividendos". `o.plataNueva` (a futuro) evita que una compra use la caja. Resultado real: caja US$ 22,91 = dividendos.

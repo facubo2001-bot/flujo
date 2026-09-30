@@ -1129,3 +1129,8 @@ h2 .i-btn{vertical-align:3px}
 
 #modal.ficha .ft .s .tn-ojo{color:var(--warn-text)}
 .cmp-tn{display:block;font-size:10.5px;font-weight:500;color:var(--ink-3);margin-top:2px;line-height:1.3} .cmp-tn.ojo{color:var(--warn-text)}
+.proy-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
+.proy-top>div,.proy-ap{display:flex;flex-direction:column;gap:2px} .proy-top b{font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:-.03em}
+.proy-ap{align-items:flex-end;text-align:right}
+.proy-hl{font-size:14px;color:var(--ink-2);margin-bottom:8px;line-height:1.4} .proy-hl b{color:var(--ink)}
+table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var(--ink-3);font-weight:500} table.proy td.b{font-weight:800;color:var(--ink)}

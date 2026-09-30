@@ -51,6 +51,32 @@ function renderResumenDetalle(tarjetaId, ym) {
 }
 
 /* ---------- PLAN: presupuesto e inversión ---------- */
+/** Proyeccion: patrimonio de hoy + aporte mensual, a tres ritmos de retorno (Facu: "cantidad de guita estimada para el anio que viene y asi") */
+function proyeccionCard() {
+  const k = E.cartera(); const pt = E.patrimonio(k); const v0 = pt.total || k.valor || 0; if (!(v0 > 0)) return '';
+  const ap = E.aporteMensual(k); const auto = Math.max(0, Math.round(ap.mensual)); const aporte = state.settings.proyAporte != null ? Number(state.settings.proyAporte) : auto;
+  const tir = k.ventanas.inicio && k.ventanas.inicio.disponible ? k.ventanas.inicio.rend.tirRealDiv : null;
+  const esc3 = [{ k: 'Prudente', r: 0.06, c: 'var(--ink-3)' }, { k: 'S&P 500 hist\u00f3rico', r: 0.10, c: 'var(--accent)' }, ...(tir != null && tir > 0 ? [{ k: 'Tu ritmo', r: tir, c: 'var(--warn-text)' }] : [])];
+  const N = 20; const series = esc3.map(e => ({ ...e, v: E.proyectar(v0, aporte, e.r, N) }));
+  const puesto = Array.from({ length: N + 1 }, (_, i) => v0 + aporte * 12 * i);
+  const f0 = x => fmtU(x, 0); const filas = [1, 2, 3, 5, 10, 20];
+  const base = series[1]; const renta = x => x * 0.04 / 12;
+  const n0 = x => Math.round(x).toLocaleString('es-AR');
+  const tabla = `<div class="table-wrap"><table class="proy"><thead><tr><th>En US$</th>${series.map(e => `<th class="r">${e.k === 'S&P 500 hist\u00f3rico' ? 'S&amp;P 500' : e.k}<small>${(e.r * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} % anual</small></th>`).join('')}</tr></thead><tbody>
+    ${filas.map(n => `<tr><td>${Number(D.today().slice(0, 4)) + n}<small>sin rendir ${n0(puesto[n])}</small></td>${series.map((e, i) => `<td class="r ${i === 1 ? 'b' : ''}">${n0(e.v[n])}</td>`).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
+  const labels = Array.from({ length: 11 }, (_, i) => i ? `+${i}` : 'hoy');
+  const chart = ChartQ.reg(w => Charts.line({ w, h: 200, labels, tipTitle: i => i ? `En ${i} a\u00f1o${i > 1 ? 's' : ''}` : 'Hoy', tipFmt: x => f0(x),
+    yFmt: x => MENOS(Math.abs(x) >= 1000 ? (x / 1000).toLocaleString('es-AR', { maximumFractionDigits: 0 }) + ' k' : Math.round(x).toString()),
+    series: [{ name: 'Sin rendir', color: 'var(--ink-3)', values: puesto.slice(0, 11), dashed: true }, ...series.map((e, i) => ({ name: e.k, color: e.c, values: e.v.slice(0, 11), strong: i === 1 }))] }), 200)
+    + Charts.legend([...series.map(e => ({ name: e.k, color: e.c, kind: 'line' })), { name: 'Sin rendir (hoy + aportes)', color: 'var(--ink-3)', kind: 'dash' }]);
+  const info = infoBtn(`Parte de todo tu patrimonio de hoy (CEDEARs, fondo, bitcoin y caja: ${f0(v0)}) y le suma cada mes el aporte. El aporte autom\u00e1tico es la plata nueva que entr\u00f3 en los \u00faltimos ${Math.round(ap.meses)} meses (compras menos ventas de CEDEARs ${f0(ap.ced)} + dep\u00f3sitos al fondo ${f0(ap.fondo)} al CCL de cada d\u00eda): ${f0(ap.mensual)} por mes. Reinvertir ventas o dividendos no cuenta como plata nueva. Retornos: 6 % prudente, 10 % lo que hist\u00f3ricamente rindi\u00f3 el S&P 500 con dividendos, y tu TIR real de CEDEARs con dividendos${tir != null ? ` (${(tir * 100).toFixed(1)} %)` : ''}, que es dif\u00edcil de sostener muchos a\u00f1os. Todo en d\u00f3lares de hoy sin descontar inflaci\u00f3n de EE.UU. (~2-3 % por a\u00f1o) ni impuestos. La renta es la regla del 4 %: lo que podr\u00edas retirar por a\u00f1o sin comerte el capital.`);
+  return `<div class="card section"><div class="card-head"><h2>Proyecci\u00f3n de tu patrimonio ${info}</h2></div>
+    <div class="proy-top"><div><span class="small muted">Hoy</span><b>${f0(v0)}</b></div>
+      <label class="proy-ap"><span class="small muted">Aporte por mes</span><span class="row" style="gap:4px;align-items:center">US$ <input id="proy-ap" class="input sm mono" inputmode="decimal" value="${aporte}" style="width:84px"></span><span class="small muted">${state.settings.proyAporte != null ? `a mano \u00b7 autom\u00e1tico ${f0(auto)} (borralo para volver)` : `promedio de los \u00faltimos ${Math.round(ap.meses)} meses`}</span></label></div>
+    <div class="proy-hl">En 1 a\u00f1o, al ritmo del S&amp;P: <b>${f0(base.v[1])}</b> \u00b7 en 10 a\u00f1os <b>${f0(base.v[10])}</b>, que al 4 % dan <b>${f0(renta(base.v[10]))}/mes</b> de renta</div>
+    ${chart}${tabla}</div>`;
+}
 function viewPlan() {
   const ym = ui.mes; const ing = E.ingreso(ym), c = E.consumo(ym), inv = E.invertido(ym); const mg = E.margen(ym);
   const meta = mg.ahorro;
@@ -331,6 +357,7 @@ function viewCartera() {
     <div class="list-item"><div><b style="font-weight:500">Operaciones con advertencias</b><span class="sub small muted">${conAviso ? `marcadas ${G.warn} en la lista: tocá para revisar` : 'cada operación se verifica contra NY, CCL, ratio y SPY al guardarla'}</span></div>${conAviso ? `<span class="pill warn">${conAviso}</span>` : `<span class="pill good">0</span>`}</div>
   </div>`;
   html += renderPatrimonio(k);
+  html += proyeccionCard();
   // operaciones
   const ops = k.ops.slice().reverse().slice(0, 25);
   const opMonto = o => o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0);

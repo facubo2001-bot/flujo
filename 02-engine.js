@@ -484,6 +484,25 @@ const E = {
     const ced = (grupos.find(g => g.id === 'cedears') || {}).valor || 0;
     return { activos, grupos, total, mep, reserva, reservaPct: ced ? reserva / ced : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
   },
+  /** Proyeccion del patrimonio (Facu: "a este ritmo invirtiendo y con este retorno, cuanta plata el anio que viene").
+   *  Parte del patrimonio de hoy (CEDEARs + fondo + BTC + caja) y suma cada mes el aporte: plata nueva que entro en los ultimos
+   *  6 meses (compras - ventas de CEDEARs + depositos - rescates del fondo al CCL de cada dia; dividendos y reinversiones no son plata nueva).
+   *  Tres ritmos de retorno anual: 6 % (prudente), 10 % (historia del S&P 500) y la TIR real de tus CEDEARs con dividendos. */
+  aporteMensual(k) {
+    const hoy = D.today(); const desde = D.addDays(hoy, -182); const ini = k.primeraOp && k.primeraOp > desde ? k.primeraOp : desde;
+    const meses = Math.max(1, D.daysBetween(ini, hoy) / 30.44);
+    const ced = sum(k.flujos.filter(f => f.tipo !== 'dividendo' && f.fecha >= desde).map(f => f.monto));
+    const ccl = Number(state.settings.ccl) || Number(state.settings.tc) || 0;
+    let fondo = 0; for (const a of (state.cartera.activos || [])) for (const l of (a.lotes || [])) {
+      if (!l.fecha || l.fecha < desde || !(Number(l.monto) > 0)) continue; const c = (typeof AD !== 'undefined' && AD.cclEn && AD.cclEn(l.fecha)) || ccl; if (!c) continue;
+      fondo += (l.tipo === 'rescate' ? -1 : 1) * Number(l.monto) / (a.moneda === 'USD' ? 1 : c); }
+    return { mensual: (ced + fondo) / meses, ced, fondo, meses, desde: ini };
+  },
+  proyectar(v0, aporte, tasaAnual, anios) {
+    const rm = Math.pow(1 + tasaAnual, 1 / 12) - 1; const out = [v0]; let v = v0;
+    for (let m = 1; m <= anios * 12; m++) { v = v * (1 + rm) + aporte; if (m % 12 === 0) out.push(v); }
+    return out;  // un valor por anio: hoy, +1, +2...
+  },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
   /** costo (FIFO) de lo que se tenia al cierre de una fecha, con las operaciones de hoy */
   costoAl(k, fecha) {

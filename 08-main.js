@@ -252,6 +252,7 @@ document.addEventListener('change', e => {
   if (t.dataset.budget) { const c = state.categorias.find(c => c.id === t.dataset.budget); if (c) { c.presupuesto = M.parse(t.value); Persist.save(); render(); } return; }
   if (t.dataset.pago) { const [tarjetaId, mes] = t.dataset.pago.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.cuentaId = t.value; Persist.save(); render(); return; }
   if (t.dataset.pagado) { const [tarjetaId, mes] = t.dataset.pagado.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.pagado = t.checked; Persist.save(); render(); return; }
+  if (t.id === 'proy-ap') { const v = M.parse(t.value); state.settings.proyAporte = t.value.trim() === '' ? null : (v >= 0 ? v : null); Persist.save(); render(); return; }
   if (t.id === 'res-mes') { ui.resMes = $('#res-mes').value; render(); return; }
   if (t.id === 'import-file') { const f = t.files[0]; if (!f) return; f.text().then(txt => { try { const j = JSON.parse(txt); if (!j || !j.v) throw new Error(); confirmar(`Importar ${j.movimientos?.length || 0} movimientos y reemplazar los datos actuales?`, () => { state = Persist.migrate(j); Persist.save(); toast('Datos importados'); go('resumen'); }, 'Importar'); } catch (e) { toast('El archivo no es un respaldo válido'); } }); return; }
   if (t.id === 'import-csv') { const f = t.files[0]; if (!f) return; f.text().then(importarCSV); return; }

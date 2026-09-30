@@ -1153,6 +1153,11 @@ h2 .i-btn{vertical-align:3px}
 
 #modal.ficha .ft .s .tn-ojo{color:var(--warn-text)}
 .cmp-tn{display:block;font-size:10.5px;font-weight:500;color:var(--ink-3);margin-top:2px;line-height:1.3} .cmp-tn.ojo{color:var(--warn-text)}
+.proy-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}
+.proy-top>div,.proy-ap{display:flex;flex-direction:column;gap:2px} .proy-top b{font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:-.03em}
+.proy-ap{align-items:flex-end;text-align:right}
+.proy-hl{font-size:14px;color:var(--ink-2);margin-bottom:8px;line-height:1.4} .proy-hl b{color:var(--ink)}
+table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var(--ink-3);font-weight:500} table.proy td.b{font-weight:800;color:var(--ink)}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1493,7 +1498,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609300106';
+const BUILD = '202609300154';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -3185,6 +3190,25 @@ const E = {
     const ced = (grupos.find(g => g.id === 'cedears') || {}).valor || 0;
     return { activos, grupos, total, mep, reserva, reservaPct: ced ? reserva / ced : null, reservaObjetivo: objetivo / 100, sinPrecio: activos.filter(a => a.sinPrecio).map(a => a.nombre) };
   },
+  /** Proyeccion del patrimonio (Facu: "a este ritmo invirtiendo y con este retorno, cuanta plata el anio que viene").
+   *  Parte del patrimonio de hoy (CEDEARs + fondo + BTC + caja) y suma cada mes el aporte: plata nueva que entro en los ultimos
+   *  6 meses (compras - ventas de CEDEARs + depositos - rescates del fondo al CCL de cada dia; dividendos y reinversiones no son plata nueva).
+   *  Tres ritmos de retorno anual: 6 % (prudente), 10 % (historia del S&P 500) y la TIR real de tus CEDEARs con dividendos. */
+  aporteMensual(k) {
+    const hoy = D.today(); const desde = D.addDays(hoy, -182); const ini = k.primeraOp && k.primeraOp > desde ? k.primeraOp : desde;
+    const meses = Math.max(1, D.daysBetween(ini, hoy) / 30.44);
+    const ced = sum(k.flujos.filter(f => f.tipo !== 'dividendo' && f.fecha >= desde).map(f => f.monto));
+    const ccl = Number(state.settings.ccl) || Number(state.settings.tc) || 0;
+    let fondo = 0; for (const a of (state.cartera.activos || [])) for (const l of (a.lotes || [])) {
+      if (!l.fecha || l.fecha < desde || !(Number(l.monto) > 0)) continue; const c = (typeof AD !== 'undefined' && AD.cclEn && AD.cclEn(l.fecha)) || ccl; if (!c) continue;
+      fondo += (l.tipo === 'rescate' ? -1 : 1) * Number(l.monto) / (a.moneda === 'USD' ? 1 : c); }
+    return { mensual: (ced + fondo) / meses, ced, fondo, meses, desde: ini };
+  },
+  proyectar(v0, aporte, tasaAnual, anios) {
+    const rm = Math.pow(1 + tasaAnual, 1 / 12) - 1; const out = [v0]; let v = v0;
+    for (let m = 1; m <= anios * 12; m++) { v = v * (1 + rm) + aporte; if (m % 12 === 0) out.push(v); }
+    return out;  // un valor por anio: hoy, +1, +2...
+  },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
   /** costo (FIFO) de lo que se tenia al cierre de una fecha, con las operaciones de hoy */
   costoAl(k, fecha) {
@@ -4237,6 +4261,32 @@ function renderResumenDetalle(tarjetaId, ym) {
 }
 
 /* ---------- PLAN: presupuesto e inversión ---------- */
+/** Proyeccion: patrimonio de hoy + aporte mensual, a tres ritmos de retorno (Facu: "cantidad de guita estimada para el anio que viene y asi") */
+function proyeccionCard() {
+  const k = E.cartera(); const pt = E.patrimonio(k); const v0 = pt.total || k.valor || 0; if (!(v0 > 0)) return '';
+  const ap = E.aporteMensual(k); const auto = Math.max(0, Math.round(ap.mensual)); const aporte = state.settings.proyAporte != null ? Number(state.settings.proyAporte) : auto;
+  const tir = k.ventanas.inicio && k.ventanas.inicio.disponible ? k.ventanas.inicio.rend.tirRealDiv : null;
+  const esc3 = [{ k: 'Prudente', r: 0.06, c: 'var(--ink-3)' }, { k: 'S&P 500 hist\u00f3rico', r: 0.10, c: 'var(--accent)' }, ...(tir != null && tir > 0 ? [{ k: 'Tu ritmo', r: tir, c: 'var(--warn-text)' }] : [])];
+  const N = 20; const series = esc3.map(e => ({ ...e, v: E.proyectar(v0, aporte, e.r, N) }));
+  const puesto = Array.from({ length: N + 1 }, (_, i) => v0 + aporte * 12 * i);
+  const f0 = x => fmtU(x, 0); const filas = [1, 2, 3, 5, 10, 20];
+  const base = series[1]; const renta = x => x * 0.04 / 12;
+  const n0 = x => Math.round(x).toLocaleString('es-AR');
+  const tabla = `<div class="table-wrap"><table class="proy"><thead><tr><th>En US$</th>${series.map(e => `<th class="r">${e.k === 'S&P 500 hist\u00f3rico' ? 'S&amp;P 500' : e.k}<small>${(e.r * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} % anual</small></th>`).join('')}</tr></thead><tbody>
+    ${filas.map(n => `<tr><td>${Number(D.today().slice(0, 4)) + n}<small>sin rendir ${n0(puesto[n])}</small></td>${series.map((e, i) => `<td class="r ${i === 1 ? 'b' : ''}">${n0(e.v[n])}</td>`).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
+  const labels = Array.from({ length: 11 }, (_, i) => i ? `+${i}` : 'hoy');
+  const chart = ChartQ.reg(w => Charts.line({ w, h: 200, labels, tipTitle: i => i ? `En ${i} a\u00f1o${i > 1 ? 's' : ''}` : 'Hoy', tipFmt: x => f0(x),
+    yFmt: x => MENOS(Math.abs(x) >= 1000 ? (x / 1000).toLocaleString('es-AR', { maximumFractionDigits: 0 }) + ' k' : Math.round(x).toString()),
+    series: [{ name: 'Sin rendir', color: 'var(--ink-3)', values: puesto.slice(0, 11), dashed: true }, ...series.map((e, i) => ({ name: e.k, color: e.c, values: e.v.slice(0, 11), strong: i === 1 }))] }), 200)
+    + Charts.legend([...series.map(e => ({ name: e.k, color: e.c, kind: 'line' })), { name: 'Sin rendir (hoy + aportes)', color: 'var(--ink-3)', kind: 'dash' }]);
+  const info = infoBtn(`Parte de todo tu patrimonio de hoy (CEDEARs, fondo, bitcoin y caja: ${f0(v0)}) y le suma cada mes el aporte. El aporte autom\u00e1tico es la plata nueva que entr\u00f3 en los \u00faltimos ${Math.round(ap.meses)} meses (compras menos ventas de CEDEARs ${f0(ap.ced)} + dep\u00f3sitos al fondo ${f0(ap.fondo)} al CCL de cada d\u00eda): ${f0(ap.mensual)} por mes. Reinvertir ventas o dividendos no cuenta como plata nueva. Retornos: 6 % prudente, 10 % lo que hist\u00f3ricamente rindi\u00f3 el S&P 500 con dividendos, y tu TIR real de CEDEARs con dividendos${tir != null ? ` (${(tir * 100).toFixed(1)} %)` : ''}, que es dif\u00edcil de sostener muchos a\u00f1os. Todo en d\u00f3lares de hoy sin descontar inflaci\u00f3n de EE.UU. (~2-3 % por a\u00f1o) ni impuestos. La renta es la regla del 4 %: lo que podr\u00edas retirar por a\u00f1o sin comerte el capital.`);
+  return `<div class="card section"><div class="card-head"><h2>Proyecci\u00f3n de tu patrimonio ${info}</h2></div>
+    <div class="proy-top"><div><span class="small muted">Hoy</span><b>${f0(v0)}</b></div>
+      <label class="proy-ap"><span class="small muted">Aporte por mes</span><span class="row" style="gap:4px;align-items:center">US$ <input id="proy-ap" class="input sm mono" inputmode="decimal" value="${aporte}" style="width:84px"></span><span class="small muted">${state.settings.proyAporte != null ? `a mano \u00b7 autom\u00e1tico ${f0(auto)} (borralo para volver)` : `promedio de los \u00faltimos ${Math.round(ap.meses)} meses`}</span></label></div>
+    <div class="proy-hl">En 1 a\u00f1o, al ritmo del S&amp;P: <b>${f0(base.v[1])}</b> \u00b7 en 10 a\u00f1os <b>${f0(base.v[10])}</b>, que al 4 % dan <b>${f0(renta(base.v[10]))}/mes</b> de renta</div>
+    ${chart}${tabla}</div>`;
+}
 function viewPlan() {
   const ym = ui.mes; const ing = E.ingreso(ym), c = E.consumo(ym), inv = E.invertido(ym); const mg = E.margen(ym);
   const meta = mg.ahorro;
@@ -4517,6 +4567,7 @@ function viewCartera() {
     <div class="list-item"><div><b style="font-weight:500">Operaciones con advertencias</b><span class="sub small muted">${conAviso ? `marcadas ${G.warn} en la lista: tocá para revisar` : 'cada operación se verifica contra NY, CCL, ratio y SPY al guardarla'}</span></div>${conAviso ? `<span class="pill warn">${conAviso}</span>` : `<span class="pill good">0</span>`}</div>
   </div>`;
   html += renderPatrimonio(k);
+  html += proyeccionCard();
   // operaciones
   const ops = k.ops.slice().reverse().slice(0, 25);
   const opMonto = o => o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0);
@@ -6367,6 +6418,7 @@ document.addEventListener('change', e => {
   if (t.dataset.budget) { const c = state.categorias.find(c => c.id === t.dataset.budget); if (c) { c.presupuesto = M.parse(t.value); Persist.save(); render(); } return; }
   if (t.dataset.pago) { const [tarjetaId, mes] = t.dataset.pago.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.cuentaId = t.value; Persist.save(); render(); return; }
   if (t.dataset.pagado) { const [tarjetaId, mes] = t.dataset.pagado.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.pagado = t.checked; Persist.save(); render(); return; }
+  if (t.id === 'proy-ap') { const v = M.parse(t.value); state.settings.proyAporte = t.value.trim() === '' ? null : (v >= 0 ? v : null); Persist.save(); render(); return; }
   if (t.id === 'res-mes') { ui.resMes = $('#res-mes').value; render(); return; }
   if (t.id === 'import-file') { const f = t.files[0]; if (!f) return; f.text().then(txt => { try { const j = JSON.parse(txt); if (!j || !j.v) throw new Error(); confirmar(`Importar ${j.movimientos?.length || 0} movimientos y reemplazar los datos actuales?`, () => { state = Persist.migrate(j); Persist.save(); toast('Datos importados'); go('resumen'); }, 'Importar'); } catch (e) { toast('El archivo no es un respaldo válido'); } }); return; }
   if (t.id === 'import-csv') { const f = t.files[0]; if (!f) return; f.text().then(importarCSV); return; }
