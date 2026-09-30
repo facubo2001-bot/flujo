@@ -32,6 +32,12 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Caja de la cartera real (29-sep, build 202609300050)
+- Facu: "esa caja no está; lo que vendo lo reinvierto; los dividendos quedan ahí". Antes la app mostraba US$ 394 de caja fantasma (ventas marcadas "a caja" sin compras marcadas "con caja", y una venta de PFE el mismo día que las compras de HD y PEP, procesada después de ellas).
+- Ahora: el cobro de una venta lo usa sola la compra siguiente, y también las compras del mismo día (`sinCubrir`). Los dividendos solo se usan si la compra dice "pagada con dividendos". `o.plataNueva` (a futuro) evita que una compra use la caja. Resultado real: caja US$ 22,91 = dividendos.
+- La caja suma al patrimonio como grupo "Caja en dólares" (total 9.194 = CEDEARs 6.386 + reserva 226 + BTC 2.559 + caja 23).
+- Rendimiento: no cambia. Prueba: vender hoy todo ASML deja YTD 12,66 %, Inicio 33,9 %, TIR 20,5 % y ganancia 604 iguales (la venta sale con la ganancia adentro); reinvertir en MSFT, igual.
+
 ### Tendencia y años en suba junto al CAGR (29-sep, build 202609300026)
 - Facu: el CAGR depende de dos años; si el 1 o el 5 son raros, engaña. `Fund.tendencia(filas, campo, 5)` → `d.tend[campo] = {v, suben, pares}`: v = crecimiento anual de la recta que mejor ajusta a los 6 años en escala log (solo si los 6 existen y son positivos; EPS solo con epsCalc); suben = años que crecieron contra el anterior.
 - Ficha (Growth): debajo del período, "tend 33 % · 4/5↑"; amarillo si |tend − CAGR| > 5 puntos. Comparador: en Ventas, Ganancia neta, EPS y nueva fila Caja libre (FCF). Export: "(tend. X %; 4/5)" junto a Ventas y EPS CAGR. Fund.VERSION 11.

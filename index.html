@@ -1493,7 +1493,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609300042';
+const BUILD = '202609300106';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2987,17 +2987,24 @@ const E = {
     const pos = {};
     const get = t => pos[t] || (pos[t] = { ticker: t, acciones: 0, costo: 0, dividendos: 0, realizado: 0, nOps: 0, lotes: [], spyShares: 0, flujoNeto: 0 });
     const flujos = []; let dividendos = 0, cajaUsada = 0, ventasEnCaja = 0;
+    // caja de la cartera (Facu: lo que vendo lo reinvierto; los dividendos quedan ahi rindiendo):
+    // el cobro de una venta la usa la compra siguiente sola; los dividendos solo si la compra dice "pagada con dividendos"
+    let poolVentas = 0, poolDiv = 0; const sinCubrir = {};  // compras del dia sin caja: una venta del mismo dia las paga (vendo PFE, compro HD y PEP)
     for (const o of ops) {
       const p = get(o.ticker); p.nOps++;
       const q = Number(o.acciones) || 0, px = Number(o.precio) || 0; let qFlujo = q;
-      if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px; const dc = Number(o.deCaja != null ? o.deCaja : o.deDividendos) || 0; if (dc > 0) cajaUsada += Math.min(dc, q * px); }
+      if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px;
+        let resto = q * px; const dc = Number(o.deCaja != null ? o.deCaja : o.deDividendos) || 0;
+        if (dc > 0) { const u = Math.min(dc, resto, poolDiv + poolVentas); const d1 = Math.min(u, poolDiv); poolDiv -= d1; poolVentas -= u - d1; resto -= u; cajaUsada += u; }
+        if (!o.plataNueva && poolVentas > 0 && resto > 0) { const u = Math.min(poolVentas, resto); poolVentas -= u; cajaUsada += u; resto -= u; }
+        if (!o.plataNueva && resto > 0) sinCubrir[o.fecha] = (sinCubrir[o.fecha] || 0) + resto; }
       else if (o.tipo === 'venta') {
         let rest = Math.min(q, p.acciones); const qv = rest; qFlujo = qv; let costoVendido = 0;  // si el CSV redondea y vende 0,0001 de mas, el flujo es lo que realmente habia
         while (rest > 1e-9 && p.lotes.length) { const l = p.lotes[0]; const take = Math.min(l.q, rest); costoVendido += take * l.px; l.q -= take; rest -= take; if (l.q <= 1e-9) p.lotes.shift(); }
         p.realizado += qv * px - costoVendido; p.costo -= costoVendido; p.acciones -= qv;
-        if (o.aCaja) ventasEnCaja += qv * px;  // el cobro de la venta queda en caja (las ventas anteriores a esta función no entran; las nuevas sí, salvo que se apague el switch)
+        if (o.aCaja) { const m = qv * px; ventasEnCaja += m; const u = Math.min(m, sinCubrir[o.fecha] || 0); if (u > 0) { sinCubrir[o.fecha] -= u; cajaUsada += u; } poolVentas += m - u; }  // el cobro de la venta queda en caja (las ventas anteriores a esta función no entran; las nuevas sí, salvo que se apague el switch)
         if (p.acciones < 1e-6) { p.acciones = 0; p.costo = 0; p.lotes = []; }
-      } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; }
+      } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; poolDiv += m; }
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -qFlujo * px);
       const spx = Number(o.spy) || Spy.at(o.fecha) || null;
       flujos.push({ fecha: o.fecha, monto, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
@@ -3038,9 +3045,9 @@ const E = {
       gpTotal: gpAb != null ? gpAb + dividendos + realizado : null, rendTotal: gpAb != null && costo ? (gpAb + divAb) / costo : null, dividendosAbiertas: divAb,
       // caja de dividendos: lo cobrado menos lo que ya se reinvirtió (compras marcadas "pagada con dividendos"); valor total = acciones + caja (sin contar dos veces)
       // caja: dividendos cobrados + cobros de ventas marcadas "a caja" − compras pagadas con la caja (nunca negativa); valor total = acciones + caja
-      cajaEntradas: dividendos + ventasEnCaja, ventasEnCaja, cajaUsada: Math.min(cajaUsada, dividendos + ventasEnCaja), dividendosUsados: Math.min(cajaUsada, dividendos + ventasEnCaja),
-      caja: Math.max(0, dividendos + ventasEnCaja - cajaUsada),
-      valorTotal: valor != null ? valor + Math.max(0, dividendos + ventasEnCaja - cajaUsada) : null,
+      cajaEntradas: dividendos + ventasEnCaja, ventasEnCaja, cajaUsada, dividendosUsados: dividendos - Math.max(0, poolDiv),
+      caja: Math.max(0, poolDiv) + Math.max(0, poolVentas), cajaDiv: Math.max(0, poolDiv), cajaVentas: Math.max(0, poolVentas),
+      valorTotal: valor != null ? valor + Math.max(0, poolDiv) + Math.max(0, poolVentas) : null,
       dividendos, realizado, mep, ccl, valorMEP: valor != null ? valor * mep : null, valorCCL: valor != null ? valor * ccl : null,
       preciosFecha: c.preciosFecha, ops, cerradasCount: cerradas.length, flujos, spyHoy, inicio: c.inicio || null,
       legados: flujos.filter(f => f.legado).length, primeraOp: ops.length ? ops[0].fecha : null };
@@ -3157,7 +3164,7 @@ const E = {
       mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
       fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
   },
-  /** Todo el patrimonio: CEDEARs + otros activos. La caja contable de la app (dividendos + ventas) no entra: esa plata ya está en alguno de estos activos. */
+  /** Todo el patrimonio: CEDEARs + otros activos + caja de la cartera (dividendos sin reinvertir y ventas sin usar: la compra siguiente usa lo de las ventas sola) */
   patrimonio(k) {
     // pesos → dolares al CCL: es el dolar con el que se compran CEDEARs (antes MEP; la reserva y el patrimonio no coincidian)
     const mep = k.ccl || k.mep, btcPx = Btc.precio();
@@ -3168,6 +3175,8 @@ const E = {
       { id: 'renta', nombre: 'Letras y bonos', color: 'var(--c6)', valor: sum(activos.filter(a => (a.tipo === 'letra' || a.tipo === 'bono') && a.valorUSD).map(a => a.valorUSD)) },
       { id: 'btc', nombre: 'Bitcoin', color: '#F7931A', valor: sum(activos.filter(a => a.tipo === 'btc' && a.valorUSD).map(a => a.valorUSD)) },
       { id: 'otro', nombre: 'Otros', color: 'var(--ink-3)', valor: sum(activos.filter(a => a.tipo === 'otro' && a.valorUSD).map(a => a.valorUSD)) },
+      // dividendos cobrados sin reinvertir y ventas todavia sin usar: plata en dolares en la cuenta
+      { id: 'caja', nombre: 'Caja en d\u00f3lares', color: 'var(--ink-2)', valor: k.caja || 0 },
     ].filter(g => g.valor > 0);
     const total = sum(grupos.map(g => g.valor));
     const reserva = (grupos.find(g => g.id === 'reserva') || {}).valor || 0;
