@@ -1126,3 +1126,6 @@ h2 .i-btn{vertical-align:3px}
 .nov-chip.tec.abajo{box-shadow:inset 0 0 0 1.5px var(--crit-text)}
 .ema{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;margin-top:8px;color:var(--ink-2)}
 .ema b{color:var(--ink);font-weight:800;margin-right:4px}
+
+#modal.ficha .ft .s .tn-ojo{color:var(--warn-text)}
+.cmp-tn{display:block;font-size:10.5px;font-weight:500;color:var(--ink-3);margin-top:2px;line-height:1.3} .cmp-tn.ojo{color:var(--warn-text)}

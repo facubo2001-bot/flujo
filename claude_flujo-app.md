@@ -32,6 +32,11 @@ Después, el backlog de datos del final del documento.
 
 > **Cómo se sube (desde el 27-sep):** Claude sube directo al repo `facubo2001-bot/flujo` (GitHub App de Claude instalada con acceso a `flujo`): clonar, copiar los archivos **planos** (src/*, pwa/index.html, sw.js, íconos, manifest, cedears.json, data/spy-*, byma, claude/*.md, build.js; nunca preset.json), commit y push a main. Ya no hace falta armar zips para Facu.
 
+### Tendencia y años en suba junto al CAGR (29-sep, build 202609300026)
+- Facu: el CAGR depende de dos años; si el 1 o el 5 son raros, engaña. `Fund.tendencia(filas, campo, 5)` → `d.tend[campo] = {v, suben, pares}`: v = crecimiento anual de la recta que mejor ajusta a los 6 años en escala log (solo si los 6 existen y son positivos; EPS solo con epsCalc); suben = años que crecieron contra el anterior.
+- Ficha (Growth): debajo del período, "tend 33 % · 4/5↑"; amarillo si |tend − CAGR| > 5 puntos. Comparador: en Ventas, Ganancia neta, EPS y nueva fila Caja libre (FCF). Export: "(tend. X %; 4/5)" junto a Ventas y EPS CAGR. Fund.VERSION 11.
+- Ejemplos: TJX ganancia CAGR 127 % (base 2021 pandemia) vs tend 87 %; AVGO 51 % vs 33 %; HON −0,2 % vs +0,5 % (estancada de verdad); MELI ganancia sin CAGR (2020 negativo) pero 5/5↑.
+
 ### Chequeo 2 vs TradingView (29-sep, build 202609292326)
 - Facu comparó P/FCF contra el "Price to cash flow" de TV (caja OPERATIVA): MSFT 57,4 vs 20,7. Nuestro P/FCF está bien (MSFT FCF 67 B con capex 116 B). Se agregó **P/CF** (precio / caja operativa 12 m, `Fund.mult().pcf`) en lugar de FCF yield (era 1/P/FCF): coincide en 12 de 13 (MSFT 21,0/20,7 · META 14,8/14,1 · GOOGL 22,7/22,7 · MCD 14,9/14,6 · HD 15,6/15,4 · PEP 13,1/13,1 · UNH 12,7/12,7 · AMZN 16,8/16,6 · CEG 22,4/22,3 · IBM 14,4/14,1 · NVDA 40,8/41,4). MELI 6,4 vs 8,45: la caja operativa de la SEC (13,9 B en 12 m) no es la de TV.
 - Márgenes bruto y neto: ahora de los últimos 12 meses (TTM, "12 m" en la ficha), el promedio 5 años sigue por ejercicio. MU queda atrás hasta su 10-K (TV ya tiene el trimestre de agosto por el comunicado). CEG bruto 43,9 vs 17,4: TV cuenta más costos (definición).
@@ -439,6 +444,5 @@ Campos: movimientos, remove, scrub, updateTarjetas, updateRecurrentes, removeRec
 ## Backlog (después del rediseño)
 **Cola de Facu (pedidos pendientes, en orden):**
 1. (29-sep, PRIORITARIO) Chequeo del CAGR 5 años contra TradingView después de los arreglos de splits y años fiscales: GOOGL, NVDA, HON, TSLA, HD (EPS, ventas, ganancia, FCF).
-2. (29-sep, idea) Complementar el CAGR, que depende solo de dos años (si el 1 y el 5 son raros, engaña): crecimiento por tendencia (ajuste sobre los 6 años) + cuántos de los 5 años creció.
 
 Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "Otras tenencias" (letra $600k, ONs, pesos) para cuadrar con el total de Balanz · sueldo real vs inflación (IPC INDEC) y meta de tasa de inversión por mes · fechar los 12 lotes previos · módulo impositivo (Ganancias cedular, costo FIFO) · riesgo (concentración por sector, beta) · rebalanceo contra pesos objetivo · segundo benchmark (QQQ / Merval USD) · importar tenencia de Balanz para conciliar sin tipear · 18 tickers de "Capa 2" de alertas pendientes.

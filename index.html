@@ -1151,6 +1151,9 @@ h2 .i-btn{vertical-align:3px}
 .ema{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;margin-top:8px;color:var(--ink-2)}
 .ema b{color:var(--ink);font-weight:800;margin-right:4px}
 
+#modal.ficha .ft .s .tn-ojo{color:var(--warn-text)}
+.cmp-tn{display:block;font-size:10.5px;font-weight:500;color:var(--ink-3);margin-top:2px;line-height:1.3} .cmp-tn.ojo{color:var(--warn-text)}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1490,7 +1493,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609292334';
+const BUILD = '202609300042';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2299,6 +2302,21 @@ const Fund = {
     if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
     return { v: Math.pow(b / a, 1 / n) - 1, desde: f0.anio, hasta: ult.anio, a, b };
   },
+  /** complemento del CAGR (Facu: si el anio 1 o el 5 son raros, el CAGR engaña):
+   *  tendencia = crecimiento anual de la recta que mejor ajusta a los n+1 anios (en escala logaritmica), con todos los anios;
+   *  suben = en cuantos de los n anios crecio contra el anterior. Tendencia solo si los n+1 anios estan y son positivos. */
+  tendencia(filas, campo, n) {
+    const ult = filas[filas.length - 1]; if (!ult) return null;
+    const xs = []; for (let a = ult.anio - n; a <= ult.anio; a++) { const f = filas.find(y => y.anio === a); xs.push(f && Number.isFinite(f[campo]) ? f[campo] : null); }
+    if (campo === 'eps' && filas.filter(f => f.anio >= ult.anio - n).some(f => !f.epsCalc)) return null;
+    let suben = 0, pares = 0; for (let i = 1; i < xs.length; i++) if (xs[i] != null && xs[i - 1] != null) { pares++; if (xs[i] > xs[i - 1]) suben++; }
+    let v = null;
+    if (xs.every(x => x != null && x > 0)) {
+      const pts = xs.map((y, i) => [i, Math.log(y)]); const mx = sum(pts.map(p => p[0])) / pts.length, my = sum(pts.map(p => p[1])) / pts.length;
+      const b = sum(pts.map(([x, y]) => (x - mx) * (y - my))) / sum(pts.map(([x]) => (x - mx) ** 2)); v = Math.exp(b) - 1;
+    }
+    return pares ? { v, suben, pares } : null;
+  },
   cagr(filas, campo, n) { const x = Fund.cagrDet(filas, campo, n); return x ? x.v : null; },
   prom(filas, campo, n) { const xs = filas.slice(-n).map(f => f[campo]).filter(Number.isFinite); return xs.length ? sum(xs) / xs.length : null; },
   mediana(xs) { const s = xs.filter(Number.isFinite).slice().sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; },
@@ -2399,6 +2417,7 @@ const Fund = {
     d.cagrEps5 = Fund.cagr(filas, 'eps', 5); d.epsFuente = d.cagrEps5 != null ? 'balances' : null;
     d.cagrEps10 = Fund.cagr(filas, 'eps', 10);
     d.cagrDet = Object.fromEntries(['ventas', 'neto', 'eps', 'fcf', 'acciones'].map(c => [c, Fund.cagrDet(filas, c, 5)]));
+    d.tend = Object.fromEntries(['ventas', 'neto', 'eps', 'fcf'].map(c => [c, Fund.tendencia(filas, c, 5)]));
     // ROIC (formula de TradingView): ganancia neta / capital total promedio. Actual = ultimos 12 meses (10-K + 10-Q),
     // si no el ultimo anual, si no el ROI que calcula Finnhub. Promedio 5 anios con la misma formula.
     const trims = Fund.trimestres(finQ); const ttm = Fund.ttm(filas, trims);
@@ -2520,7 +2539,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 10,
+  VERSION: 11,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -5279,8 +5298,15 @@ function fundHTML(t, pos) {
       tile('FCF / NI', d.fcfSobreNeto != null ? num(d.fcfSobreNeto, 2) + '\u00d7' : '\u2014', d.fcfSobreNeto5 ? vsH(d.fcfSobreNeto, d.fcfSobreNeto5) : abs(d.fcfSobreNeto, 0.9, 0.6), d.fcfSobreNeto5 ? `5Y avg ${num(d.fcfSobreNeto5, 2)}\u00d7` : ''),
     ]);
     // periodo exacto del CAGR (FY20\u2192FY25); si no hay dato: 'con base negativa' o sin anios
-    const per = c => { const x = d.cagrDet && d.cagrDet[c]; return x ? `FY${String(x.desde).slice(2)}\u2192${String(x.hasta).slice(2)}` : '5Y CAGR'; };
-    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. Siempre del \u00faltimo a\u00f1o fiscal contra el de 5 a\u00f1os antes (se ve abajo de cada dato); si alguno de los dos es negativo o falta, \u201c\u2014\u201d. EPS = ganancia / acciones diluidas, ajustado por splits. Share count: si baja, la empresa recompra acciones.', [
+    // debajo del CAGR: tendencia con los 6 anios y cuantos de los 5 subio. Si la tendencia se aleja mas de 5 puntos del CAGR, en amarillo:
+    // el primer o el ultimo anio esta distorsionando el numero grande
+    const per = c => { const x = d.cagrDet && d.cagrDet[c]; const tn = d.tend && d.tend[c];
+      const l1 = x ? `FY${String(x.desde).slice(2)}\u2192${String(x.hasta).slice(2)}` : '5Y CAGR';
+      if (!tn) return l1;
+      const ojo = tn.v != null && x && Math.abs(tn.v - x.v) > 0.05;
+      const tv = tn.v == null ? '\u2014' : Math.abs(tn.v) >= 0.1 ? `${tn.v < 0 ? '\u2212' : ''}${Math.round(Math.abs(tn.v) * 100)} %` : pct1(tn.v);
+      return `${l1}<br><span class="${ojo ? 'tn-ojo' : ''}">tend ${tv} \u00b7 ${tn.suben}/${tn.pares}\u2191</span>`; };
+    const g = grupo('Growth', 'Crecimiento compuesto anual (CAGR) de los \u00faltimos 5 a\u00f1os, con los balances presentados a la SEC. Siempre del \u00faltimo a\u00f1o fiscal contra el de 5 a\u00f1os antes (se ve abajo de cada dato); si alguno de los dos es negativo o falta, \u201c\u2014\u201d. EPS = ganancia / acciones diluidas, ajustado por splits. Share count: si baja, la empresa recompra acciones. Debajo: \u201ctend\u201d es el crecimiento por a\u00f1o de la tendencia con los 6 a\u00f1os (un a\u00f1o raro al principio o al final pesa poco) y \u201c4/5\u2191\u201d en cu\u00e1ntos de los 5 a\u00f1os subi\u00f3. En amarillo si la tendencia se aleja m\u00e1s de 5 puntos del CAGR: el primer o el \u00faltimo a\u00f1o est\u00e1 distorsionando el n\u00famero.', [
       tile('Revenue', pct1(d.cagrVentas5 ?? d.crecVentas5), abs(d.cagrVentas5 ?? d.crecVentas5, 0.08, 0.03), per('ventas')),
       tile('Net income', pct1(d.cagrNeto5), abs(d.cagrNeto5, 0.10, 0.04), per('neto')),
       tile('EPS', pct1(d.cagrEps5), abs(d.cagrEps5, 0.10, 0.04), per('eps')),
@@ -5393,6 +5419,11 @@ function formPosicion(ticker) {
 const CMP_MAX = 4;
 const cmpPct = v => v == null ? '\u2014' : `${v < 0 ? '\u2212' : ''}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
 const cmpNum = n => v => v == null ? '\u2014' : MENOS(Number(v).toLocaleString('es-AR', { maximumFractionDigits: n }));
+/** complemento del CAGR para el export: " (tend. 11 %; 4/5)" */
+function tnTxt(d, c) { const tn = d && d.tend && d.tend[c]; if (!tn) return ''; return ` (tend. ${tn.v != null ? `${(tn.v * 100).toFixed(1)} %` : '\u2014'}; ${tn.suben}/${tn.pares})`; }
+/** comparador: debajo del CAGR, tendencia y años en suba; en amarillo si la tendencia se aleja mas de 5 puntos del CAGR */
+function tnCmp(d, c, cagr) { const tn = d && d.tend && d.tend[c]; if (!tn) return ''; const ojo = tn.v != null && cagr != null && Math.abs(tn.v - cagr) > 0.05;
+  return `<small class="cmp-tn${ojo ? ' ojo' : ''}">tend ${tn.v != null ? `${tn.v < 0 ? '\u2212' : ''}${Math.round(Math.abs(tn.v) * 100)} %` : '\u2014'}<br>${tn.suben}/${tn.pares} a\u00f1os \u2191</small>`; }
 const CMP_FILAS = [
   { sec: 'Calidad del negocio' },
   { k: 'ROIC', v: d => d.roicAct, f: cmpPct, mejor: 1 },
@@ -5403,9 +5434,10 @@ const CMP_FILAS = [
   { k: 'Margen neto', v: d => d.margenNeto, f: cmpPct, mejor: 1 },
   { k: 'Caja libre / ganancia', v: d => d.fcfSobreNeto, f: v => v == null ? '\u2014' : cmpNum(2)(v) + '\u00d7', mejor: 1 },
   { sec: 'Crecimiento, CAGR 5 a\u00f1os' },
-  { k: 'Ventas', v: d => d.cagrVentas5 ?? d.crecVentas5, f: cmpPct, mejor: 1 },
-  { k: 'Ganancia neta', v: d => d.cagrNeto5, f: cmpPct, mejor: 1 },
-  { k: 'EPS', v: d => d.cagrEps5, f: cmpPct, mejor: 1 },
+  { k: 'Ventas', v: d => d.cagrVentas5 ?? d.crecVentas5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'ventas', d.cagrVentas5) },
+  { k: 'Ganancia neta', v: d => d.cagrNeto5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'neto', d.cagrNeto5) },
+  { k: 'EPS', v: d => d.cagrEps5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'eps', d.cagrEps5) },
+  { k: 'Caja libre (FCF)', v: d => d.cagrFcf5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'fcf', d.cagrFcf5) },
   { sec: 'Valuaci\u00f3n' },
   { k: 'P/E', v: d => Fund.pe(d.ticker, d), f: cmpNum(1), mejor: -1, valido: v => v > 0 },
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
@@ -5455,7 +5487,7 @@ function cmpBody() {
       const idx = vals.map((v, i) => v != null && fila.f(v) === fila.f(obj) ? i : -1).filter(i => i >= 0);
       if (idx.length === 1) { lider = idx[0]; lidera[sel[lider]]++; filasConLider++; }
     }
-    return `<tr><td class="k">${fila.k}</td>${datos.map((x, i) => `<td class="${i === lider ? 'lider' : crudo[i] != null && vals[i] == null && fila.ns ? 'ns' : ''}">${!x.d ? '\u2026' : fila.f(crudo[i])}</td>`).join('')}</tr>`;
+    return `<tr><td class="k">${fila.k}</td>${datos.map((x, i) => `<td class="${i === lider ? 'lider' : crudo[i] != null && vals[i] == null && fila.ns ? 'ns' : ''}">${!x.d ? '\u2026' : fila.f(crudo[i])}${x.d && fila.sub ? fila.sub(x.d) : ''}</td>`).join('')}</tr>`;
   }).join('');
 
   const maxL = Math.max(...Object.values(lidera));
@@ -5719,7 +5751,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)} | ${pc(d.cagrEps5)} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)}${tnTxt(d, 'ventas')} | ${pc(d.cagrEps5)}${tnTxt(d, 'eps')} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -5733,7 +5765,7 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os | EPS CAGR 5 a\u00f1os | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
+| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));

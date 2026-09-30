@@ -1107,6 +1107,21 @@ const Fund = {
     if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
     return { v: Math.pow(b / a, 1 / n) - 1, desde: f0.anio, hasta: ult.anio, a, b };
   },
+  /** complemento del CAGR (Facu: si el anio 1 o el 5 son raros, el CAGR engaña):
+   *  tendencia = crecimiento anual de la recta que mejor ajusta a los n+1 anios (en escala logaritmica), con todos los anios;
+   *  suben = en cuantos de los n anios crecio contra el anterior. Tendencia solo si los n+1 anios estan y son positivos. */
+  tendencia(filas, campo, n) {
+    const ult = filas[filas.length - 1]; if (!ult) return null;
+    const xs = []; for (let a = ult.anio - n; a <= ult.anio; a++) { const f = filas.find(y => y.anio === a); xs.push(f && Number.isFinite(f[campo]) ? f[campo] : null); }
+    if (campo === 'eps' && filas.filter(f => f.anio >= ult.anio - n).some(f => !f.epsCalc)) return null;
+    let suben = 0, pares = 0; for (let i = 1; i < xs.length; i++) if (xs[i] != null && xs[i - 1] != null) { pares++; if (xs[i] > xs[i - 1]) suben++; }
+    let v = null;
+    if (xs.every(x => x != null && x > 0)) {
+      const pts = xs.map((y, i) => [i, Math.log(y)]); const mx = sum(pts.map(p => p[0])) / pts.length, my = sum(pts.map(p => p[1])) / pts.length;
+      const b = sum(pts.map(([x, y]) => (x - mx) * (y - my))) / sum(pts.map(([x]) => (x - mx) ** 2)); v = Math.exp(b) - 1;
+    }
+    return pares ? { v, suben, pares } : null;
+  },
   cagr(filas, campo, n) { const x = Fund.cagrDet(filas, campo, n); return x ? x.v : null; },
   prom(filas, campo, n) { const xs = filas.slice(-n).map(f => f[campo]).filter(Number.isFinite); return xs.length ? sum(xs) / xs.length : null; },
   mediana(xs) { const s = xs.filter(Number.isFinite).slice().sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; },
@@ -1207,6 +1222,7 @@ const Fund = {
     d.cagrEps5 = Fund.cagr(filas, 'eps', 5); d.epsFuente = d.cagrEps5 != null ? 'balances' : null;
     d.cagrEps10 = Fund.cagr(filas, 'eps', 10);
     d.cagrDet = Object.fromEntries(['ventas', 'neto', 'eps', 'fcf', 'acciones'].map(c => [c, Fund.cagrDet(filas, c, 5)]));
+    d.tend = Object.fromEntries(['ventas', 'neto', 'eps', 'fcf'].map(c => [c, Fund.tendencia(filas, c, 5)]));
     // ROIC (formula de TradingView): ganancia neta / capital total promedio. Actual = ultimos 12 meses (10-K + 10-Q),
     // si no el ultimo anual, si no el ROI que calcula Finnhub. Promedio 5 anios con la misma formula.
     const trims = Fund.trimestres(finQ); const ttm = Fund.ttm(filas, trims);
@@ -1328,7 +1344,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 10,
+  VERSION: 11,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
