@@ -47,7 +47,7 @@ function formMov(m = null, opts = {}) {
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
     ${F.field('Categoría', F.catSelect('f-cat', base.catId), '', 'full')}
-    ${F.field('Viaje', formViajeSel(base, isNew), 'Lo de un viaje no cuenta en el gasto del mes: va al viaje y al año', 'full" id="f-viaje-box')}
+    ${F.field('Viaje', formViajeSel(base, isNew), 'No suma al gasto del mes: va al viaje y al año', 'full" id="f-viaje-box" hidden="')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date" data-id="ayer">Ayer</button>${F.input('f-fecha', base.fecha, 'type="date"')}</div>`, '', 'full')}
     ${F.field('Medio de pago', F.choice('f-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('Cuotas', `<div class="row" style="gap:6px;flex-wrap:nowrap">${F.choice('f-cuotas', [[1, 'Un pago'], [3, '3'], [6, '6'], [12, '12']], [1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? (base.cuotas || 1) : '')}<input class="input sm mono" id="f-cuotas-n" inputmode="numeric" placeholder="otra" style="width:70px" value="${[1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? '' : base.cuotas}"></div>`, '<span id="f-pago-hint"></span>', 'full')}
@@ -104,20 +104,18 @@ function formMov(m = null, opts = {}) {
 /* ---------- viajes: selector dentro del gasto ---------- */
 function formViajeSel(base, isNew) {
   const vs = (state.viajes || []).slice().sort((a, b) => String(b.desde || '').localeCompare(String(a.desde || '')));
-  const auto = !base.viajeId && isNew ? L.viajeEn(base.fecha) : null; const sel = base.viajeId || (auto && auto.id) || '';
+  const sel = base.viajeId || '';
   const hoy = D.today();
-  return `<select class="input" id="f-viaje" data-auto="${auto ? '1' : ''}"><option value="">No es de un viaje</option>${vs.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.nombre)}${v.desde ? ` \u00b7 ${D.fmt(v.desde)}` : ''}</option>`).join('')}<option value="nuevo">+ Nuevo viaje\u2026</option></select>
+  return `<select class="input" id="f-viaje" data-tenia="${base.viajeId ? '1' : ''}"><option value="">No es de un viaje</option>${vs.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.nombre)}${v.desde ? ` \u00b7 ${D.fmt(v.desde)}` : ''}</option>`).join('')}<option value="nuevo">+ Nuevo viaje\u2026</option></select>
     <div id="f-vj-nuevo" class="form-grid" style="margin-top:8px" hidden>
       ${F.field('Destino', F.input('f-vj-nombre', '', 'placeholder="Bariloche, Chile\u2026"'), '', 'full')}
       ${F.field('Desde', F.input('f-vj-desde', base.fecha && base.fecha > hoy ? base.fecha : '', 'type="date"'))}${F.field('Hasta', F.input('f-vj-hasta', '', 'type="date"'))}
     </div>`;
 }
-/** muestra el campo si la categoria es Viajes, si la fecha cae en un viaje o si ya tenia viaje; asigna solo el viaje de esas fechas */
+/** Facu: el formulario de siempre; el campo Viaje aparece solo con la categoria Viajes (o si el gasto ya era de un viaje, para poder sacarlo) */
 function formViajeUpd(fecha, cid) {
   const box = $('#f-viaje-box'), sel = $('#f-viaje'); if (!box || !sel) return;
-  const enViaje = fecha ? L.viajeEn(fecha) : null;
-  if (sel.dataset.touched !== '1' && enViaje && sel.value !== enViaje.id && sel.value !== 'nuevo') sel.value = enViaje.id;
-  box.hidden = !(cid === 'viajes' || enViaje || (sel.value && sel.value !== ''));
+  box.hidden = !(cid === 'viajes' || sel.dataset.tenia === '1');
   const nuevo = $('#f-vj-nuevo'); if (nuevo) nuevo.hidden = sel.value !== 'nuevo';
   if (!sel._w) { sel._w = true; sel.addEventListener('change', () => { sel.dataset.touched = '1'; formViajeUpd(Modal.val('f-fecha'), $('#f-cat').value); }); }
 }

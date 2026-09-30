@@ -1140,3 +1140,6 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .vj-anio{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--line)} .vj-anio b{display:block;font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:-.03em}
 .vj-item{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer} .vj-item:last-child{border-bottom:0}
 .vj-cats{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2)} .vj-cats b{color:var(--ink)}
+/* iOS: los input date tienen ancho minimo propio y empujaban el formulario para los costados */
+#modal input[type=date]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
+#modal .m-body{overflow-x:hidden}
