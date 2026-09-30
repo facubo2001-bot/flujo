@@ -1168,6 +1168,9 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 #modal input[type=date]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
 #modal .m-body{overflow-x:hidden}
 
+/* el atributo hidden tiene que ganarle a display:flex/grid de .field y .form-grid (el campo Viaje se veia siempre en el iPhone) */
+[hidden]{display:none!important}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1507,7 +1510,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609301430';
+const BUILD = '202609301601';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
