@@ -433,7 +433,14 @@ function viewMovimientos() {
       </div>`;
     })()}
     ${renderMovTable(movs)}
-  </div>`;
+    ${Object.values(f).some(Boolean) ? '' : viajesDelMes(c)}
+  </div>${Object.values(f).some(Boolean) ? '' : viajesCard()}`;
+}
+/** gastos de viajes que caen este mes: aparte, no suman al gasto del mes (van al viaje y al año) */
+function viajesDelMes(c) {
+  if (!c.viajeMovs.length) return '';
+  const porV = {}; for (const m of c.viajeMovs) (porV[m.viajeId] = porV[m.viajeId] || []).push(m);
+  return Object.entries(porV).map(([id, ms]) => { const v = L.viaje(id); return `<div class="vj-mes"><div class="vj-h" data-act="viaje" data-id="${id}"><span>${ICONS.plane || '\u2708'} <b>${esc(v.nombre)}</b>${v.desde ? ` \u00b7 ${D.fmt(v.desde)}${v.hasta && v.hasta !== v.desde ? ` al ${D.fmt(v.hasta)}` : ''}` : ''}</span><span class="mono">${M.f(sum(ms.map(E.rowAmount)))}</span></div><div class="vj-sub">Viaje: no suma al gasto de este mes, s\u00ed al del a\u00f1o</div>${renderMovTable(ms)}</div>`; }).join('');
 }
 
 /* ---------- CUOTAS Y FIJOS ---------- */

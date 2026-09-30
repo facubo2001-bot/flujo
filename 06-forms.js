@@ -47,6 +47,7 @@ function formMov(m = null, opts = {}) {
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
     ${F.field('Categoría', F.catSelect('f-cat', base.catId), '', 'full')}
+    ${F.field('Viaje', formViajeSel(base, isNew), 'Lo de un viaje no cuenta en el gasto del mes: va al viaje y al año', 'full" id="f-viaje-box')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date" data-id="ayer">Ayer</button>${F.input('f-fecha', base.fecha, 'type="date"')}</div>`, '', 'full')}
     ${F.field('Medio de pago', F.choice('f-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('Cuotas', `<div class="row" style="gap:6px;flex-wrap:nowrap">${F.choice('f-cuotas', [[1, 'Un pago'], [3, '3'], [6, '6'], [12, '12']], [1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? (base.cuotas || 1) : '')}<input class="input sm mono" id="f-cuotas-n" inputmode="numeric" placeholder="otra" style="width:70px" value="${[1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? '' : base.cuotas}"></div>`, '<span id="f-pago-hint"></span>', 'full')}
@@ -61,7 +62,8 @@ function formMov(m = null, opts = {}) {
       if (!desc) { toast('Falta la descripción'); return false; } if (!monto) { toast('Falta el monto'); return false; }
       const medio = F.parseMedio(Modal.choice('f-medio') || 'debito');
       const cuotasN = Number(Modal.val('f-cuotas-n')) || Number(Modal.choice('f-cuotas')) || 1;
-      const rec = { id: isNew ? uid() : m.id, desc, monto, moneda: Modal.choice('f-moneda') || 'ARS', fecha: Modal.val('f-fecha') || D.today(), catId: Modal.val('f-cat'), ...medio, cuotas: medio.medio === 'tarjeta' ? clamp(cuotasN, 1, 60) : 1, necesidad: Number(Modal.choice('f-nec')) || 2, notas: Modal.val('f-notas').trim() || undefined, primerPago: Modal.val('f-primer') || undefined };
+      const viajeId = formViajeVal(); if (viajeId === false) return false;
+      const rec = { id: isNew ? uid() : m.id, viajeId: viajeId || undefined, desc, monto, moneda: Modal.choice('f-moneda') || 'ARS', fecha: Modal.val('f-fecha') || D.today(), catId: Modal.val('f-cat'), ...medio, cuotas: medio.medio === 'tarjeta' ? clamp(cuotasN, 1, 60) : 1, necesidad: Number(Modal.choice('f-nec')) || 2, notas: Modal.val('f-notas').trim() || undefined, primerPago: Modal.val('f-primer') || undefined };
       if (virtual) { rec.recId = m.recId; rec.mesRec = m.mesRec; } else if (m && m.recId && !opts.dup) { rec.recId = m.recId; rec.mesRec = m.mesRec; }
       if (isNew || virtual) state.movimientos.push(rec); else Object.assign(m, rec);
       if (!rec.recId) Smart.learn(rec);
@@ -76,6 +78,7 @@ function formMov(m = null, opts = {}) {
     else hint.textContent = medio.medio === 'tarjeta' ? '' : 'Sale de la cuenta el mismo día';
     $('#f-cursym').textContent = (Modal.choice('f-moneda') || 'ARS') === 'USD' ? 'US$' : '$';
     const cid = $('#f-cat').value; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === cid));
+    formViajeUpd(fecha, cid);
   };
   $('#modal').onchange = upd; $('#modal').oninput = e => { if (e.target.id === 'f-monto' || e.target.id === 'f-cuotas-n') upd(); };
   // "¿Hacia falta?" arranca segun la categoria (esencial -> Necesario, si no Util) mientras no lo toques a mano
@@ -98,6 +101,47 @@ function formMov(m = null, opts = {}) {
   upd();
 }
 
+/* ---------- viajes: selector dentro del gasto ---------- */
+function formViajeSel(base, isNew) {
+  const vs = (state.viajes || []).slice().sort((a, b) => String(b.desde || '').localeCompare(String(a.desde || '')));
+  const auto = !base.viajeId && isNew ? L.viajeEn(base.fecha) : null; const sel = base.viajeId || (auto && auto.id) || '';
+  const hoy = D.today();
+  return `<select class="input" id="f-viaje" data-auto="${auto ? '1' : ''}"><option value="">No es de un viaje</option>${vs.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.nombre)}${v.desde ? ` \u00b7 ${D.fmt(v.desde)}` : ''}</option>`).join('')}<option value="nuevo">+ Nuevo viaje\u2026</option></select>
+    <div id="f-vj-nuevo" class="form-grid" style="margin-top:8px" hidden>
+      ${F.field('Destino', F.input('f-vj-nombre', '', 'placeholder="Bariloche, Chile\u2026"'), '', 'full')}
+      ${F.field('Desde', F.input('f-vj-desde', base.fecha && base.fecha > hoy ? base.fecha : '', 'type="date"'))}${F.field('Hasta', F.input('f-vj-hasta', '', 'type="date"'))}
+    </div>`;
+}
+/** muestra el campo si la categoria es Viajes, si la fecha cae en un viaje o si ya tenia viaje; asigna solo el viaje de esas fechas */
+function formViajeUpd(fecha, cid) {
+  const box = $('#f-viaje-box'), sel = $('#f-viaje'); if (!box || !sel) return;
+  const enViaje = fecha ? L.viajeEn(fecha) : null;
+  if (sel.dataset.touched !== '1' && enViaje && sel.value !== enViaje.id && sel.value !== 'nuevo') sel.value = enViaje.id;
+  box.hidden = !(cid === 'viajes' || enViaje || (sel.value && sel.value !== ''));
+  const nuevo = $('#f-vj-nuevo'); if (nuevo) nuevo.hidden = sel.value !== 'nuevo';
+  if (!sel._w) { sel._w = true; sel.addEventListener('change', () => { sel.dataset.touched = '1'; formViajeUpd(Modal.val('f-fecha'), $('#f-cat').value); }); }
+}
+/** id del viaje elegido; crea el nuevo si hace falta. false = falta un dato */
+function formViajeVal() {
+  const sel = $('#f-viaje'); const box = $('#f-viaje-box'); if (!sel || (box && box.hidden)) return null;
+  if (sel.value !== 'nuevo') return sel.value || null;
+  const nombre = Modal.val('f-vj-nombre').trim(); if (!nombre) { toast('Poné el destino del viaje'); return false; }
+  const desde = Modal.val('f-vj-desde') || null, hasta = Modal.val('f-vj-hasta') || desde;
+  if (desde && hasta && hasta < desde) { toast('La vuelta es antes que la ida'); return false; }
+  const v = { id: uid(), nombre, desde, hasta }; state.viajes = state.viajes || []; state.viajes.push(v); return v.id;
+}
+/** editar un viaje: destino, fechas y nota */
+function formViaje(id) {
+  const v = L.viaje(id); if (!v) return;
+  Modal.open({ title: 'Viaje', submit: 'Guardar', body: `<div class="form-grid">
+    ${F.field('Destino', F.input('v-nombre', v.nombre || ''), '', 'full')}
+    ${F.field('Desde', F.input('v-desde', v.desde || '', 'type="date"'))}${F.field('Hasta', F.input('v-hasta', v.hasta || '', 'type="date"'))}
+    ${F.field('Nota', F.input('v-nota', v.nota || '', 'placeholder="con quién, qué hicieron\u2026"'), '', 'full')}
+  </div>`, extra: `<button type="button" class="btn danger" data-act="del-viaje" data-id="${v.id}">Borrar viaje</button>`,
+  onSubmit: () => { const n = Modal.val('v-nombre').trim(); if (!n) { toast('Falta el destino'); return false; }
+    Object.assign(v, { nombre: n, desde: Modal.val('v-desde') || null, hasta: Modal.val('v-hasta') || Modal.val('v-desde') || null, nota: Modal.val('v-nota').trim() || undefined });
+    Persist.save(); render(); toast('Viaje guardado'); } });
+}
 /* ---------- recurrente ---------- */
 function formRec(r = null, fromMov = null) {
   const base = r ? { ...r } : fromMov ? { desc: fromMov.desc, monto: fromMov.monto, moneda: fromMov.moneda, catId: fromMov.catId, medio: fromMov.medio, tarjetaId: fromMov.tarjetaId, dia: Number(fromMov.fecha.slice(8, 10)), necesidad: fromMov.necesidad, desde: D.thisMonth() } : { moneda: 'ARS', medio: state.tarjetas.length ? 'tarjeta' : 'debito', tarjetaId: (state.tarjetas[0] || {}).id, catId: 'subs', dia: 1, necesidad: 1, desde: D.thisMonth() };

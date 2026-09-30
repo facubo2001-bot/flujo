@@ -1134,3 +1134,9 @@ h2 .i-btn{vertical-align:3px}
 .proy-ap{align-items:flex-end;text-align:right}
 .proy-hl{font-size:14px;color:var(--ink-2);margin-bottom:8px;line-height:1.4} .proy-hl b{color:var(--ink)}
 table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var(--ink-3);font-weight:500} table.proy td.b{font-weight:800;color:var(--ink)}
+.vj-mes{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.vj-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;cursor:pointer} .vj-h b{font-weight:800}
+.vj-sub{font-size:12px;color:var(--ink-3);margin:2px 0 6px}
+.vj-anio{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--line)} .vj-anio b{display:block;font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:-.03em}
+.vj-item{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer} .vj-item:last-child{border-bottom:0}
+.vj-cats{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2)} .vj-cats b{color:var(--ink)}

@@ -90,6 +90,8 @@ const Actions = {
   'new-ing'() { formIng(); },
   'del-ing'(id) { state.ingresos = state.ingresos.filter(x => x.id !== id); Persist.save(); render(); },
   'new-cat'() { formCat(); },
+  viaje(id) { formViaje(id); },
+  'del-viaje'(id) { const v = L.viaje(id); if (!v) return; const n = state.movimientos.filter(m => m.viajeId === id).length; confirmar(`¿Borrar el viaje ${v.nombre}? ${n === 1 ? 'Su gasto queda como gasto normal' : n ? `Sus ${n} gastos quedan como gastos normales` : 'No tiene gastos cargados'}${n ? ' del mes' : ''}.`, () => { state.viajes = state.viajes.filter(x => x.id !== id); for (const m of state.movimientos) if (m.viajeId === id) delete m.viajeId; E._cache = null; Persist.save(); Modal.close(); render(); toast('Viaje borrado'); }, 'Borrar'); },
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
   'clear-filters'() { ui.filtros = {}; ui.gaGrupo = null; render(); arriba(); },

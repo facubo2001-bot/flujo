@@ -102,6 +102,7 @@ const Insights = {
     lines.push(`Gastos del mes: ${M.f(c.total, { cur: 'ARS' })} — fijos ${M.f(c.fijo, { cur: 'ARS' })}, cuotas de compras anteriores ${M.f(c.cuotas, { cur: 'ARS' })}, compras ${M.f(c.compras, { cur: 'ARS' })}. Innecesario: ${M.f(c.innecesario, { cur: 'ARS' })} (${M.pct(c.innecesario / (c.total || 1))}).`);
     lines.push(`Presupuesto mensual: ${M.f(mg.presupuesto, { cur: 'ARS' })} (el resto, ${M.f(mg.ahorro, { cur: 'ARS' })}, va a inversión). Queda para gastar: ${M.f(mg.queda, { cur: 'ARS' })}.`);
     lines.push(`Invertido: ${M.f(E.invertido(ym), { cur: 'ARS' })}.`);
+    if (c.viaje) lines.push(`Viajes (aparte, no suman al gasto del mes; sí al del año): ${M.f(c.viaje, { cur: 'ARS' })} — ${[...new Set(c.viajeMovs.map(m => (L.viaje(m.viajeId) || {}).nombre))].join(', ')}.`);
     lines.push('\n## Por categoría');
     Object.entries(c.byCat).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => lines.push(`- ${L.cat(k).nombre}: ${M.f(v, { cur: 'ARS' })} (${M.pct(v / (c.total || 1))})`));
     lines.push('\n## Próximos 6 meses (comprometido: fijos + cuotas)');

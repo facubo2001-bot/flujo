@@ -1158,6 +1158,12 @@ h2 .i-btn{vertical-align:3px}
 .proy-ap{align-items:flex-end;text-align:right}
 .proy-hl{font-size:14px;color:var(--ink-2);margin-bottom:8px;line-height:1.4} .proy-hl b{color:var(--ink)}
 table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var(--ink-3);font-weight:500} table.proy td.b{font-weight:800;color:var(--ink)}
+.vj-mes{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.vj-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;cursor:pointer} .vj-h b{font-weight:800}
+.vj-sub{font-size:12px;color:var(--ink-3);margin:2px 0 6px}
+.vj-anio{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--line)} .vj-anio b{display:block;font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:-.03em}
+.vj-item{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer} .vj-item:last-child{border-bottom:0}
+.vj-cats{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2)} .vj-cats b{color:var(--ink)}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1498,7 +1504,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202609300154';
+const BUILD = '202609301030';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1510,6 +1516,9 @@ const L = {
   slotColor(slot) { return slot >= 8 ? 'var(--c-otras)' : `var(--c${slot})`; },
   catColor(catId) { return L.slotColor(L.grupoDeCat(catId).slot); },
   tarjeta(id) { return state.tarjetas.find(t => t.id === id); },
+  viaje(id) { return (state.viajes || []).find(v => v.id === id) || null; },
+  /** viaje que incluye esa fecha (para asignar sola la comida del viaje) */
+  viajeEn(fecha) { return (state.viajes || []).find(v => v.desde && v.hasta && fecha >= v.desde && fecha <= v.hasta) || null; },
   cuenta(id) { return state.cuentas.find(c => c.id === id); },
 };
 
@@ -1583,7 +1592,7 @@ const Persist = {
     const base = defaultState();
     const s = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) } };
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
-    for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos']) if (!Array.isArray(s[k])) s[k] = [];
+    for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
     if (!s.sueldos || typeof s.sueldos !== 'object' || Array.isArray(s.sueldos)) s.sueldos = {};
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
@@ -2834,12 +2843,15 @@ const E = {
   /** Gasto del mes (devengado): fijos del mes + cuotas que caen en el mes + compras del mes (primera cuota) */
   consumo(ym) {
     const pieces = E.data().pieces.filter(p => p.mesGasto === ym);
-    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0, esencial: 0, elegible: 0 };
+    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0, esencial: 0, elegible: 0, viaje: 0, viajeCuotas: 0, viajeMovs: [] };
     const dias = D.daysIn(ym);
     for (const p of pieces) {
       const m = p.m; const v = p.montoARS;
       let row = m;
-      if (p.idx > 1) { row = { ...m, id: m.id + '#' + p.idx, origId: m.id, cuotaRow: true, cuotaIdx: p.idx, cuotaN: p.n, monto: v, moneda: 'ARS', cuotas: 1, fecha: D.dateIn(ym, Math.min(Number(m.fecha.slice(8, 10)), dias)), primerPago: undefined }; agg.cuotas += v; agg.nCuotas++; }
+      if (p.idx > 1) row = { ...m, id: m.id + '#' + p.idx, origId: m.id, cuotaRow: true, cuotaIdx: p.idx, cuotaN: p.n, monto: v, moneda: 'ARS', cuotas: 1, fecha: D.dateIn(ym, Math.min(Number(m.fecha.slice(8, 10)), dias)), primerPago: undefined };
+      // gastos de un viaje (Facu: las vacaciones son puntuales y distorsionan el mes): fuera del gasto mensual, cuentan en el viaje y en el anio
+      if (m.viajeId && L.viaje(m.viajeId)) { agg.viaje += v; if (p.idx > 1) agg.viajeCuotas += v; agg.viajeMovs.push(row); continue; }
+      if (p.idx > 1) { agg.cuotas += v; agg.nCuotas++; }
       else if (m.recId) agg.fijo += v;
       else agg.compras += v;
       agg.total += v; agg.count++; agg.movs.push(row);
@@ -2939,9 +2951,28 @@ const E = {
   horizonte(fromYm, n = 12) {
     return D.range(fromYm, n).map(ym => {
       const c = E.consumo(ym); const ing = E.ingreso(ym).total || E.ingreso(D.thisMonth()).base; const pres = E.presupuesto(ym) || ing;
-      const fijos = Math.max(c.fijo, E.fijosEstimados(ym)); const comprometido = fijos + c.cuotas;
-      return { ym, ingreso: ing, presupuesto: pres, fijos, cuotas: c.cuotas, nuevo: c.compras, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 };
+      const fijos = Math.max(c.fijo, E.fijosEstimados(ym)); const comprometido = fijos + c.cuotas + c.viajeCuotas;  // las cuotas de un viaje no son gasto del mes, pero se pagan con el sueldo
+      return { ym, ingreso: ing, presupuesto: pres, fijos, cuotas: c.cuotas + c.viajeCuotas, nuevo: c.compras, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 };
     });
+  },
+  /** dolares de un movimiento: USD directo; pesos al CCL del dia de la compra (si no hay historico, el de hoy) */
+  aUSD(m) { const v = Number(m.monto) || 0; if (m.moneda === 'USD') return v; const c = (typeof AD !== 'undefined' && AD.cclEn && AD.cclEn(m.fecha)) || Number(state.settings.ccl) || Number(state.settings.tc) || 0; return c ? v / c : null; },
+  /** resumen de cada viaje: total (la compra entera, aunque sea en cuotas), por categoria, por dia */
+  viajes() {
+    return (state.viajes || []).map(v => {
+      const movs = state.movimientos.filter(m => m.viajeId === v.id);
+      const total = sum(movs.map(m => M.toARS(Number(m.monto) || 0, m.moneda))); const usd = movs.every(m => E.aUSD(m) != null) ? sum(movs.map(E.aUSD)) : null;
+      const byCat = {}; for (const m of movs) byCat[m.catId] = (byCat[m.catId] || 0) + M.toARS(Number(m.monto) || 0, m.moneda);
+      const dias = v.desde && v.hasta ? D.daysBetween(v.desde, v.hasta) + 1 : null;
+      return { ...v, movs, total, usd, byCat, dias, porDia: dias ? total / dias : null, porDiaUSD: dias && usd != null ? usd / dias : null, anio: (v.desde || (movs[0] || {}).fecha || D.today()).slice(0, 4) };
+    }).sort((a, b) => String(b.desde || '').localeCompare(String(a.desde || '')));
+  },
+  /** gasto de un anio: meses (sin viajes) + viajes, por fecha de gasto (devengado) */
+  anual(anio) {
+    const meses = D.range(`${anio}-01`, 12).filter(ym => ym <= D.thisMonth());
+    const cs = meses.map(ym => ({ ym, c: E.consumo(ym) }));
+    const mensual = sum(cs.map(x => x.c.total)), viajes = sum(cs.map(x => x.c.viaje));
+    return { anio, meses: cs.length, mensual, viajes, total: mensual + viajes, promMes: cs.length ? mensual / cs.length : 0 };
   },
   /** Cuotas que se PAGAN en el mes ym (entran en el resumen que vence ese mes): cuota k de N */
   pagosCuotas(ym) {
@@ -3690,6 +3721,7 @@ const Insights = {
     lines.push(`Gastos del mes: ${M.f(c.total, { cur: 'ARS' })} — fijos ${M.f(c.fijo, { cur: 'ARS' })}, cuotas de compras anteriores ${M.f(c.cuotas, { cur: 'ARS' })}, compras ${M.f(c.compras, { cur: 'ARS' })}. Innecesario: ${M.f(c.innecesario, { cur: 'ARS' })} (${M.pct(c.innecesario / (c.total || 1))}).`);
     lines.push(`Presupuesto mensual: ${M.f(mg.presupuesto, { cur: 'ARS' })} (el resto, ${M.f(mg.ahorro, { cur: 'ARS' })}, va a inversión). Queda para gastar: ${M.f(mg.queda, { cur: 'ARS' })}.`);
     lines.push(`Invertido: ${M.f(E.invertido(ym), { cur: 'ARS' })}.`);
+    if (c.viaje) lines.push(`Viajes (aparte, no suman al gasto del mes; sí al del año): ${M.f(c.viaje, { cur: 'ARS' })} — ${[...new Set(c.viajeMovs.map(m => (L.viaje(m.viajeId) || {}).nombre))].join(', ')}.`);
     lines.push('\n## Por categoría');
     Object.entries(c.byCat).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => lines.push(`- ${L.cat(k).nombre}: ${M.f(v, { cur: 'ARS' })} (${M.pct(v / (c.total || 1))})`));
     lines.push('\n## Próximos 6 meses (comprometido: fijos + cuotas)');
@@ -4139,7 +4171,14 @@ function viewMovimientos() {
       </div>`;
     })()}
     ${renderMovTable(movs)}
-  </div>`;
+    ${Object.values(f).some(Boolean) ? '' : viajesDelMes(c)}
+  </div>${Object.values(f).some(Boolean) ? '' : viajesCard()}`;
+}
+/** gastos de viajes que caen este mes: aparte, no suman al gasto del mes (van al viaje y al año) */
+function viajesDelMes(c) {
+  if (!c.viajeMovs.length) return '';
+  const porV = {}; for (const m of c.viajeMovs) (porV[m.viajeId] = porV[m.viajeId] || []).push(m);
+  return Object.entries(porV).map(([id, ms]) => { const v = L.viaje(id); return `<div class="vj-mes"><div class="vj-h" data-act="viaje" data-id="${id}"><span>${ICONS.plane || '\u2708'} <b>${esc(v.nombre)}</b>${v.desde ? ` \u00b7 ${D.fmt(v.desde)}${v.hasta && v.hasta !== v.desde ? ` al ${D.fmt(v.hasta)}` : ''}` : ''}</span><span class="mono">${M.f(sum(ms.map(E.rowAmount)))}</span></div><div class="vj-sub">Viaje: no suma al gasto de este mes, s\u00ed al del a\u00f1o</div>${renderMovTable(ms)}</div>`; }).join('');
 }
 
 /* ---------- CUOTAS Y FIJOS ---------- */
@@ -4348,6 +4387,18 @@ function viewPlan() {
 }
 
 /* ---------- TENDENCIAS ---------- */
+/** Viajes: cada uno con total, por dia y en que se fue la plata; y el gasto del año = meses + viajes */
+function viajesCard() {
+  const vs = E.viajes(); const anio = D.thisMonth().slice(0, 4); const a = E.anual(anio);
+  const usd = x => x != null ? fmtU(x, 0) : '\u2014';
+  const anual = `<div class="vj-anio"><div><span class="small muted">Gasto ${anio} (${a.meses} meses)</span><b>${M.f(a.total)}</b></div><div class="small muted">meses ${M.f(a.mensual)} \u00b7 viajes ${M.f(a.viajes)} \u00b7 promedio por mes sin viajes ${M.f(a.promMes)}</div></div>`;
+  const lista = vs.length ? vs.map(v => { const cats = Object.entries(v.byCat).sort((x, y) => y[1] - x[1]);
+    return `<div class="vj-item" data-act="viaje" data-id="${v.id}"><div class="vj-h"><span><b>${esc(v.nombre)}</b>${v.desde ? ` \u00b7 ${D.fmt(v.desde, { year: true })}` : ''}${v.dias ? ` \u00b7 ${v.dias} d\u00eda${v.dias > 1 ? 's' : ''}` : ''}</span><span class="mono">${M.f(v.total)}</span></div>
+      <div class="vj-sub">${usd(v.usd)}${v.porDia ? ` \u00b7 ${M.f(v.porDia)} por d\u00eda${v.porDiaUSD != null ? ` (${usd(v.porDiaUSD)})` : ''}` : ''} \u00b7 ${v.movs.length} gasto${v.movs.length === 1 ? '' : 's'}</div>
+      ${cats.length ? `<div class="vj-cats">${cats.map(([k, x]) => `<span>${esc(L.cat(k).nombre)} <b>${M.pct(x / (v.total || 1), 0)}</b></span>`).join('')}</div>` : ''}${v.nota ? `<div class="vj-sub">${esc(v.nota)}</div>` : ''}</div>`; }).join('')
+    : `<div class="small muted" style="padding:6px 0">Todav\u00eda no hay viajes. Al cargar un gasto de la categor\u00eda Viajes (o con fecha dentro de un viaje) aparece el campo Viaje: eleg\u00ed "+ Nuevo viaje".</div>`;
+  return `<div class="card section"><div class="card-head"><h2>Viajes ${infoBtn('Lo que cargues en un viaje (pasajes, hospedaje, comida, lo que sea) no suma al gasto del mes, porque es puntual y lo distorsiona. S\u00ed suma al gasto del a\u00f1o. Los pesos se pasan a d\u00f3lares al CCL del d\u00eda de cada gasto, para comparar viajes de a\u00f1os distintos. Las cuotas del viaje igual cuentan en lo comprometido de cada mes, porque se pagan con el sueldo.')}</h2></div>${anual}${lista}</div>`;
+}
 function viewTendencias() {
   const n = ui.trendRange || 6; const ym = ui.mes;
   const months = D.range(D.addMonths(ym, -(n - 1)), n);
@@ -4359,6 +4410,7 @@ function viewTendencias() {
     ${ChartQ.reg(w => Charts.stacked({ w, h: 260, labels, highlight: n - 1, series: gruposUsados.map(g => ({ name: g.nombre, color: L.slotColor(g.slot), values: cons.map(c => c.byGrupo[g.id] || 0) })), line: state.settings.ingreso ? { name: 'Ingreso', color: 'var(--ink-2)', values: months.map(m => E.ingreso(m).total) } : null }), 260)}
     ${Charts.legend(gruposUsados.map(g => ({ name: g.nombre, color: L.slotColor(g.slot) })))}
   </div>`;
+  html += viajesCard();
   // necesidad + medio
   const necSeries = [1, 2, 3].map(k => ({ name: NECESIDAD[k], color: k === 1 ? 'var(--c1)' : k === 2 ? 'var(--c4)' : 'var(--c7)', values: cons.map(c => c.byNec[k]) }));
   const innecPct = cons.map(c => c.total ? c.byNec[3] / c.total : null);
@@ -4873,6 +4925,7 @@ function formMov(m = null, opts = {}) {
     <div class="full"><div class="big-amount"><span class="cur" id="f-cursym">${base.moneda === 'USD' ? 'US$' : '$'}</span><input id="f-monto" inputmode="decimal" autocomplete="off" value="${base.monto != null ? (base.moneda === 'USD' ? String(base.monto).replace('.', ',') : fmtARS.format(base.monto)) : ''}" placeholder="0" ${isNew && !virtual ? 'autofocus' : ''}></div><div class="row" style="justify-content:center;gap:6px">${F.choice('f-moneda', [['ARS', 'Pesos'], ['USD', 'Dólares']], base.moneda)}</div></div>
     ${F.field('Descripción', `<input class="input" id="f-desc" list="f-desc-list" value="${esc(base.desc || '')}" placeholder="Carrefour, Netflix, nafta…" autocomplete="off" ${!isNew || virtual ? 'autofocus' : ''}><datalist id="f-desc-list">${descs.map(d => `<option value="${esc(d)}">`).join('')}</datalist><div class="suggest" id="f-sug"></div>`, '', 'full')}
     ${F.field('Categoría', F.catSelect('f-cat', base.catId), '', 'full')}
+    ${F.field('Viaje', formViajeSel(base, isNew), 'Lo de un viaje no cuenta en el gasto del mes: va al viaje y al año', 'full" id="f-viaje-box')}
     ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date" data-id="ayer">Ayer</button>${F.input('f-fecha', base.fecha, 'type="date"')}</div>`, '', 'full')}
     ${F.field('Medio de pago', F.choice('f-medio', F.medioOpts(), F.medioVal(base)), '', 'full')}
     ${F.field('Cuotas', `<div class="row" style="gap:6px;flex-wrap:nowrap">${F.choice('f-cuotas', [[1, 'Un pago'], [3, '3'], [6, '6'], [12, '12']], [1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? (base.cuotas || 1) : '')}<input class="input sm mono" id="f-cuotas-n" inputmode="numeric" placeholder="otra" style="width:70px" value="${[1, 3, 6, 12].includes(Number(base.cuotas) || 1) ? '' : base.cuotas}"></div>`, '<span id="f-pago-hint"></span>', 'full')}
@@ -4887,7 +4940,8 @@ function formMov(m = null, opts = {}) {
       if (!desc) { toast('Falta la descripción'); return false; } if (!monto) { toast('Falta el monto'); return false; }
       const medio = F.parseMedio(Modal.choice('f-medio') || 'debito');
       const cuotasN = Number(Modal.val('f-cuotas-n')) || Number(Modal.choice('f-cuotas')) || 1;
-      const rec = { id: isNew ? uid() : m.id, desc, monto, moneda: Modal.choice('f-moneda') || 'ARS', fecha: Modal.val('f-fecha') || D.today(), catId: Modal.val('f-cat'), ...medio, cuotas: medio.medio === 'tarjeta' ? clamp(cuotasN, 1, 60) : 1, necesidad: Number(Modal.choice('f-nec')) || 2, notas: Modal.val('f-notas').trim() || undefined, primerPago: Modal.val('f-primer') || undefined };
+      const viajeId = formViajeVal(); if (viajeId === false) return false;
+      const rec = { id: isNew ? uid() : m.id, viajeId: viajeId || undefined, desc, monto, moneda: Modal.choice('f-moneda') || 'ARS', fecha: Modal.val('f-fecha') || D.today(), catId: Modal.val('f-cat'), ...medio, cuotas: medio.medio === 'tarjeta' ? clamp(cuotasN, 1, 60) : 1, necesidad: Number(Modal.choice('f-nec')) || 2, notas: Modal.val('f-notas').trim() || undefined, primerPago: Modal.val('f-primer') || undefined };
       if (virtual) { rec.recId = m.recId; rec.mesRec = m.mesRec; } else if (m && m.recId && !opts.dup) { rec.recId = m.recId; rec.mesRec = m.mesRec; }
       if (isNew || virtual) state.movimientos.push(rec); else Object.assign(m, rec);
       if (!rec.recId) Smart.learn(rec);
@@ -4902,6 +4956,7 @@ function formMov(m = null, opts = {}) {
     else hint.textContent = medio.medio === 'tarjeta' ? '' : 'Sale de la cuenta el mismo día';
     $('#f-cursym').textContent = (Modal.choice('f-moneda') || 'ARS') === 'USD' ? 'US$' : '$';
     const cid = $('#f-cat').value; $$('#f-catchips button').forEach(b => b.classList.toggle('on', b.dataset.id === cid));
+    formViajeUpd(fecha, cid);
   };
   $('#modal').onchange = upd; $('#modal').oninput = e => { if (e.target.id === 'f-monto' || e.target.id === 'f-cuotas-n') upd(); };
   // "¿Hacia falta?" arranca segun la categoria (esencial -> Necesario, si no Util) mientras no lo toques a mano
@@ -4924,6 +4979,47 @@ function formMov(m = null, opts = {}) {
   upd();
 }
 
+/* ---------- viajes: selector dentro del gasto ---------- */
+function formViajeSel(base, isNew) {
+  const vs = (state.viajes || []).slice().sort((a, b) => String(b.desde || '').localeCompare(String(a.desde || '')));
+  const auto = !base.viajeId && isNew ? L.viajeEn(base.fecha) : null; const sel = base.viajeId || (auto && auto.id) || '';
+  const hoy = D.today();
+  return `<select class="input" id="f-viaje" data-auto="${auto ? '1' : ''}"><option value="">No es de un viaje</option>${vs.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.nombre)}${v.desde ? ` \u00b7 ${D.fmt(v.desde)}` : ''}</option>`).join('')}<option value="nuevo">+ Nuevo viaje\u2026</option></select>
+    <div id="f-vj-nuevo" class="form-grid" style="margin-top:8px" hidden>
+      ${F.field('Destino', F.input('f-vj-nombre', '', 'placeholder="Bariloche, Chile\u2026"'), '', 'full')}
+      ${F.field('Desde', F.input('f-vj-desde', base.fecha && base.fecha > hoy ? base.fecha : '', 'type="date"'))}${F.field('Hasta', F.input('f-vj-hasta', '', 'type="date"'))}
+    </div>`;
+}
+/** muestra el campo si la categoria es Viajes, si la fecha cae en un viaje o si ya tenia viaje; asigna solo el viaje de esas fechas */
+function formViajeUpd(fecha, cid) {
+  const box = $('#f-viaje-box'), sel = $('#f-viaje'); if (!box || !sel) return;
+  const enViaje = fecha ? L.viajeEn(fecha) : null;
+  if (sel.dataset.touched !== '1' && enViaje && sel.value !== enViaje.id && sel.value !== 'nuevo') sel.value = enViaje.id;
+  box.hidden = !(cid === 'viajes' || enViaje || (sel.value && sel.value !== ''));
+  const nuevo = $('#f-vj-nuevo'); if (nuevo) nuevo.hidden = sel.value !== 'nuevo';
+  if (!sel._w) { sel._w = true; sel.addEventListener('change', () => { sel.dataset.touched = '1'; formViajeUpd(Modal.val('f-fecha'), $('#f-cat').value); }); }
+}
+/** id del viaje elegido; crea el nuevo si hace falta. false = falta un dato */
+function formViajeVal() {
+  const sel = $('#f-viaje'); const box = $('#f-viaje-box'); if (!sel || (box && box.hidden)) return null;
+  if (sel.value !== 'nuevo') return sel.value || null;
+  const nombre = Modal.val('f-vj-nombre').trim(); if (!nombre) { toast('Poné el destino del viaje'); return false; }
+  const desde = Modal.val('f-vj-desde') || null, hasta = Modal.val('f-vj-hasta') || desde;
+  if (desde && hasta && hasta < desde) { toast('La vuelta es antes que la ida'); return false; }
+  const v = { id: uid(), nombre, desde, hasta }; state.viajes = state.viajes || []; state.viajes.push(v); return v.id;
+}
+/** editar un viaje: destino, fechas y nota */
+function formViaje(id) {
+  const v = L.viaje(id); if (!v) return;
+  Modal.open({ title: 'Viaje', submit: 'Guardar', body: `<div class="form-grid">
+    ${F.field('Destino', F.input('v-nombre', v.nombre || ''), '', 'full')}
+    ${F.field('Desde', F.input('v-desde', v.desde || '', 'type="date"'))}${F.field('Hasta', F.input('v-hasta', v.hasta || '', 'type="date"'))}
+    ${F.field('Nota', F.input('v-nota', v.nota || '', 'placeholder="con quién, qué hicieron\u2026"'), '', 'full')}
+  </div>`, extra: `<button type="button" class="btn danger" data-act="del-viaje" data-id="${v.id}">Borrar viaje</button>`,
+  onSubmit: () => { const n = Modal.val('v-nombre').trim(); if (!n) { toast('Falta el destino'); return false; }
+    Object.assign(v, { nombre: n, desde: Modal.val('v-desde') || null, hasta: Modal.val('v-hasta') || Modal.val('v-desde') || null, nota: Modal.val('v-nota').trim() || undefined });
+    Persist.save(); render(); toast('Viaje guardado'); } });
+}
 /* ---------- recurrente ---------- */
 function formRec(r = null, fromMov = null) {
   const base = r ? { ...r } : fromMov ? { desc: fromMov.desc, monto: fromMov.monto, moneda: fromMov.moneda, catId: fromMov.catId, medio: fromMov.medio, tarjetaId: fromMov.tarjetaId, dia: Number(fromMov.fecha.slice(8, 10)), necesidad: fromMov.necesidad, desde: D.thisMonth() } : { moneda: 'ARS', medio: state.tarjetas.length ? 'tarjeta' : 'debito', tarjetaId: (state.tarjetas[0] || {}).id, catId: 'subs', dia: 1, necesidad: 1, desde: D.thisMonth() };
@@ -6256,6 +6352,8 @@ const Actions = {
   'new-ing'() { formIng(); },
   'del-ing'(id) { state.ingresos = state.ingresos.filter(x => x.id !== id); Persist.save(); render(); },
   'new-cat'() { formCat(); },
+  viaje(id) { formViaje(id); },
+  'del-viaje'(id) { const v = L.viaje(id); if (!v) return; const n = state.movimientos.filter(m => m.viajeId === id).length; confirmar(`¿Borrar el viaje ${v.nombre}? ${n === 1 ? 'Su gasto queda como gasto normal' : n ? `Sus ${n} gastos quedan como gastos normales` : 'No tiene gastos cargados'}${n ? ' del mes' : ''}.`, () => { state.viajes = state.viajes.filter(x => x.id !== id); for (const m of state.movimientos) if (m.viajeId === id) delete m.viajeId; E._cache = null; Persist.save(); Modal.close(); render(); toast('Viaje borrado'); }, 'Borrar'); },
   'edit-cat'(id) { const c = state.categorias.find(c => c.id === id); if (c) formCat(c); },
   'del-cat'(id) { state.categorias = state.categorias.filter(c => c.id !== id); Persist.save(); render(); },
   'clear-filters'() { ui.filtros = {}; ui.gaGrupo = null; render(); arriba(); },

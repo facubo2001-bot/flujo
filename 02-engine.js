@@ -128,12 +128,15 @@ const E = {
   /** Gasto del mes (devengado): fijos del mes + cuotas que caen en el mes + compras del mes (primera cuota) */
   consumo(ym) {
     const pieces = E.data().pieces.filter(p => p.mesGasto === ym);
-    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0, esencial: 0, elegible: 0 };
+    const agg = { total: 0, fijo: 0, cuotas: 0, compras: 0, variable: 0, byCat: {}, byGrupo: {}, byNec: { 1: 0, 2: 0, 3: 0 }, byMedio: {}, byDay: {}, count: 0, movs: [], innecesario: 0, tarjeta: 0, nCuotas: 0, esencial: 0, elegible: 0, viaje: 0, viajeCuotas: 0, viajeMovs: [] };
     const dias = D.daysIn(ym);
     for (const p of pieces) {
       const m = p.m; const v = p.montoARS;
       let row = m;
-      if (p.idx > 1) { row = { ...m, id: m.id + '#' + p.idx, origId: m.id, cuotaRow: true, cuotaIdx: p.idx, cuotaN: p.n, monto: v, moneda: 'ARS', cuotas: 1, fecha: D.dateIn(ym, Math.min(Number(m.fecha.slice(8, 10)), dias)), primerPago: undefined }; agg.cuotas += v; agg.nCuotas++; }
+      if (p.idx > 1) row = { ...m, id: m.id + '#' + p.idx, origId: m.id, cuotaRow: true, cuotaIdx: p.idx, cuotaN: p.n, monto: v, moneda: 'ARS', cuotas: 1, fecha: D.dateIn(ym, Math.min(Number(m.fecha.slice(8, 10)), dias)), primerPago: undefined };
+      // gastos de un viaje (Facu: las vacaciones son puntuales y distorsionan el mes): fuera del gasto mensual, cuentan en el viaje y en el anio
+      if (m.viajeId && L.viaje(m.viajeId)) { agg.viaje += v; if (p.idx > 1) agg.viajeCuotas += v; agg.viajeMovs.push(row); continue; }
+      if (p.idx > 1) { agg.cuotas += v; agg.nCuotas++; }
       else if (m.recId) agg.fijo += v;
       else agg.compras += v;
       agg.total += v; agg.count++; agg.movs.push(row);
@@ -233,9 +236,28 @@ const E = {
   horizonte(fromYm, n = 12) {
     return D.range(fromYm, n).map(ym => {
       const c = E.consumo(ym); const ing = E.ingreso(ym).total || E.ingreso(D.thisMonth()).base; const pres = E.presupuesto(ym) || ing;
-      const fijos = Math.max(c.fijo, E.fijosEstimados(ym)); const comprometido = fijos + c.cuotas;
-      return { ym, ingreso: ing, presupuesto: pres, fijos, cuotas: c.cuotas, nuevo: c.compras, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 };
+      const fijos = Math.max(c.fijo, E.fijosEstimados(ym)); const comprometido = fijos + c.cuotas + c.viajeCuotas;  // las cuotas de un viaje no son gasto del mes, pero se pagan con el sueldo
+      return { ym, ingreso: ing, presupuesto: pres, fijos, cuotas: c.cuotas + c.viajeCuotas, nuevo: c.compras, comprometido, libre: pres - comprometido, pct: pres ? comprometido / pres : 0 };
     });
+  },
+  /** dolares de un movimiento: USD directo; pesos al CCL del dia de la compra (si no hay historico, el de hoy) */
+  aUSD(m) { const v = Number(m.monto) || 0; if (m.moneda === 'USD') return v; const c = (typeof AD !== 'undefined' && AD.cclEn && AD.cclEn(m.fecha)) || Number(state.settings.ccl) || Number(state.settings.tc) || 0; return c ? v / c : null; },
+  /** resumen de cada viaje: total (la compra entera, aunque sea en cuotas), por categoria, por dia */
+  viajes() {
+    return (state.viajes || []).map(v => {
+      const movs = state.movimientos.filter(m => m.viajeId === v.id);
+      const total = sum(movs.map(m => M.toARS(Number(m.monto) || 0, m.moneda))); const usd = movs.every(m => E.aUSD(m) != null) ? sum(movs.map(E.aUSD)) : null;
+      const byCat = {}; for (const m of movs) byCat[m.catId] = (byCat[m.catId] || 0) + M.toARS(Number(m.monto) || 0, m.moneda);
+      const dias = v.desde && v.hasta ? D.daysBetween(v.desde, v.hasta) + 1 : null;
+      return { ...v, movs, total, usd, byCat, dias, porDia: dias ? total / dias : null, porDiaUSD: dias && usd != null ? usd / dias : null, anio: (v.desde || (movs[0] || {}).fecha || D.today()).slice(0, 4) };
+    }).sort((a, b) => String(b.desde || '').localeCompare(String(a.desde || '')));
+  },
+  /** gasto de un anio: meses (sin viajes) + viajes, por fecha de gasto (devengado) */
+  anual(anio) {
+    const meses = D.range(`${anio}-01`, 12).filter(ym => ym <= D.thisMonth());
+    const cs = meses.map(ym => ({ ym, c: E.consumo(ym) }));
+    const mensual = sum(cs.map(x => x.c.total)), viajes = sum(cs.map(x => x.c.viaje));
+    return { anio, meses: cs.length, mensual, viajes, total: mensual + viajes, promMes: cs.length ? mensual / cs.length : 0 };
   },
   /** Cuotas que se PAGAN en el mes ym (entran en el resumen que vence ese mes): cuota k de N */
   pagosCuotas(ym) {

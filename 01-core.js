@@ -310,6 +310,9 @@ const L = {
   slotColor(slot) { return slot >= 8 ? 'var(--c-otras)' : `var(--c${slot})`; },
   catColor(catId) { return L.slotColor(L.grupoDeCat(catId).slot); },
   tarjeta(id) { return state.tarjetas.find(t => t.id === id); },
+  viaje(id) { return (state.viajes || []).find(v => v.id === id) || null; },
+  /** viaje que incluye esa fecha (para asignar sola la comida del viaje) */
+  viajeEn(fecha) { return (state.viajes || []).find(v => v.desde && v.hasta && fecha >= v.desde && fecha <= v.hasta) || null; },
   cuenta(id) { return state.cuentas.find(c => c.id === id); },
 };
 
@@ -383,7 +386,7 @@ const Persist = {
     const base = defaultState();
     const s = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) } };
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
-    for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos']) if (!Array.isArray(s[k])) s[k] = [];
+    for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
     if (!s.sueldos || typeof s.sueldos !== 'object' || Array.isArray(s.sueldos)) s.sueldos = {};
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
