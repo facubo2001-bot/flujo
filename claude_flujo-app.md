@@ -35,7 +35,7 @@ Después, el backlog de datos del final del documento.
 ### Viajes fuera del gasto del mes (30-sep, build 202609301023)
 - Facu: las vacaciones son puntuales y distorsionan el mes; que cuenten en el año y quede registro de cuánto se gastó en cada viaje.
 - `state.viajes = [{id, nombre, desde, hasta, nota}]`; un gasto con `viajeId` sale de `E.consumo` (total, categorías, presupuesto, ritmo, promedios) y va a `c.viaje` / `c.viajeMovs`. Tarjetas y pagos no cambian (se pagan igual). Las cuotas de un viaje sí cuentan en lo comprometido de cada mes (`c.viajeCuotas` en `E.horizonte`).
-- Formulario de gasto: campo **Viaje** (aparece con la categoría Viajes, si la fecha cae dentro de un viaje o si el gasto ya tenía viaje); "+ Nuevo viaje…" pide destino y fechas; la comida con fecha dentro del viaje se asigna sola.
+- Formulario de gasto: el de siempre; el campo **Viaje** aparece SOLO con la categoría Viajes (o si el gasto ya era de un viaje, para poder sacarlo). Facu no quiso que aparezca por fecha. "+ Nuevo viaje…" pide destino y fechas. Comida del viaje: cargarla con categoría Viajes para que vaya al viaje.
 - Gastos: abajo, "✈ Bariloche · 10 oct al 17 oct" con sus gastos del mes (no suman arriba) y la tarjeta **Viajes**: gasto del año (meses + viajes, `E.anual`), y cada viaje con total, US$ al CCL de cada día, por día y en qué se fue (por categoría). Tocar un viaje: editar o borrar (sus gastos vuelven a ser del mes). También en Tendencias y en el resumen para Claude.
 
 ### Proyección del patrimonio (29-sep, build 202609300139)
