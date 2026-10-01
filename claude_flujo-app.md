@@ -43,6 +43,7 @@ Después, el backlog de datos del final del documento.
 - `E.build()` ahora arranca en el primer gasto cargado (antes 18 meses atrás), para poder ver 2025 entero.
 - La tarjeta Viajes del mes quedó solo con la lista de viajes (el total del año vive en Año).
 - Viajes del año incluye también lo de meses que vienen (un viaje con fecha de octubre o en cuotas); el gráfico muestra esos meses solo con su parte de viaje.
+- (1-oct) Form de operación: los placeholders dicen "ej. …" en gris itálica tenue (Facu confundió el "4" de ejemplo con un valor cargado). Debajo del precio por CEDEAR aparece en vivo "= US$ X por acción" (precio × ratio ÷ CCL), y el cuadro de cálculo muestra el parcial si falta cantidad o precio.
 
 ### Viajes fuera del gasto del mes (30-sep, build 202609301023)
 - Facu: las vacaciones son puntuales y distorsionan el mes; que cuenten en el año y quede registro de cuánto se gastó en cada viaje.

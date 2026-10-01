@@ -487,12 +487,12 @@ function formOpCampos(tipo, modo, pre = {}) {
   const p = pre.ticker ? E.cartera().posiciones.find(x => x.ticker === pre.ticker) : null; const c = pre.ticker ? Cedears.de(pre.ticker) : null;
   if (modo === 'cedear') {
     const ccl = pre.ccl || Number(state.settings.ccl) || Number(state.settings.tc) || '';
-    return F.field('Cantidad de CEDEARs', F.input('o-ced', pre.cedears || '', 'inputmode="numeric" placeholder="4"'), tipo === 'venta' && p && c ? `Tenés ~${fmtAcc(Cedears.aCedears(p.acciones, c))} CEDEARs` : '')
-      + F.field('Precio por CEDEAR ($)', F.input('o-pxars', pre.precioCedear || '', 'inputmode="decimal" placeholder="15.250"'), 'Lo que pagaste/cobraste por cada uno en pesos')
+    return F.field('Cantidad de CEDEARs', F.input('o-ced', pre.cedears || '', 'inputmode="numeric" placeholder="ej. 4"'), tipo === 'venta' && p && c ? `Tenés ~${fmtAcc(Cedears.aCedears(p.acciones, c))} CEDEARs` : '')
+      + F.field('Precio por CEDEAR ($)', F.input('o-pxars', pre.precioCedear || '', 'inputmode="decimal" placeholder="ej. 15.250"') + '<div class="px-usd" id="o-pxusd"></div>', 'Lo que pagaste/cobraste por cada uno en pesos')
       + F.field('Dólar CCL de la operación', F.input('o-ccl', ccl, 'inputmode="decimal"') + `<div class="ccl-info" id="o-ccl-info"></div>`, 'Se usa para pasar tu precio en pesos a dólares. El de mercado se refresca solo; el implícito sale de tu precio y del precio en USD del subyacente ahora.')
-      + (pre.ticker && !c ? F.field('Ratio del CEDEAR', F.input('o-ratio', '', 'placeholder="24:1"'), 'No está en la tabla BYMA: cargalo a mano (N CEDEARs : M acciones)') : '');
+      + (pre.ticker && !c ? F.field('Ratio del CEDEAR', F.input('o-ratio', '', 'placeholder="ej. 24:1"'), 'No está en la tabla BYMA: cargalo a mano (N CEDEARs : M acciones)') : '');
   }
-  return F.field('Acciones', F.input('o-acc', pre.acciones || '', 'inputmode="decimal" placeholder="0,5"'), tipo === 'venta' && p ? `Tenés ${fmtAcc(p.acciones)}` : 'Fracciones con coma: 0,508')
+  return F.field('Acciones', F.input('o-acc', pre.acciones || '', 'inputmode="decimal" placeholder="ej. 0,5"'), tipo === 'venta' && p ? `Tenés ${fmtAcc(p.acciones)}` : 'Fracciones con coma: 0,508')
     + F.field('Precio por acción (USD)', F.input('o-precio', pre.precio || (p && p.precio ? String(p.precio).replace('.', ',') : ''), 'inputmode="decimal" placeholder="0,00"'), tipo === 'venta' && p ? `PPC ${fmtU(p.ppc)}` : '');
 }
 function formOpCalc() {
@@ -506,7 +506,10 @@ function formOpCalc() {
     const ced = M.parse(Modal.val('o-ced')), px = M.parse(Modal.val('o-pxars'));
     if (!c) html = 'Cargá el ratio para poder convertir.';
     else if (ced && px && ccl) { const acc = Cedears.aAcciones(ced, c); const pu = Cedears.precioUSD(px, c, ccl); html = `= <b>${fmtAcc(acc)} acciones</b> de ${esc(ticker)} · <b>${fmtU(pu)}</b> por acción · total <b>${fmtU(acc * pu)}</b> (${M.f(ced * px, { cur: 'ARS' })} al CCL $ ${fmtARS.format(ccl)})`; }
+    else if (px && ccl) { const pu = Cedears.precioUSD(px, c, ccl); html = `= <b>${fmtU(pu)}</b> por acción <small class="muted">(${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ ${fmtARS.format(ccl)})</small> · falta la <b>cantidad de CEDEARs</b> para el total`; }
+    else if (ced) html = `= <b>${fmtAcc(Cedears.aAcciones(ced, c))} acciones</b> de ${esc(ticker)} · falta el <b>precio por CEDEAR</b> para pasarlo a dólares`;
     else html = 'Completá cantidad y precio para ver el equivalente en acciones y dólares.';
+    const pxu = $('#o-pxusd'); if (pxu) pxu.textContent = c && px && ccl ? `= ${fmtU(Cedears.precioUSD(px, c, ccl))} por acción de ${ticker}` : '';
     formOpCclInfo();
   } else {
     const acc = M.parse(Modal.val('o-acc')), pu = M.parse(Modal.val('o-precio'));
@@ -1147,7 +1150,7 @@ function formActivo(id) {
       ${F.field('Vence', F.input('ac-vence', v.vence || '', 'type="date"'), 'opcional', 'ac-f ac-tasa')}
       ${F.field('Valor hoy (correcci\u00f3n)', F.input('ac-vmanual', v.valorManual ? v.valorManual.v : '', 'inputmode="decimal" placeholder="lo que muestra Balanz"'), 'opcional: si lo carg\u00e1s, de ac\u00e1 en m\u00e1s devenga desde este valor', 'ac-f ac-tasa')}
       ${F.field('Fecha del valor', F.input('ac-vfecha', v.valorManual ? v.valorManual.fecha : D.today(), 'type="date"'), '', 'ac-f ac-tasa')}
-      ${F.field('Cantidad de BTC', F.input('ac-cantidad', v.cantidad || '', 'inputmode="decimal" placeholder="0,0125"'), 'precio autom\u00e1tico (CoinGecko)', 'ac-f ac-btc')}
+      ${F.field('Cantidad de BTC', F.input('ac-cantidad', v.cantidad || '', 'inputmode="decimal" placeholder="ej. 0,0125"'), 'precio autom\u00e1tico (CoinGecko)', 'ac-f ac-btc')}
       ${F.field('Precio a mano (US$)', F.input('ac-pxmanual', v.precioManual || '', 'inputmode="decimal" placeholder="solo si no llega el precio"'), '', 'ac-f ac-btc')}
       ${F.field('Fecha', F.input('ac-fecha', v.fecha || D.today(), 'type="date"'), '', 'ac-f ac-efectivo ac-otro')}
     </div>
@@ -1250,7 +1253,7 @@ function formReserva(id, mov = null) {
   const movs = a.lotes.slice().sort((x, y) => y.fecha.localeCompare(x.fecha)).map(x => `<div class="rs-mov" data-act="rs-edit" data-id="${x.id}"><span>${D.fmt(x.fecha)}</span><span class="t ${x.tipo === 'rescate' ? 'r' : ''}">${x.tipo === 'rescate' ? 'Rescate' : 'Suscripci\u00f3n'}</span><span class="m">${x.tipo === 'rescate' ? '\u2212' : ''}$ ${fmtARS.format(Math.round(x.monto))}</span></div>`).join('');
   const panel = mov ? `<div class="rs-panel"><div class="rs-panel-h"><b>${tipo === 'rescate' ? 'Saqu\u00e9 plata' : 'Puse plata'}</b>${l ? `<button type="button" class="link-btn" data-act="rs-del-lote" data-id="${l.id}">borrar</button>` : ''}</div>
       <div class="rs-two">${F.input('rs-fecha', l ? l.fecha : D.today(), 'type="date"')}${F.input('rs-monto', l ? String(l.monto) : '', 'inputmode="decimal" placeholder="$ monto"')}</div>
-      <details class="rs-det"><summary>Valor cuota del comprobante (opcional)</summary>${F.input('rs-vc', l && l.vc ? String(l.vc) : '', 'inputmode="decimal" placeholder="2,140265"')}</details>
+      <details class="rs-det"><summary>Valor cuota del comprobante (opcional)</summary>${F.input('rs-vc', l && l.vc ? String(l.vc) : '', 'inputmode="decimal" placeholder="ej. 2,140265"')}</details>
       <button type="button" class="btn primary rs-save" data-act="rs-save">Guardar</button></div>` : '';
   Modal.open({ title: '', submit: '', body: `
     <div class="rs-sub">Reserva en pesos \u00b7 ${esc(a.nombre || '')}</div>
