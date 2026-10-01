@@ -42,6 +42,7 @@ Después, el backlog de datos del final del documento.
 - `E.anual(anio)`: total (meses + viajes), en US$ con el CCL de cada mes (con la inflación, comparar años en pesos no sirve), gráfico mes a mes (gasto + viajes), en qué se fue (categorías, sin viajes) y viajes del año. El promedio por mes usa solo meses cargados completos (5 gastos o más): antes de jul-26 solo había cuotas sueltas. Compara el promedio en US$ contra el año anterior.
 - `E.build()` ahora arranca en el primer gasto cargado (antes 18 meses atrás), para poder ver 2025 entero.
 - La tarjeta Viajes del mes quedó solo con la lista de viajes (el total del año vive en Año).
+- Viajes del año incluye también lo de meses que vienen (un viaje con fecha de octubre o en cuotas); el gráfico muestra esos meses solo con su parte de viaje.
 
 ### Viajes fuera del gasto del mes (30-sep, build 202609301023)
 - Facu: las vacaciones son puntuales y distorsionan el mes; que cuenten en el año y quede registro de cuánto se gastó en cada viaje.
