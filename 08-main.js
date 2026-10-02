@@ -48,7 +48,7 @@ function headLine() {
   const h = $('.mobile-head'); if (h) h.classList.toggle('scrolled', m.scrollTop > 4);
   const f = $('.fab'); if (!f) { _scrollY = m.scrollTop; return; }
   const y = m.scrollTop;
-  if (y > _scrollY + 2 && y > 40) f.classList.add('hide');
+  if (y > _scrollY + 2 && y > 40) { f.classList.add('hide'); fabMenu(false); }
   else if (y < _scrollY - 2) f.classList.remove('hide');
   _scrollY = y;
   clearTimeout(_fabT); _fabT = setTimeout(() => f.classList.remove('hide'), 450);
@@ -56,6 +56,14 @@ function headLine() {
 function go(view) { ui.view = view; render(); }
 
 /** setea el ticker elegido en el form de operación y refresca campos/cálculo */
+/** El + despliega burbujas: lo más usado en la pestaña queda pegado al dedo */
+function fabMenu(abrir) {
+  const m = $('#fab-menu'), f = $('#fab'); if (!m || !f) return;
+  const on = abrir == null ? m.hidden : abrir; if (on === !m.hidden) return;
+  if (on) { const G_ = ['fab-gasto', 'Cargar gasto'], O_ = ['fab-op', 'Compra / venta / dividendo'], C_ = ['fab-calc', 'Calculadora de CEDEAR']; const it = ui.view === 'cartera' ? [G_, C_, O_] : [C_, O_, G_];
+    m.innerHTML = it.map(([a, l]) => `<button type="button" data-act="${a}">${l}</button>`).join(''); }
+  m.hidden = !on; f.classList.toggle('open', on);
+}
 function formOpSet(t) {
   const c = Cedears.de(t); const tk = $('#o-tk'), inp = $('#o-ticker'); if (!tk) return;
   tk.value = t; if (inp) inp.value = c ? `${c.code} · ${c.nombre}` : t; const sug = $('#o-sug'); if (sug) sug.innerHTML = '';
@@ -63,6 +71,7 @@ function formOpSet(t) {
   const info = $('#o-info'); if (info) info.innerHTML = formOpInfo(t);
   const box = $('#o-campos'); if (box) { const tipo = Modal.choice('o-tipo') || 'compra'; const modo = Modal.choice('o-modo') || 'usd'; const vals = { ced: Modal.val('o-ced'), pxars: Modal.val('o-pxars'), ccl: Modal.val('o-ccl'), acc: Modal.val('o-acc'), precio: Modal.val('o-precio'), monto: Modal.val('o-monto') }; box.innerHTML = formOpCampos(tipo, modo, { ticker: t, cedears: vals.ced, precioCedear: vals.pxars, ccl: vals.ccl, acciones: vals.acc, precio: vals.precio, monto: vals.monto }); }
   formOpCalc();
+  if ($('#k-res')) calcFresco(); else opFresco(t).then(() => { if ($('#o-tk') && formOpTicker() === t) { formOpCclInfo(); formOpCalc(); } });
 }
 
 /* ---------- actions ---------- */
@@ -133,6 +142,10 @@ const Actions = {
   'new-op'() { formOp(); },
   'op-para'(v) { const [t, tipo] = v.split('|'); formOp({ ticker: t, tipo }); },
   'pick-ticker'(t) { formOpSet(t); },
+  'calc-fresco'() { calcFresco(true); },
+  'fab-gasto'() { fabMenu(false); formMov(); },
+  'fab-op'() { fabMenu(false); formOp(); },
+  'fab-calc'() { fabMenu(false); formCalc(); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
   'cartera-info'(v) { infoEvolucion(v); },
@@ -241,7 +254,8 @@ document.addEventListener('click', e => {
   const cur = e.target.closest('[data-cur]'); if (cur) { ui.cur = cur.dataset.cur; render(); return; }
   const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; if (ui.sort.key === k) ui.sort.dir *= -1; else ui.sort = { key: k, dir: k === 'monto' || k === 'fecha' ? -1 : 1 }; render(); return; }
   const rg = e.target.closest('[data-range]'); if (rg) { ui.trendRange = Number(rg.dataset.range); render(); return; }
-  if (e.target.closest('#fab')) { if (ui.view === 'cartera') formOp(); else formMov(); return; }
+  if (e.target.closest('#fab')) { fabMenu(); return; }
+  if (!e.target.closest('#fab-menu')) fabMenu(false);
   // cualquier fila de alerta abre la ficha (posicion o watchlist): antes buscaba tr[data-alerta] y la fila ya no es una tabla
   const ta = e.target.closest('[data-alerta]'); if (ta && !e.target.closest('button')) { formPosicion(ta.dataset.alerta); return; }
   if (e.target.id === 'overlay') { Modal.close(); return; }

@@ -458,12 +458,88 @@ function formOp(pre = {}) {
 }
 /** CCL fresco al abrir el form (dolarapi, ≤10 min) + precio del subyacente en vivo para el CCL implícito */
 async function formOpCclFresh() {
-  const r = await TC.ccl(10);
+  const r = await TC.ccl(2);
   const el = $('#o-ccl'); if (el && r && r.ccl && !el.dataset.manual && !el.value) { el.value = r.ccl; el.dataset.fuente = 'mercado'; }
   if (el && r && r.ccl && !el.dataset.manual && Number(el.value) !== r.ccl && !r.cache) { el.value = r.ccl; el.dataset.fuente = 'mercado'; }
   formOpCclInfo(); formOpCalc();
-  const t = formOpTicker(); if (t && (Modal.choice('o-modo') || 'usd') === 'cedear') { const pr = state.cartera.precios[t]; if (!pr || !pr.t || Date.now() - pr.t > 10 * 60000) { await Precios.quote(t); formOpCclInfo(); } }
+  const t = formOpTicker(); if (t && (Modal.choice('o-modo') || 'usd') === 'cedear') { const pr = state.cartera.precios[t]; if (!pr || !pr.t || Date.now() - pr.t > 2 * 60000) { await Precios.quote(t); formOpCclInfo(); formOpCalc(); } }
   const sp = state.cartera.precios.SPY; if (!sp || !sp.t || Date.now() - sp.t > 10 * 60000) await Precios.quote('SPY');  // SPY en vivo: la sombra compra al precio del momento
+}
+/** "hace cuánto" corto para un instante en ms */
+function opEdad(ms) { if (!ms) return 'sin hora'; const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; }
+/** Trae al momento el CCL y el precio de NY del ticker (los dos con ≤ max minutos) */
+async function opFresco(t, max = 2) {
+  const r = await TC.ccl(max);
+  if (t) { const pr = state.cartera.precios[t]; if (!pr || !pr.t || Date.now() - pr.t > max * 60000) await Precios.quote(t); }
+  return r;
+}
+/** ¿Más cara o más barata que en NY? Devuelve {txt, cls, mk, d} o null si no hay precio real para comparar */
+function opVeredicto(tipo, pu, t) {
+  const pr = state.cartera.precios[t]; if (!pr || !pr.c || pr.estimado || !pu) return null;
+  const d = pu / pr.c - 1; const pc = (Math.abs(d) * 100).toFixed(1).replace('.', ','); const venta = tipo === 'venta';
+  let txt, cls;
+  if (Math.abs(d) < 0.005) { txt = `Al precio de mercado (${d >= 0 ? '+' : '−'}${pc}%)`; cls = 'up'; }
+  else if (d > 0) { txt = venta ? `La vendés ${pc}% más cara que en NY` : `Ojo: la comprás ${pc}% más cara que en NY`; cls = venta ? 'up' : 'warn-text'; }
+  else { txt = venta ? `Ojo: la vendés ${pc}% más barata que en NY` : `La comprás ${pc}% más barata que en NY`; cls = venta ? 'warn-text' : 'up'; }
+  const ny = mercadoNY(); const viejo = ny.abierto && (!pr.t || Date.now() - pr.t > 15 * 60000);
+  return { txt, cls, d, mk: pr.c, pie: `NY ${fmtU(pr.c)} ${ny.abierto ? opEdad(pr.t) : `(mercado cerrado: último precio, ${opEdad(pr.t)})`}${viejo ? ' · precio viejo, actualizá' : ''}`, viejo };
+}
+/* ---------- Calculadora de CEDEAR: de pesos a precio real de la acción, y si está cara o barata ---------- */
+function formCalc(pre = {}) {
+  const k = E.cartera(); const mios = k.posiciones.map(p => p.ticker); const ced = pre.ticker ? Cedears.de(pre.ticker) : null;
+  const body = `<div class="form-grid">
+    ${F.field('Ticker', `${mios.length ? `<div class="chips" style="margin-bottom:6px">${mios.map(t => `<button type="button" data-act="pick-ticker" data-id="${esc(t)}" class="${t === pre.ticker ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>` : ''}
+      <input type="hidden" id="o-tk" value="${esc(pre.ticker || '')}">
+      <input class="input" id="o-ticker" value="${esc(ced ? `${ced.code} · ${ced.nombre}` : (pre.ticker || ''))}" placeholder="Buscá el CEDEAR: MELI, Apple, Nvidia…" autocomplete="off" autocapitalize="characters">
+      <div class="sug-list" id="o-sug"></div>`, '', 'full')}
+    <div class="full">${F.choice('k-tipo', [['compra', 'Voy a comprar'], ['venta', 'Voy a vender']], pre.tipo || 'compra')}</div>
+    ${F.field('Precio del CEDEAR ($)', F.input('k-px', pre.precioCedear || '', 'inputmode="decimal" placeholder="ej. 22.600"'), '', 'full')}
+    <div class="full" id="k-res"></div>
+  </div>`;
+  Modal.open({ title: 'Calculadora de CEDEAR', body, submit: 'Cargar la operación', onSubmit: () => {
+    const t = formOpTicker(); if (!t) { toast('Elegí un ticker'); return false; }
+    const o = { ticker: t, tipo: Modal.choice('k-tipo') || 'compra', modo: 'cedear', precioCedear: Modal.val('k-px') };
+    setTimeout(() => formOp(o), 0);
+  } });
+  $('#modal').onchange = () => calcPintar();
+  $('#modal').oninput = e => {
+    if (e.target.id === 'o-ticker') { const q = e.target.value.trim(); $('#o-tk').value = ''; const res = Cedears.buscar(q); $('#o-sug').innerHTML = res.map(c => `<button type="button" data-act="pick-ced" data-id="${esc(c.code)}"><b>${esc(c.code)}</b><span>${esc(c.nombre)}</span><i>${Cedears.ratioTxt(c)}</i></button>`).join(''); }
+    calcPintar();
+  };
+  calcPintar(); calcFresco();
+}
+/** refresca CCL y precio de NY y repinta (al abrir, al cambiar de ticker y con el botón) */
+async function calcFresco(forzar = false) {
+  const t = formOpTicker(); const box = $('#k-res'); if (box) box.classList.add('cargando');
+  const antes = t && state.cartera.precios[t] ? state.cartera.precios[t].t : 0;
+  const r = await opFresco(t, forzar ? 0 : 2); const pr = t ? state.cartera.precios[t] : null;
+  calcFresco.fallo = !r || r.error || (t && Cedears.de(t) && (!pr || !pr.t || (Date.now() - pr.t > 3 * 60000 && pr.t === antes)));
+  const b2 = $('#k-res'); if (b2) { b2.classList.remove('cargando'); calcPintar(); }
+}
+function calcPintar() {
+  const box = $('#k-res'); if (!box) return;
+  const t = formOpTicker(); const c = t ? Cedears.de(t) : null; const s = state.settings; const ccl = Number(s.ccl) || 0; const tipo = Modal.choice('k-tipo') || 'compra';
+  if (!t) { box.innerHTML = '<div class="callout small">Elegí el CEDEAR y poné a cuánto está en pesos: te digo a qué precio en dólares estás comprando la acción y si está cara o barata contra Nueva York.</div>'; return; }
+  if (!c) { box.innerHTML = `<div class="callout small">${esc(t)} no está en la tabla de CEDEARs de BYMA.</div>`; return; }
+  if (!ccl) { box.innerHTML = '<div class="callout small">Sin dólar CCL: no hay conexión con dolarapi. Probá “Actualizar”.</div><button type="button" class="btn sm" data-act="calc-fresco" style="margin-top:8px">Actualizar</button>'; return; }
+  const pr = state.cartera.precios[t]; const mk = pr && pr.c && !pr.estimado ? pr.c : null; const px = M.parse(Modal.val('k-px'));
+  const justo = mk ? mk * ccl * c.ratio[1] / c.ratio[0] : null; const ny = mercadoNY(); const cclMs = s.cclHora ? new Date(s.cclHora).getTime() : 0;
+  let h = ''; const lim = ny.abierto ? 20 * 60000 : 96 * 3600000; const vCcl = !cclMs || Date.now() - cclMs > lim, vPr = mk && (!pr.t || Date.now() - pr.t > lim);
+  if (calcFresco.fallo || vCcl || vPr) h += `<div class="callout amber small" style="margin-bottom:10px"><b>Ojo: datos sin actualizar.</b> ${calcFresco.fallo ? 'No pude traer los valores de ahora (¿sin conexión?). ' : ''}${vCcl ? `El CCL es de ${opEdad(cclMs)}. ` : ''}${vPr ? `El precio de NY es de ${opEdad(pr.t)}. ` : ''}No decidas con esto.</div>`;
+  if (px) {
+    const pu = Cedears.precioUSD(px, c, ccl); const v = opVeredicto(tipo, pu, t);
+    h += `<div class="px-usd"><small>Precio real de la acción al que ${tipo === 'venta' ? 'vendés' : 'comprás'}</small><b>${fmtU(pu)}</b>${v ? `<strong class="${v.cls}">${v.txt}</strong>` : '<small>Sin precio de Nueva York para comparar (cargá la clave de Finnhub en Ajustes)</small>'}<small>${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ CCL ${fmtARS.format(ccl)}</small></div>`;
+  }
+  h += `<dl class="k-datos">
+    ${justo ? `<div><dt>CEDEAR al precio de NY</dt><dd><b>$ ${fmtARS.format(justo)}</b>${px ? ` <small class="muted">vos: $ ${fmtARS.format(px)}</small>` : ''}</dd></div>` : ''}
+    <div><dt>${esc(t)} en Nueva York</dt><dd>${mk ? `<b>${fmtU(mk)}</b> <small class="muted">${ny.abierto ? opEdad(pr.t) : `cierre · ${opEdad(pr.t)}`}</small>` : '<small class="muted">sin precio</small>'}</dd></div>
+    <div><dt>Dólar CCL</dt><dd><b>$ ${fmtARS.format(ccl)}</b> <small class="muted">${opEdad(cclMs)}</small></dd></div>
+    ${px && mk ? `<div><dt>CCL implícito en ese precio</dt><dd><b>$ ${fmtARS.format(px * c.ratio[0] / c.ratio[1] / mk)}</b></dd></div>` : ''}
+    <div><dt>Ratio</dt><dd>${Cedears.ratioTxt(c)}</dd></div>
+  </dl>
+  ${!ny.abierto ? '<div class="small muted" style="margin-top:6px">Nueva York está cerrado: la comparación usa el último precio, que puede no ser el de ahora.</div>' : ''}
+  <button type="button" class="btn sm" data-act="calc-fresco" style="margin-top:10px">Actualizar datos</button>`;
+  box.innerHTML = h;
 }
 function formOpCclInfo() {
   const box = $('#o-ccl-info'); if (!box) return;
@@ -496,6 +572,7 @@ function formOpCampos(tipo, modo, pre = {}) {
     + F.field('Precio por acción (USD)', F.input('o-precio', pre.precio || (p && p.precio ? String(p.precio).replace('.', ',') : ''), 'inputmode="decimal" placeholder="0,00"'), tipo === 'venta' && p ? `PPC ${fmtU(p.ppc)}` : '');
 }
 function formOpCalc() {
+  if ($('#k-res')) { calcPintar(); return; }
   const box = $('#o-calc'); if (!box) return;
   const tipo = Modal.choice('o-tipo') || 'compra'; const ticker = formOpTicker(); const modo = Modal.choice('o-modo') || 'usd';
   if (!ticker) { box.hidden = true; return; }
@@ -509,13 +586,14 @@ function formOpCalc() {
     else if (px && ccl) { const pu = Cedears.precioUSD(px, c, ccl); html = `= <b>${fmtU(pu)}</b> por acción <small class="muted">(${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ ${fmtARS.format(ccl)})</small> · falta la <b>cantidad de CEDEARs</b> para el total`; }
     else if (ced) html = `= <b>${fmtAcc(Cedears.aAcciones(ced, c))} acciones</b> de ${esc(ticker)} · falta el <b>precio por CEDEAR</b> para pasarlo a dólares`;
     else html = 'Completá cantidad y precio para ver el equivalente en acciones y dólares.';
-    const pxu = $('#o-pxusd'); if (pxu) { if (c && px && ccl) { const pu = Cedears.precioUSD(px, c, ccl); const pr = state.cartera.precios[ticker]; const mk = pr && pr.c && !pr.estimado ? pr.c : null; const df = mk ? (pu / mk - 1) * 100 : null;
-      pxu.innerHTML = `<small>Precio de la acción al que ${tipo === 'venta' ? 'vendés' : 'comprás'}</small><b>${fmtU(pu)}</b><small>${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ CCL ${fmtARS.format(ccl)}${mk ? ` · mercado ahora ${fmtU(mk)} (${df >= 0 ? '+' : '−'}${Math.abs(df).toFixed(1).replace('.', ',')}%)` : ''}</small>`; } else pxu.innerHTML = ''; }
+    const pxu = $('#o-pxusd'); if (pxu) { if (c && px && ccl) { const pu = Cedears.precioUSD(px, c, ccl); const v = opVeredicto(tipo, pu, ticker);
+      pxu.innerHTML = `<small>Precio real de la acción al que ${tipo === 'venta' ? 'vendés' : 'comprás'}</small><b>${fmtU(pu)}</b>${v ? `<strong class="${v.cls}">${v.txt}</strong>` : ''}<small>${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ CCL ${fmtARS.format(ccl)}${v ? ` · ${v.pie}` : ''}</small>`; } else pxu.innerHTML = ''; }
     formOpCclInfo();
   } else {
     const acc = M.parse(Modal.val('o-acc')), pu = M.parse(Modal.val('o-precio'));
     if (acc && pu) html = `= total <b>${fmtU(acc * pu)}</b>${c && ccl ? ` · equivale a <b>${fmtAcc(Cedears.aCedears(acc, c))} CEDEARs</b> a ~$ ${fmtARS.format(pu * ccl * c.ratio[1] / c.ratio[0])} c/u al CCL` : ''}`;
     else html = 'Completá acciones y precio.';
+    if (pu) { const v = opVeredicto(tipo, pu, ticker); if (v) html = `<strong class="${v.cls}" style="display:block;margin-bottom:4px">${v.txt}</strong>` + html; }
   }
   let ver = '', nivel = 'ok'; try { const k = E.cartera(); const o = Verif.candidata(formOpCalc._pre || {}); const ev = Verif.evaluar(o, k); ver = Verif.html(ev); nivel = ev.nivel; } catch (err) { ver = ''; }
   box.hidden = false; box.innerHTML = html + ver; box.classList.toggle('crit', nivel === 'block'); box.classList.toggle('amber', nivel === 'warn');
