@@ -472,7 +472,7 @@ function formOpCclInfo() {
   const px = M.parse(Modal.val('o-pxars'));
   let imp = null; if (c && pr && pr.c && px) imp = px * c.ratio[0] / c.ratio[1] / pr.c;
   box.innerHTML = `<span>Mercado: <b>$ ${s.ccl ? fmtARS.format(s.ccl) : 's/d'}</b>${edad != null ? ` <small class="muted">(${edad < 1 ? 'recién' : edad < 60 ? `hace ${edad} min` : edad < 1440 ? `hace ${Math.round(edad / 60)} h` : D.fmt(D.iso(hora))})</small>` : ''} <button type="button" class="btn ghost sm" data-act="op-ccl-usar" data-id="${s.ccl || ''}|mercado" style="padding:2px 8px;min-height:26px">usar</button></span>`
-    + (imp ? `<span>Implícito en tu compra: <b>$ ${fmtARS.format(imp)}</b> <small class="muted">(${esc(t)} a ${fmtU(pr.c)} ${pr.t ? 'ahora' : 'estimado'})</small> <button type="button" class="btn ghost sm" data-act="op-ccl-usar" data-id="${Math.round(imp)}|implicito" style="padding:2px 8px;min-height:26px">usar</button></span>` : (c && px ? `<span class="muted">Implícito: falta el precio en USD de ${esc(t)} (cargá la clave de Finnhub)</span>` : ''));
+    + (imp ? `<span>CCL implícito: <b>$ ${fmtARS.format(imp)}</b> <small class="muted">(el dólar que resulta si tomás ${esc(t)} a ${fmtU(pr.c)} ${pr.t ? 'de ahora' : 'estimado'})</small> <button type="button" class="btn ghost sm" data-act="op-ccl-usar" data-id="${Math.round(imp)}|implicito" style="padding:2px 8px;min-height:26px">usar</button></span>` : (c && px ? `<span class="muted">Implícito: falta el precio en USD de ${esc(t)} (cargá la clave de Finnhub)</span>` : ''));
 }
 /** ticker interno (US) elegido en el form de operación */
 function formOpTicker() { const el = $('#o-tk'); return el ? el.value.trim().toUpperCase() : ''; }
@@ -509,7 +509,8 @@ function formOpCalc() {
     else if (px && ccl) { const pu = Cedears.precioUSD(px, c, ccl); html = `= <b>${fmtU(pu)}</b> por acción <small class="muted">(${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ ${fmtARS.format(ccl)})</small> · falta la <b>cantidad de CEDEARs</b> para el total`; }
     else if (ced) html = `= <b>${fmtAcc(Cedears.aAcciones(ced, c))} acciones</b> de ${esc(ticker)} · falta el <b>precio por CEDEAR</b> para pasarlo a dólares`;
     else html = 'Completá cantidad y precio para ver el equivalente en acciones y dólares.';
-    const pxu = $('#o-pxusd'); if (pxu) pxu.textContent = c && px && ccl ? `= ${fmtU(Cedears.precioUSD(px, c, ccl))} por acción de ${ticker}` : '';
+    const pxu = $('#o-pxusd'); if (pxu) { if (c && px && ccl) { const pu = Cedears.precioUSD(px, c, ccl); const pr = state.cartera.precios[ticker]; const mk = pr && pr.c && !pr.estimado ? pr.c : null; const df = mk ? (pu / mk - 1) * 100 : null;
+      pxu.innerHTML = `<small>Precio de la acción al que ${tipo === 'venta' ? 'vendés' : 'comprás'}</small><b>${fmtU(pu)}</b><small>${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ CCL ${fmtARS.format(ccl)}${mk ? ` · mercado ahora ${fmtU(mk)} (${df >= 0 ? '+' : '−'}${Math.abs(df).toFixed(1).replace('.', ',')}%)` : ''}</small>`; } else pxu.innerHTML = ''; }
     formOpCclInfo();
   } else {
     const acc = M.parse(Modal.val('o-acc')), pu = M.parse(Modal.val('o-precio'));

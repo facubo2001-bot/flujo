@@ -1149,4 +1149,4 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .gm-seg{width:fit-content;margin:0 auto 12px}
 
 .input::placeholder{color:var(--ink-3);opacity:.5;font-style:italic}
-.px-usd{color:var(--accent);font-weight:700;font-size:13px;margin-top:5px}.px-usd:empty{display:none}
+.px-usd{margin-top:8px;padding:10px 12px;border:1px solid var(--accent);border-radius:var(--r-sm);display:flex;flex-direction:column;gap:2px}.px-usd b{color:var(--accent);font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.15}.px-usd small{color:var(--ink-3);font-size:12px}.px-usd:empty{display:none}
