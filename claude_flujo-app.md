@@ -481,3 +481,9 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Decisión de Facu: todo lote sin fecha real de compra (`legado`) va al **31/12/2025** (último día hábil de 2025). `Persist.migrate` mueve los que estaban en 2026-01-02; es idempotente.
 - Para medir rendimiento entran ese día **a lo que valían** (precios de `cartera.inicio`), no a su costo: `montoRet` en el flujo, usado en `ventana()` y en la sombra SPY por posición. Costo, PPC y ganancia en USD no cambian.
 - Efecto medido (respaldo 27-sep): "Todo" 31,7% → 29,2% (S&P 30,4%); YTD sin cambios (ya los tomaba al 31-dic).
+
+## P/E inflado por ganancias fuera del negocio (6-oct, build 202610062212, Fund.VERSION 12)
+- Caso: Facu casi compra GOOGL por P/E 17; estaba inflado por revalúo de inversiones. Pidió que la app lo marque sola.
+- `Fund.peAj(t)`: si la ganancia neta de 12 meses supera en más de 20 % al resultado operativo después de impuestos (tasa efectiva del mismo período, 21 % si falta), devuelve `{pe, aj, exc}`; P/E limpio = P/E × neto / (operativo × (1 − tasa)). Sin resultado operativo (bancos, 20-F) no marca nada.
+- Se ve en: ficha (tile "P/E *" ámbar con "inflado: limpio X" y PEG recalculado), comparador (usa el limpio, con nota), export para el otro chat ("20,1* (limpio 37,5)") y `Fund.barata` (usa el limpio, así no salta como barata).
+- Con los datos de prueba marca AMZN (20,1 → 37,5), GOOGL (17 → ~35) y HON; NVDA queda justo abajo del umbral (16 %).

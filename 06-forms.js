@@ -673,9 +673,9 @@ function fundHTML(t, pos) {
       tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', per('acciones')),
     ]);
     const mu = Fund.mult(t, d);
-    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
-      tile('P/E', num(Fund.pe(t, d), 1), vsH(Fund.pe(t, d), d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''),
-      tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'),
+    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. Un P/E con asterisco est\u00e1 inflado: m\u00e1s del 20 % de la ganancia de los \u00faltimos 12 meses no viene del negocio (reval\u00fao de inversiones, venta de activos, cr\u00e9ditos fiscales); el P/E limpio usa solo el resultado operativo despu\u00e9s de impuestos. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
+      (aj => aj ? tile('P/E *', num(aj.pe, 1), 'mid', `<span class="warn-text">* inflado: limpio ${num(aj.aj, 1)}</span>`) : tile('P/E', num(Fund.pe(t, d), 1), vsH(Fund.pe(t, d), d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''))(Fund.peAj(t, d)),
+      (aj => aj && d.peg > 0 ? tile('PEG *', num(d.peg * aj.aj / aj.pe, 2), abs(d.peg * aj.aj / aj.pe, 1, 2, true), `con P/E limpio (publicado ${num(d.peg, 2)})`) : tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'))(Fund.peAj(t, d)),
       tile('P/S', num(mu.ps, 1), vsH(mu.ps, d.psMed, false), mu.ps != null ? (d.psMed ? `10Y med ${num(d.psMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
       tile('P/FCF', num(mu.pfcf, 1), vsH(mu.pfcf, d.pfcfMed, false), mu.pfcf != null ? (d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
       // P/CF = precio / flujo de caja operativo (el "Price to cash flow" de TradingView); P/FCF descuenta ademas las inversiones (capex)
@@ -797,9 +797,9 @@ const CMP_FILAS = [
   { k: 'EPS', v: d => d.cagrEps5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'eps', d.cagrEps5) },
   { k: 'Caja libre (FCF)', v: d => d.cagrFcf5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'fcf', d.cagrFcf5) },
   { sec: 'Valuaci\u00f3n' },
-  { k: 'P/E', v: d => Fund.pe(d.ticker, d), f: cmpNum(1), mejor: -1, valido: v => v > 0 },
+  { k: 'P/E', v: d => { const aj = Fund.peAj(d.ticker, d); return aj ? aj.aj : Fund.pe(d.ticker, d); }, f: cmpNum(1), mejor: -1, valido: v => v > 0, sub: d => { const aj = Fund.peAj(d.ticker, d); return aj ? `<small class="cmp-tn ojo">* limpio<br>publicado ${String(aj.pe.toFixed(1)).replace('.', ',')}</small>` : ''; } },
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
-  { k: 'P/E vs su mediana', v: d => { const pe = Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
+  { k: 'P/E vs su mediana', v: d => { const aj = Fund.peAj(d.ticker, d); const pe = aj ? aj.aj : Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
   { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : Tec.distTxt(v, ' '), mejor: -1 },
@@ -1109,7 +1109,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)}${tnTxt(d, 'ventas')} | ${pc(d.cagrEps5)}${tnTxt(d, 'eps')} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))}${(aj => aj ? `* (limpio ${n1(aj.aj)})` : '')(Fund.peAj(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)}${tnTxt(d, 'ventas')} | ${pc(d.cagrEps5)}${tnTxt(d, 'eps')} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -1123,7 +1123,7 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
+| Ticker | P/E (con * = inflado por ganancias fuera del negocio; \"limpio\" = precio / resultado operativo despu\u00e9s de impuestos) | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));

@@ -946,7 +946,7 @@ const Fund = {
       const invertido = pat != null ? pat + deu - caj : null;
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
-        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi,
+        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi, antesImp: pre, impuesto: imp,
         bruto: Fund.bruto(ic, opi),
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), dps: Fund.dps(ic, cf), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
@@ -1038,7 +1038,7 @@ const Fund = {
       const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = V(cf, C.capex); const abs = v => v != null ? Math.abs(v) : null;
       let acc = V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']); if (acc > 0 && acc < 1e5) acc *= 1e6;
       const opi = V(ic, C.operativo);
-      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), operativo: opi, bruto: Fund.bruto(ic, opi), capital: Fund.capitalTotal(bs),
+      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), operativo: opi, antesImp: V(ic, C.antesImp), impuesto: V(ic, C.impuesto), bruto: Fund.bruto(ic, opi), capital: Fund.capitalTotal(bs),
         cfo, capex: abs(cpx), div: abs(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])) ?? (Fund.dps(ic, cf) > 0 && acc > 0 ? Fund.dps(ic, cf) * acc : null), recompra: abs(V(cf, ['PaymentsForRepurchaseOfCommonStock'])), acciones: acc };
     }).sort((a, b) => a.fin.localeCompare(b.fin));
   },
@@ -1248,7 +1248,10 @@ const Fund = {
     // ultimos 12 meses para los multiplos propios (Fund.mult)
     if (u) { const T = c => Fund.ttmCampo(filas, trims, c); const ve = T('ventas'), ne = T('neto'), cfo = T('cfo'), cpx = T('capex'), dv = T('div'), rc = T('recompra');
       const qa = trims.filter(q => q.acciones > 0 && q.fin > u.fin); const acc = qa.length ? qa[qa.length - 1].acciones : u.acciones;
-      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, cfo: cfo ? cfo.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null }; }
+      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, cfo: cfo ? cfo.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null };
+      // para detectar ganancia inflada por resultados fuera del negocio (Fund.peAj): operativo y tasa de impuestos del mismo periodo que la ganancia
+      const op = T('operativo'), pre = T('antesImp'), im = T('impuesto');
+      if (ne && op && op.hasta === ne.hasta && op.base === ne.base) { d.ttm.operativo = op.v; d.ttm.tasa = pre && im && pre.hasta === ne.hasta && pre.v > 0 ? clamp(im.v / pre.v, 0, 0.6) : null; } }
     d.pxCap = state.cartera.precios[t] && state.cartera.precios[t].c || null;
     // deuda / patrimonio como TradingView: deuda total (corto + largo + leases) / patrimonio del ultimo balance (trimestral si hay)
     { const qs = trims.filter(q => q.capital && q.capital.deudaTotal != null); const ultQ = qs[qs.length - 1];
@@ -1331,8 +1334,17 @@ const Fund = {
     if (!d || !(d.pe > 0)) return null;
     const m = Fund.mult(t, d); return m.pe > 0 ? m.pe : d.pe;
   },
+  /** P/E "limpio": si la ganancia de 12 meses supera en mas de 20 % a la que deja el negocio (resultado operativo menos impuestos),
+   *  el P/E esta inflado por resultados fuera de la operacion (GOOGL, AMZN: revaluo de inversiones; ventas de activos; creditos fiscales).
+   *  Devuelve {pe, aj, exc} (exc = que parte de la ganancia no viene del negocio) o null si no aplica o no hay datos (bancos, 20-F). */
+  peAj(t, d = Fund.de(t)) {
+    const pe = Fund.pe(t, d); const x = d && d.ttm; if (!(pe > 0) || !x || !(x.neto > 0) || !(x.operativo > 0)) return null;
+    const mu = Fund.mult(t, d); if (!(mu.pe > 0) || Math.abs(mu.pe / pe - 1) > 0.02) return null;  // solo si el P/E mostrado es el propio (misma ganancia)
+    const netoOp = x.operativo * (1 - (x.tasa != null ? x.tasa : 0.21)); if (!(netoOp > 0) || x.neto <= netoOp * 1.2) return null;
+    return { pe, aj: pe * x.neto / netoOp, exc: 1 - netoOp / x.neto };
+  },
   barata(t, d = Fund.de(t)) {
-    const pe = Fund.pe(t, d);
+    const aj0 = Fund.peAj(t, d); const pe = aj0 ? aj0.aj : Fund.pe(t, d);
     if (!d || !(pe > 0) || !(d.peMediana > 0)) return null;
     const desc = 1 - pe / d.peMediana; if (desc < 0.2) return null;
     if (d.peN != null && d.peN < 7) return null;  // poca historia (GEV): la mediana no dice nada
@@ -1349,7 +1361,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 11,
+  VERSION: 12,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)

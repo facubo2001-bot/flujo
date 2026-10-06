@@ -1525,7 +1525,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610062155';
+const BUILD = '202610062212';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2173,7 +2173,7 @@ const Fund = {
       const invertido = pat != null ? pat + deu - caj : null;
       return {
         anio: Number(d.year) || Number((d.endDate || '').slice(0, 4)), fin: (d.endDate || '').slice(0, 10), inicio: (d.startDate || '').slice(0, 10), trim: Number(d.quarter) || null,
-        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi,
+        ventas: V(ic, C.ventas), neto: V(ic, C.neto), eps: V(ic, C.eps), epsRep: V(ic, C.eps), accSig: Number(d.accSig) || null, netoComun: V(ic, ['NetIncomeLossAvailableToCommonStockholdersBasic']), operativo: opi, antesImp: pre, impuesto: imp,
         bruto: Fund.bruto(ic, opi),
         patrimonio: pat, cfo, capex: cpx != null ? Math.abs(cpx) : null,
         div: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])), dps: Fund.dps(ic, cf), recompra: (v => v != null ? Math.abs(v) : null)(V(cf, ['PaymentsForRepurchaseOfCommonStock'])),
@@ -2265,7 +2265,7 @@ const Fund = {
       const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = V(cf, C.capex); const abs = v => v != null ? Math.abs(v) : null;
       let acc = V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']); if (acc > 0 && acc < 1e5) acc *= 1e6;
       const opi = V(ic, C.operativo);
-      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), operativo: opi, bruto: Fund.bruto(ic, opi), capital: Fund.capitalTotal(bs),
+      return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), operativo: opi, antesImp: V(ic, C.antesImp), impuesto: V(ic, C.impuesto), bruto: Fund.bruto(ic, opi), capital: Fund.capitalTotal(bs),
         cfo, capex: abs(cpx), div: abs(V(cf, ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'])) ?? (Fund.dps(ic, cf) > 0 && acc > 0 ? Fund.dps(ic, cf) * acc : null), recompra: abs(V(cf, ['PaymentsForRepurchaseOfCommonStock'])), acciones: acc };
     }).sort((a, b) => a.fin.localeCompare(b.fin));
   },
@@ -2475,7 +2475,10 @@ const Fund = {
     // ultimos 12 meses para los multiplos propios (Fund.mult)
     if (u) { const T = c => Fund.ttmCampo(filas, trims, c); const ve = T('ventas'), ne = T('neto'), cfo = T('cfo'), cpx = T('capex'), dv = T('div'), rc = T('recompra');
       const qa = trims.filter(q => q.acciones > 0 && q.fin > u.fin); const acc = qa.length ? qa[qa.length - 1].acciones : u.acciones;
-      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, cfo: cfo ? cfo.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null }; }
+      d.ttm = { hasta: (ne || ve || {}).hasta || u.fin, base: ne && ne.base, ventas: ve && ve.v, neto: ne && ne.v, fcf: cfo && cpx && cfo.base === cpx.base ? cfo.v - cpx.v : null, cfo: cfo ? cfo.v : null, div: dv && dv.v, recompra: rc && rc.v, acciones: acc || null };
+      // para detectar ganancia inflada por resultados fuera del negocio (Fund.peAj): operativo y tasa de impuestos del mismo periodo que la ganancia
+      const op = T('operativo'), pre = T('antesImp'), im = T('impuesto');
+      if (ne && op && op.hasta === ne.hasta && op.base === ne.base) { d.ttm.operativo = op.v; d.ttm.tasa = pre && im && pre.hasta === ne.hasta && pre.v > 0 ? clamp(im.v / pre.v, 0, 0.6) : null; } }
     d.pxCap = state.cartera.precios[t] && state.cartera.precios[t].c || null;
     // deuda / patrimonio como TradingView: deuda total (corto + largo + leases) / patrimonio del ultimo balance (trimestral si hay)
     { const qs = trims.filter(q => q.capital && q.capital.deudaTotal != null); const ultQ = qs[qs.length - 1];
@@ -2558,8 +2561,17 @@ const Fund = {
     if (!d || !(d.pe > 0)) return null;
     const m = Fund.mult(t, d); return m.pe > 0 ? m.pe : d.pe;
   },
+  /** P/E "limpio": si la ganancia de 12 meses supera en mas de 20 % a la que deja el negocio (resultado operativo menos impuestos),
+   *  el P/E esta inflado por resultados fuera de la operacion (GOOGL, AMZN: revaluo de inversiones; ventas de activos; creditos fiscales).
+   *  Devuelve {pe, aj, exc} (exc = que parte de la ganancia no viene del negocio) o null si no aplica o no hay datos (bancos, 20-F). */
+  peAj(t, d = Fund.de(t)) {
+    const pe = Fund.pe(t, d); const x = d && d.ttm; if (!(pe > 0) || !x || !(x.neto > 0) || !(x.operativo > 0)) return null;
+    const mu = Fund.mult(t, d); if (!(mu.pe > 0) || Math.abs(mu.pe / pe - 1) > 0.02) return null;  // solo si el P/E mostrado es el propio (misma ganancia)
+    const netoOp = x.operativo * (1 - (x.tasa != null ? x.tasa : 0.21)); if (!(netoOp > 0) || x.neto <= netoOp * 1.2) return null;
+    return { pe, aj: pe * x.neto / netoOp, exc: 1 - netoOp / x.neto };
+  },
   barata(t, d = Fund.de(t)) {
-    const pe = Fund.pe(t, d);
+    const aj0 = Fund.peAj(t, d); const pe = aj0 ? aj0.aj : Fund.pe(t, d);
     if (!d || !(pe > 0) || !(d.peMediana > 0)) return null;
     const desc = 1 - pe / d.peMediana; if (desc < 0.2) return null;
     if (d.peN != null && d.peN < 7) return null;  // poca historia (GEV): la mediana no dice nada
@@ -2576,7 +2588,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 11,
+  VERSION: 12,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
@@ -5618,9 +5630,9 @@ function fundHTML(t, pos) {
       tile('Share count', pct1(d.cagrAcc5), d.cagrAcc5 == null ? '' : d.cagrAcc5 <= -0.005 ? 'pos' : d.cagrAcc5 >= 0.01 ? 'neg' : 'mid', per('acciones')),
     ]);
     const mu = Fund.mult(t, d);
-    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
-      tile('P/E', num(Fund.pe(t, d), 1), vsH(Fund.pe(t, d), d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''),
-      tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'),
+    const v = grupo('Valuation', 'Contra su propia mediana de 10 a\u00f1os: m\u00e1s bajo que su historia es verde (m\u00e1s barata), m\u00e1s alto es rojo. Un P/E con asterisco est\u00e1 inflado: m\u00e1s del 20 % de la ganancia de los \u00faltimos 12 meses no viene del negocio (reval\u00fao de inversiones, venta de activos, cr\u00e9ditos fiscales); el P/E limpio usa solo el resultado operativo despu\u00e9s de impuestos. PEG de Lynch: por debajo de 1 es barata para lo que crece. P/S, P/FCF y FCF yield se calculan con el precio de hoy y las ventas y caja libre de los \u00faltimos 12 meses de los balances (SEC). Recompra: lo que gast\u00f3 en recomprar acciones en 12 meses sobre su valor.', [
+      (aj => aj ? tile('P/E *', num(aj.pe, 1), 'mid', `<span class="warn-text">* inflado: limpio ${num(aj.aj, 1)}</span>`) : tile('P/E', num(Fund.pe(t, d), 1), vsH(Fund.pe(t, d), d.peMediana, false), d.peMediana ? `10Y med ${num(d.peMediana, 1)}` : ''))(Fund.peAj(t, d)),
+      (aj => aj && d.peg > 0 ? tile('PEG *', num(d.peg * aj.aj / aj.pe, 2), abs(d.peg * aj.aj / aj.pe, 1, 2, true), `con P/E limpio (publicado ${num(d.peg, 2)})`) : tile('PEG', num(d.peg, 2), abs(d.peg, 1, 2, true), '&lt; 1 es barata'))(Fund.peAj(t, d)),
       tile('P/S', num(mu.ps, 1), vsH(mu.ps, d.psMed, false), mu.ps != null ? (d.psMed ? `10Y med ${num(d.psMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
       tile('P/FCF', num(mu.pfcf, 1), vsH(mu.pfcf, d.pfcfMed, false), mu.pfcf != null ? (d.pfcfMed ? `10Y med ${num(d.pfcfMed, 1)}` : mu.base === 'fy' ? 'FY' : 'TTM') : ''),
       // P/CF = precio / flujo de caja operativo (el "Price to cash flow" de TradingView); P/FCF descuenta ademas las inversiones (capex)
@@ -5742,9 +5754,9 @@ const CMP_FILAS = [
   { k: 'EPS', v: d => d.cagrEps5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'eps', d.cagrEps5) },
   { k: 'Caja libre (FCF)', v: d => d.cagrFcf5, f: cmpPct, mejor: 1, sub: d => tnCmp(d, 'fcf', d.cagrFcf5) },
   { sec: 'Valuaci\u00f3n' },
-  { k: 'P/E', v: d => Fund.pe(d.ticker, d), f: cmpNum(1), mejor: -1, valido: v => v > 0 },
+  { k: 'P/E', v: d => { const aj = Fund.peAj(d.ticker, d); return aj ? aj.aj : Fund.pe(d.ticker, d); }, f: cmpNum(1), mejor: -1, valido: v => v > 0, sub: d => { const aj = Fund.peAj(d.ticker, d); return aj ? `<small class="cmp-tn ojo">* limpio<br>publicado ${String(aj.pe.toFixed(1)).replace('.', ',')}</small>` : ''; } },
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
-  { k: 'P/E vs su mediana', v: d => { const pe = Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
+  { k: 'P/E vs su mediana', v: d => { const aj = Fund.peAj(d.ticker, d); const pe = aj ? aj.aj : Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
   { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : Tec.distTxt(v, ' '), mejor: -1 },
@@ -6054,7 +6066,7 @@ function ctxPartes(pendientes = []) {
 
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
-    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)}${tnTxt(d, 'ventas')} | ${pc(d.cagrEps5)}${tnTxt(d, 'eps')} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
+    return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))}${(aj => aj ? `* (limpio ${n1(aj.aj)})` : '')(Fund.peAj(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)}${tnTxt(d, 'ventas')} | ${pc(d.cagrEps5)}${tnTxt(d, 'eps')} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
   }).join('\n');
 
 
@@ -6068,7 +6080,7 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
-| Ticker | P/E | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
+| Ticker | P/E (con * = inflado por ganancias fuera del negocio; \"limpio\" = precio / resultado operativo despu\u00e9s de impuestos) | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el export lista que tickers faltan)
       const pg = Motor.progreso(); const pend = pendientes.filter(t => !Fund.de(t)); const viejas = pendientes.filter(t => Fund.de(t));
