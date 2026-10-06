@@ -1525,7 +1525,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610020129';
+const BUILD = '202610062155';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1615,6 +1615,8 @@ const Persist = {
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
     for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
+    // lotes previos sin fecha real ("año cero"): van al último día hábil de 2025 (pedido de Facu, 6-oct)
+    if (s.cartera && Array.isArray(s.cartera.operaciones)) for (const o of s.cartera.operaciones) if (o && o.legado && o.fecha === '2026-01-02') { o.fecha = '2025-12-31'; delete o.spy; }
     if (!s.sueldos || typeof s.sueldos !== 'object' || Array.isArray(s.sueldos)) s.sueldos = {};
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
     for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];
@@ -3080,8 +3082,11 @@ const E = {
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; poolDiv += m; }
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -qFlujo * px);
       const spx = Number(o.spy) || Spy.at(o.fecha) || null;
-      flujos.push({ fecha: o.fecha, monto, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
-      if (spx && o.tipo !== 'dividendo') p.spyShares += monto / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
+      // lote previo sin fecha real ("año cero"): para medir rendimiento entra el 31-dic a lo que valía ese día, no a su costo
+      // (si entrara al costo, toda la ganancia de antes aparecería como ganada en pocos días). El costo y la ganancia en USD no cambian.
+      const sd = state.cartera.inicio; const mRet = o.legado && o.tipo === 'compra' && sd && sd.precios && sd.precios[o.ticker] && o.fecha <= sd.fecha ? q * sd.precios[o.ticker] : null;
+      flujos.push({ fecha: o.fecha, monto, montoRet: mRet, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
+      if (spx && o.tipo !== 'dividendo') p.spyShares += (mRet != null ? mRet : monto) / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
       p.flujoNeto += monto;
     }
     const mep = Number(state.settings.tc) || 0, ccl = Number(state.settings.ccl) || mep;
@@ -3335,7 +3340,7 @@ const E = {
     if (modo !== 'inicio' && D.daysBetween(objetivo, k.primeraOp) > 15) return { disponible: false, modo, objetivo, masLargo: true, motivo: `Tu historia arranca el ${D.fmt(k.primeraOp, { year: true })}: este rango es igual a Todo.` };
     if (modo === 'inicio' || objetivo <= k.primeraOp) {
       desde = k.primeraOp; spy0 = Spy.at(desde);
-      if (k.legados) nota = `${k.legados} lote${k.legados > 1 ? 's' : ''} previo${k.legados > 1 ? 's' : ''} sin fecha real de compra (entran el 2/1/26): corregí la fecha tocando la operación para afinar esta comparación.`;
+      if (k.legados) nota = `${k.legados} lote${k.legados > 1 ? 's' : ''} previo${k.legados > 1 ? 's' : ''} sin fecha real de compra: cuentan desde el 31/12/25 a lo que valían ese día (año cero).`;
     } else {
       const val = E.valuacionEn(k, objetivo);
       if (!val || D.daysBetween(val.fecha, objetivo) > tolerancia) return { disponible: false, modo, objetivo, motivo: `Todavía no hay una valuación guardada cerca del ${D.fmt(objetivo, { year: true })}. La app guarda una por día hábil cuando trae precios: este rango se habilita solo.` };
@@ -3344,7 +3349,8 @@ const E = {
     }
     if (!spy0 || !spyHoy) return { disponible: false, modo, motivo: 'Falta la cotización de SPY.' };
     // precio contra precio: los dividendos (tuyos y del S&P) quedan afuera de esta comparación; el rendimiento total con dividendos vive en el resumen y en cada posición
-    const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && !esInicial({ fecha: f.fecha, legado: f.legado }));
+    const aRet = f => f.montoRet != null ? { ...f, monto: f.montoRet } : f;
+    const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && !esInicial({ fecha: f.fecha, legado: f.legado })).map(aRet);
     // la sombra reinvierte los dividendos de SPY (S&P 500 total return): cada lote de acciones sombra crece por las ex-fechas posteriores a su entrada
     const S = S0 * Spy.factor(desde, hoy) + sum(fl.map(f => f.spy ? f.monto / f.spy * Spy.factor(f.fecha, hoy) : 0));
     const sombraValor = S * spyHoy;
@@ -3353,7 +3359,7 @@ const E = {
     const cfs = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...fl.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
     const tirReal = k.valor != null ? E.xirr(cfs(k.valor)) : null; const tirSombra = E.xirr(cfs(sombraValor));
     // --- rendimiento CON dividendos (lo que ganó tu plata de verdad): mismos flujos + cada dividendo como cash que te entra en su fecha
-    const flD = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado }));
+    const flD = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado })).map(aRet);
     const cfsD = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...flD.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
     const tirRealDiv = k.valor != null ? E.xirr(cfsD(k.valor)) : null; const dietzRealDiv = k.valor != null ? E.dietz(V0, k.valor, flD, desde, hoy) : null;
     const dividendosVentana = sum(flD.filter(f => f.tipo === 'dividendo').map(f => -f.monto));
@@ -3372,8 +3378,8 @@ const E = {
       const vals = [{ fecha: desde, V: Vstart }];
       const seed = c.inicio;
       if (seed && seed.precios && seed.fecha > desde && seed.fecha < hoy) {
-        // valuación al 31-dic con lo que ya había entrado a la ventana ese día (los lotes previos sin fecha entran después, a su costo); se omite si falta algún precio
-        const pos0 = {}; for (const o of k.ops) if (o.tipo !== 'dividendo' && !o.legado && o.fecha <= seed.fecha) pos0[o.ticker] = (pos0[o.ticker] || 0) + (o.tipo === 'compra' ? Number(o.acciones) || 0 : -(Number(o.acciones) || 0));
+        // valuación al 31-dic con lo que ya había entrado a la ventana ese día (incluye los lotes previos sin fecha, que entran ese día a su valor); se omite si falta algún precio
+        const pos0 = {}; for (const o of k.ops) if (o.tipo !== 'dividendo' && o.fecha <= seed.fecha) pos0[o.ticker] = (pos0[o.ticker] || 0) + (o.tipo === 'compra' ? Number(o.acciones) || 0 : -(Number(o.acciones) || 0));
         let ok = true; const V = sum(Object.entries(pos0).map(([t, q]) => { if (q <= 1e-9) return 0; if (!seed.precios[t]) ok = false; return q * (seed.precios[t] || 0); }));
         if (ok && V > 0) vals.push({ fecha: seed.fecha, V });
       }
@@ -4684,7 +4690,7 @@ function viewCartera() {
   // operaciones
   const ops = k.ops.slice().reverse().slice(0, 25);
   const opMonto = o => o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0);
-  html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} · tocá para editar${k.legados ? ` · <span class="tag" style="color:var(--warn-text)">${k.legados} con fecha estimada</span>` : ''}</span></div>
+  html += `<div class="card section"><div class="card-head"><h2>Operaciones</h2><span class="hint">${k.ops.length} · tocá para editar${k.legados ? ` · <span class="tag">${k.legados} de año cero (31/12/25)</span>` : ''}</span></div>
     ${ops.map(o => `<div class="list-item op-row" data-act="edit-op" data-id="${o.id}" style="cursor:pointer"><div style="min-width:0"><b style="font-weight:500">${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'} ${esc(o.ticker)}</b>${o.legado ? ' <span class="tag" style="color:var(--warn-text)">fecha estimada</span>' : ''}${o.verif && o.verif.nivel !== 'ok' ? ` <span class="tag ${o.verif.nivel === 'block' ? 'verif-block' : 'verif-warn'}">${o.verif.nivel === 'block' ? G.no : G.warn} revisar</span>` : ''}${(o.deCaja || o.deDividendos) > 0 ? ` <span class="tag">con caja ${fmtU(o.deCaja || o.deDividendos, 0)}</span>` : ''}${o.aCaja ? ' <span class="tag">a caja</span>' : ''}${k.dupIds.has(o.id) ? ' <span class="tag verif-warn">¿duplicada?</span>' : ''}<span class="sub small muted">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` · ${o.modo === 'cedear' ? `${fmtAcc(o.cedears)} CEDEARs a $ ${fmtARS.format(o.precioCedear)} · ` : ''}${fmtAcc(o.acciones)} acc × ${fmtU(o.precio)}` : ''}</span></div><div class="row" style="gap:4px;flex:none;flex-wrap:nowrap"><span class="mono op-amt ${o.tipo === 'venta' ? 'up' : o.tipo === 'dividendo' ? 'up' : ''}">${o.tipo === 'compra' ? '−' : '+'}${fmtU(opMonto(o), 2)}</span><button class="mini-btn" data-act="del-op" data-id="${o.id}">${ICONS.trash}</button></div></div>`).join('') || emptyInline('Sin operaciones', 'Cargar', 'new-op')}
   </div>`;
   return html;
@@ -5349,7 +5355,7 @@ function formOp(pre = {}) {
     <div class="full callout" id="o-calc" style="padding:8px 12px;font-size:13px"></div>
     ${(k.caja || 0) + (pre.deCaja || 0) > 0.005 ? `<div class="full" id="o-dediv-box" ${tipo === 'compra' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-de-div" ${pre.deCaja > 0 ? 'checked' : ''}><span>Pagada con la caja <small class="muted">(dividendos y ventas: tenés ${fmtU((k.caja || 0) + (pre.deCaja || 0), 2)})</small></span></label></div>` : ''}
     <div class="full" id="o-acaja-box" ${tipo === 'venta' ? '' : 'hidden'}><label class="switch"><input type="checkbox" id="o-a-caja" ${editando ? (pre.aCaja ? 'checked' : '') : 'checked'}><span>El cobro queda en caja <small class="muted">(para pagar compras futuras)</small></span></label></div>
-    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? `${G.warn} Fecha estimada (posición previa cargada el 3-4/1/26). Poné la fecha real de compra para afinar la comparación contra el S&P.` : '', 'full')}
+    ${F.field('Fecha', `<div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn sm" data-act="set-date-op" data-id="hoy">Hoy</button><button type="button" class="btn sm" data-act="set-date-op" data-id="ayer">Ayer</button>${F.input('o-fecha', pre.fecha || D.today(), 'type="date"')}</div>`, pre.legado ? `Posición previa sin fecha real de compra: cuenta desde el 31/12/25 a lo que valía ese día (año cero). Si sabés la fecha real, cambiala.` : '', 'full')}
     ${F.field('Nota', F.input('o-nota', pre.nota || '', 'placeholder="opcional"'), '', 'full')}
     ${editando && pre.verif ? `<div class="full small muted traza"><b class="${pre.verif.nivel === 'ok' ? 'up' : 'warn-text'}">${pre.verif.nivel === 'ok' ? G.ok + ' verificada' : pre.verif.nivel === 'block' ? G.no + ' guardada con errores' : G.warn + ' con advertencias'}</b> · ${esc(Verif.trazaTxt(pre.verif))}</div>` : ''}
   </div>`;

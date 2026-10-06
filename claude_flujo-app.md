@@ -476,3 +476,8 @@ Campos: movimientos, remove, scrub, updateTarjetas, updateRecurrentes, removeRec
 1. (29-sep, PRIORITARIO) Chequeo del CAGR 5 años contra TradingView después de los arreglos de splits y años fiscales: GOOGL, NVDA, HON, TSLA, HD (EPS, ventas, ganancia, FCF).
 
 Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "Otras tenencias" (letra $600k, ONs, pesos) para cuadrar con el total de Balanz · sueldo real vs inflación (IPC INDEC) y meta de tasa de inversión por mes · fechar los 12 lotes previos · módulo impositivo (Ganancias cedular, costo FIFO) · riesgo (concentración por sector, beta) · rebalanceo contra pesos objetivo · segundo benchmark (QQQ / Merval USD) · importar tenencia de Balanz para conciliar sin tipear · 18 tickers de "Capa 2" de alertas pendientes.
+
+## Lotes previos sin fecha = "año cero" (6-oct, build 202610062155)
+- Decisión de Facu: todo lote sin fecha real de compra (`legado`) va al **31/12/2025** (último día hábil de 2025). `Persist.migrate` mueve los que estaban en 2026-01-02; es idempotente.
+- Para medir rendimiento entran ese día **a lo que valían** (precios de `cartera.inicio`), no a su costo: `montoRet` en el flujo, usado en `ventana()` y en la sombra SPY por posición. Costo, PPC y ganancia en USD no cambian.
+- Efecto medido (respaldo 27-sep): "Todo" 31,7% → 29,2% (S&P 30,4%); YTD sin cambios (ya los tomaba al 31-dic).

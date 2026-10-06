@@ -388,6 +388,8 @@ const Persist = {
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
     for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
+    // lotes previos sin fecha real ("año cero"): van al último día hábil de 2025 (pedido de Facu, 6-oct)
+    if (s.cartera && Array.isArray(s.cartera.operaciones)) for (const o of s.cartera.operaciones) if (o && o.legado && o.fecha === '2026-01-02') { o.fecha = '2025-12-31'; delete o.spy; }
     if (!s.sueldos || typeof s.sueldos !== 'object' || Array.isArray(s.sueldos)) s.sueldos = {};
     if (!s.cartera || typeof s.cartera !== 'object') s.cartera = { operaciones: [], alertas: {}, precios: {}, preciosFecha: null };
     for (const k of ['operaciones']) if (!Array.isArray(s.cartera[k])) s.cartera[k] = [];

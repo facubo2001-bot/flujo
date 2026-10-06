@@ -344,8 +344,11 @@ const E = {
       } else if (o.tipo === 'dividendo') { const m = Number(o.monto) || 0; p.dividendos += m; dividendos += m; poolDiv += m; }
       const monto = o.tipo === 'dividendo' ? -(Number(o.monto) || 0) : (o.tipo === 'compra' ? q * px : -qFlujo * px);
       const spx = Number(o.spy) || Spy.at(o.fecha) || null;
-      flujos.push({ fecha: o.fecha, monto, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
-      if (spx && o.tipo !== 'dividendo') p.spyShares += monto / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
+      // lote previo sin fecha real ("año cero"): para medir rendimiento entra el 31-dic a lo que valía ese día, no a su costo
+      // (si entrara al costo, toda la ganancia de antes aparecería como ganada en pocos días). El costo y la ganancia en USD no cambian.
+      const sd = state.cartera.inicio; const mRet = o.legado && o.tipo === 'compra' && sd && sd.precios && sd.precios[o.ticker] && o.fecha <= sd.fecha ? q * sd.precios[o.ticker] : null;
+      flujos.push({ fecha: o.fecha, monto, montoRet: mRet, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
+      if (spx && o.tipo !== 'dividendo') p.spyShares += (mRet != null ? mRet : monto) / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
       p.flujoNeto += monto;
     }
     const mep = Number(state.settings.tc) || 0, ccl = Number(state.settings.ccl) || mep;
@@ -599,7 +602,7 @@ const E = {
     if (modo !== 'inicio' && D.daysBetween(objetivo, k.primeraOp) > 15) return { disponible: false, modo, objetivo, masLargo: true, motivo: `Tu historia arranca el ${D.fmt(k.primeraOp, { year: true })}: este rango es igual a Todo.` };
     if (modo === 'inicio' || objetivo <= k.primeraOp) {
       desde = k.primeraOp; spy0 = Spy.at(desde);
-      if (k.legados) nota = `${k.legados} lote${k.legados > 1 ? 's' : ''} previo${k.legados > 1 ? 's' : ''} sin fecha real de compra (entran el 2/1/26): corregí la fecha tocando la operación para afinar esta comparación.`;
+      if (k.legados) nota = `${k.legados} lote${k.legados > 1 ? 's' : ''} previo${k.legados > 1 ? 's' : ''} sin fecha real de compra: cuentan desde el 31/12/25 a lo que valían ese día (año cero).`;
     } else {
       const val = E.valuacionEn(k, objetivo);
       if (!val || D.daysBetween(val.fecha, objetivo) > tolerancia) return { disponible: false, modo, objetivo, motivo: `Todavía no hay una valuación guardada cerca del ${D.fmt(objetivo, { year: true })}. La app guarda una por día hábil cuando trae precios: este rango se habilita solo.` };
@@ -608,7 +611,8 @@ const E = {
     }
     if (!spy0 || !spyHoy) return { disponible: false, modo, motivo: 'Falta la cotización de SPY.' };
     // precio contra precio: los dividendos (tuyos y del S&P) quedan afuera de esta comparación; el rendimiento total con dividendos vive en el resumen y en cada posición
-    const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && !esInicial({ fecha: f.fecha, legado: f.legado }));
+    const aRet = f => f.montoRet != null ? { ...f, monto: f.montoRet } : f;
+    const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && !esInicial({ fecha: f.fecha, legado: f.legado })).map(aRet);
     // la sombra reinvierte los dividendos de SPY (S&P 500 total return): cada lote de acciones sombra crece por las ex-fechas posteriores a su entrada
     const S = S0 * Spy.factor(desde, hoy) + sum(fl.map(f => f.spy ? f.monto / f.spy * Spy.factor(f.fecha, hoy) : 0));
     const sombraValor = S * spyHoy;
@@ -617,7 +621,7 @@ const E = {
     const cfs = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...fl.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
     const tirReal = k.valor != null ? E.xirr(cfs(k.valor)) : null; const tirSombra = E.xirr(cfs(sombraValor));
     // --- rendimiento CON dividendos (lo que ganó tu plata de verdad): mismos flujos + cada dividendo como cash que te entra en su fecha
-    const flD = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado }));
+    const flD = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado })).map(aRet);
     const cfsD = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...flD.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
     const tirRealDiv = k.valor != null ? E.xirr(cfsD(k.valor)) : null; const dietzRealDiv = k.valor != null ? E.dietz(V0, k.valor, flD, desde, hoy) : null;
     const dividendosVentana = sum(flD.filter(f => f.tipo === 'dividendo').map(f => -f.monto));
@@ -636,8 +640,8 @@ const E = {
       const vals = [{ fecha: desde, V: Vstart }];
       const seed = c.inicio;
       if (seed && seed.precios && seed.fecha > desde && seed.fecha < hoy) {
-        // valuación al 31-dic con lo que ya había entrado a la ventana ese día (los lotes previos sin fecha entran después, a su costo); se omite si falta algún precio
-        const pos0 = {}; for (const o of k.ops) if (o.tipo !== 'dividendo' && !o.legado && o.fecha <= seed.fecha) pos0[o.ticker] = (pos0[o.ticker] || 0) + (o.tipo === 'compra' ? Number(o.acciones) || 0 : -(Number(o.acciones) || 0));
+        // valuación al 31-dic con lo que ya había entrado a la ventana ese día (incluye los lotes previos sin fecha, que entran ese día a su valor); se omite si falta algún precio
+        const pos0 = {}; for (const o of k.ops) if (o.tipo !== 'dividendo' && o.fecha <= seed.fecha) pos0[o.ticker] = (pos0[o.ticker] || 0) + (o.tipo === 'compra' ? Number(o.acciones) || 0 : -(Number(o.acciones) || 0));
         let ok = true; const V = sum(Object.entries(pos0).map(([t, q]) => { if (q <= 1e-9) return 0; if (!seed.precios[t]) ok = false; return q * (seed.precios[t] || 0); }));
         if (ok && V > 0) vals.push({ fecha: seed.fecha, V });
       }
