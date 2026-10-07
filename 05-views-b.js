@@ -318,11 +318,13 @@ function viewCartera() {
   const conc = state.cartera.conciliacion || null;
   // composición ↔ evolución
   const modo = ui.carteraChart || 'comp';
-  const seg = `<div class="seg" style="padding:2px"><button class="${modo === 'comp' ? 'on' : ''}" data-act="cartera-chart" data-id="comp" style="padding:4px 10px;font-size:12.5px">Composición</button><button class="${modo === 'evo' ? 'on' : ''}" data-act="cartera-chart" data-id="evo" style="padding:4px 10px;font-size:12.5px">vs S&P 500</button></div>`;
+  const segB = (id, l) => `<button class="${modo === id ? 'on' : ''}" data-act="cartera-chart" data-id="${id}" style="padding:4px 9px;font-size:12.5px">${l}</button>`;
+  const seg = `<div class="seg" style="padding:2px">${segB('comp', 'Mapa')}${segB('dist', 'Grupos')}${segB('evo', 'vs S&P')}</div>`;
   let chartCard;
   if (modo === 'comp') {
-    chartCard = `<div class="card"><div class="card-head"><h2>Composición</h2>${seg}</div>${mapaCartera(k)}</div>`;
-  } else chartCard = renderEvolucion(k, seg);
+    chartCard = `<div class="card"><div class="card-head"><h2>Composici\u00f3n</h2>${seg}</div>${mapaCartera(k)}</div>`;
+  } else if (modo === 'dist') chartCard = `<div class="card"><div class="card-head"><h2>Distribuci\u00f3n</h2>${seg}</div>${distCartera(k)}</div>`;
+  else chartCard = renderEvolucion(k, seg);
   html += `<div class="grid g-12 section">
     ${chartCard}
     <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
@@ -565,6 +567,20 @@ function infoEvolucion(modo) {
 }
 
 
+/** Distribuci\u00f3n de los CEDEARs por grupo: anillo + lista con las empresas de cada grupo. Tocar una empresa cambia su grupo. */
+const DIST_COL = ['var(--accent)', 'var(--c1)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--c7)', 'var(--c8)', 'var(--c9)'];
+function distCartera(k) {
+  const d = Grupo.distribucion(k); if (!d.grupos.length) return '<div class="muted small">Sin posiciones todav\u00eda.</div>';
+  const pc = v => M.pct(v, v < 0.1 ? 1 : 0);
+  return `<div class="dist"><div class="dist-d">${Charts.donut({ slices: d.grupos.map((g, i) => ({ name: g.nombre, value: g.valor, color: DIST_COL[i % DIST_COL.length] })), size: 170, thick: 24, center: `CEDEARs|${fmtU(d.total, 0)}` })}</div>
+    <div class="dist-l">${d.grupos.map((g, i) => `<div class="dist-g"><div class="dist-h"><i style="background:${DIST_COL[i % DIST_COL.length]}"></i><span>${esc(g.nombre)}</span><b>${pc(g.pct)}</b><em>${fmtU(g.valor, 0)}</em></div>
+      <div class="dist-t">${g.items.map(x => `<button type="button" data-act="grupo-cambiar" data-id="${esc(x.t)}">${esc(x.t)} <small>${pc(x.pct)}</small></button>`).join('')}</div></div>`).join('')}</div>
+    <div class="small muted" style="margin-top:10px">Toc\u00e1 una empresa para cambiarla de grupo.</div></div>`;
+}
+function formGrupo(t) {
+  const act = Grupo.de(t);
+  Modal.open({ title: `Grupo de ${t}`, submit: '', body: `<div class="small muted" style="margin-bottom:10px">Eleg\u00ed d\u00f3nde cuenta en la distribuci\u00f3n.</div><div class="dist-pick">${Grupo.LISTA.map(g => `<button type="button" class="btn ${g === act ? 'primary' : ''}" data-act="grupo-set" data-id="${esc(t)}|${esc(g)}">${esc(g)}</button>`).join('')}</div>` });
+}
 /** tocar la card Portfolio: dona con la distribucion (antes estaba fija en la card de abajo) */
 function verDistribucion() {
   const pt = E.patrimonio(E.cartera()); if (!pt.activos.length) return;

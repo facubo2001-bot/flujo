@@ -726,6 +726,43 @@ const Finnhub = {
 /* ---------- Tier y tipo de cada ticker (A, B, C, Ciclica, Especulativa, F) ----------
  * Campo propio en la alerta (formato de cambios v3). Si no esta, se deduce de la nota ("A def", "B+ ciclica"). */
 const TIERS = ['A', 'B', 'C', 'Cíclica', 'Especulativa', 'F'];
+/** Grupos para la distribución de la cartera (la mirada de Facu, no la clasificación oficial: MELI y NU son "Emergentes"
+ *  por el país donde operan aunque sean tecnológicas). Orden: lo que eligió a mano > esta tabla > sector de Finnhub > Otros. */
+const Grupo = {
+  LISTA: ['Tecnología', 'Emergentes', 'Consumo defensivo', 'Consumo discrecional', 'Salud', 'Financieras', 'Energía e industria', 'Índices y oro', 'Otros'],
+  TABLA: {
+    'Tecnología': 'MSFT GOOGL GOOG AMZN NVDA META AAPL ADBE ASML IBM MRVL NFLX TSLA AMD AVGO TSM ORCL CRM INTC QCOM MU UBER SHOP SPOT PLTR NOW SNOW',
+    'Emergentes': 'MELI NU PBR VIST ALUA TS SATL YPF GGAL BMA PAM CEPU TGS LOMA CRESY EDN SUPV BBAR TEO DESP GLOB BABA JD PDD BIDU VALE ITUB BBD ABEV EWZ EEM FXI ARGT',
+    'Consumo defensivo': 'PEP KO COST HSY TGT WMT PG MDLZ CL KMB MO PM UL',
+    'Consumo discrecional': 'NKE HD MCD RACE SBUX DIS LOW BKNG ABNB LVMUY',
+    'Salud': 'UNH PFE JNJ LLY ABBV MRK NVO ABT TMO AMGN',
+    'Financieras': 'BRK-B MA V JPM BAC GS MS C WFC AXP PYPL BLK',
+    'Energía e industria': 'CEG HON XOM CVX GE GEV CAT DE BA LMT RTX UNP MMM',
+    'Índices y oro': 'SPY QQQ DIA IWM GLD SLV VTI VOO',
+  },
+  _idx: null,
+  porTabla(t) { if (!Grupo._idx) { Grupo._idx = {}; for (const [g, l] of Object.entries(Grupo.TABLA)) for (const x of l.split(' ')) Grupo._idx[x] = g; } return Grupo._idx[t] || null; },
+  porSector(sec) {
+    const x = normTxt(sec || ''); if (!x) return null;
+    if (/tech|software|semicond|internet|media|communic|telecom|electronic/.test(x)) return 'Tecnología';
+    if (/pharma|health|biotech|medical|life scien/.test(x)) return 'Salud';
+    if (/bank|financ|insur|asset manag/.test(x)) return 'Financieras';
+    if (/food|beverage|tobacco|household|consumer products|staples/.test(x)) return 'Consumo defensivo';
+    if (/retail|apparel|textile|hotel|restaurant|leisure|auto|luxury/.test(x)) return 'Consumo discrecional';
+    if (/energy|oil|gas|utilit|industr|machin|aerospace|metal|mining|chemic|building|transport|airline|logistic/.test(x)) return 'Energía e industria';
+    return null;
+  },
+  de(t) { const g = (state.cartera.grupos || {})[t]; if (g && Grupo.LISTA.includes(g)) return g; const f = state.cartera.fund && state.cartera.fund[t]; return Grupo.porTabla(t) || Grupo.porSector(f && f.sector) || 'Otros'; },
+  /** [{nombre, valor, pct, items:[{t, valor, pct}]}] de mayor a menor, con el valor de hoy de cada posición */
+  distribucion(k) {
+    const m = {}; let total = 0;
+    for (const p of k.posiciones) { const v = p.valor != null ? p.valor : p.costo; if (!(v > 0)) continue; const g = Grupo.de(p.ticker); (m[g] || (m[g] = { nombre: g, valor: 0, items: [] })).items.push({ t: p.ticker, valor: v }); m[g].valor += v; total += v; }
+    const gs = Object.values(m).sort((a, b) => b.valor - a.valor);
+    for (const g of gs) { g.pct = total ? g.valor / total : 0; g.items.sort((a, b) => b.valor - a.valor); for (const i of g.items) i.pct = total ? i.valor / total : 0; }
+    return { total, grupos: gs };
+  },
+};
+
 const Tier = {
   norm(x) {
     const t = normTxt(String(x || '').split('·')[0]); if (!t) return null;

@@ -487,3 +487,8 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - `Fund.peAj(t)`: si la ganancia neta de 12 meses supera en más de 20 % al resultado operativo después de impuestos (tasa efectiva del mismo período, 21 % si falta), devuelve `{pe, aj, exc}`; P/E limpio = P/E × neto / (operativo × (1 − tasa)). Sin resultado operativo (bancos, 20-F) no marca nada.
 - Se ve en: ficha (tile "P/E *" ámbar con "inflado: limpio X" y PEG recalculado), comparador (usa el limpio, con nota), export para el otro chat ("20,1* (limpio 37,5)") y `Fund.barata` (usa el limpio, así no salta como barata).
 - Con los datos de prueba marca AMZN (20,1 → 37,5), GOOGL (17 → ~35) y HON; NVDA queda justo abajo del umbral (16 %).
+
+## Distribución de la cartera por grupos (7-oct)
+- Cartera → gráfico: tercer modo "Grupos" (`distCartera`, selector Mapa / Grupos / vs S&P). Anillo + lista con % y US$ por grupo y las empresas de cada uno.
+- `Grupo` (01-core): grupos a la mirada de Facu, no GICS — MELI, NU, PBR, VIST, etc. van a "Emergentes" por país. Orden: elección manual (`state.cartera.grupos[t]`, se cambia tocando la empresa) > tabla fija > sector de Finnhub > Otros.
+- Pendiente posible: objetivo de % por grupo para "respetar algo" (Facu lo mencionó; no definió los %).

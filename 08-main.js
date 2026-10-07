@@ -148,6 +148,8 @@ const Actions = {
   'fab-calc'() { fabMenu(false); formCalc(); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
+  'grupo-cambiar'(t) { formGrupo(t); },
+  'grupo-set'(v) { const [t, g] = v.split('|'); if (!state.cartera.grupos) state.cartera.grupos = {}; state.cartera.grupos[t] = g; Persist.save(); Modal.close(); render(); },
   'cartera-info'(v) { infoEvolucion(v); },
   'cartera-ventana'(v) { const k = E.cartera(); const w = k.ventanas[v]; if (w && !w.disponible) { toast(w.motivo || 'Rango no disponible todavía', 4500); return; } ui.carteraVentana = v; render(); },
   'edit-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (o) formOp({ ...o }); },
