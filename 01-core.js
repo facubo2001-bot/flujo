@@ -964,13 +964,23 @@ const Fund = {
   /** el "año fiscal" que viene en la SEC (fy) a veces esta mal: HON etiqueto su 10-K de 2021 como 2020 (pisaba al 2020 y el CAGR
    *  a 5 anios usaba 2021), TJX cambio de convencion. Se rotula por la fecha de cierre, con la convencion del ultimo balance
    *  (HD llama 2025 al anio que cierra en feb-26). 15 dias antes del cierre: un anio que cierra el 1-ene cuenta como el anterior */
+  /** año de cada ejercicio como lo rotula TradingView: el del cierre, salvo que cierre en enero o principios de febrero, que cuenta como
+   *  el año anterior (NVDA cierra ene-26 → 2025; HD feb-26 → 2025; MSFT jun-26 → 2026). Facu, chequeo CAGR 2 (10-oct). */
   rotular(filas) {
-    const E = f => { const d = D.parse(f.fin); return d ? new Date(d.getTime() - 15 * 86400000).getFullYear() : null; };
-    const conFin = filas.filter(f => f.fin && E(f)); if (!conFin.length) return filas;
-    const ult = conFin.reduce((m, f) => (f.fin > m.fin ? f : m)); const off = ult.anio - E(ult);
-    if (Math.abs(off) > 1) return filas;
-    for (const f of conFin) f.anio = E(f) + off;
+    const E = f => { const d = D.parse(f.fin); return d ? new Date(d.getTime() - 45 * 86400000).getFullYear() : null; };
+    for (const f of filas) { const a = f.fin ? E(f) : null; if (a) f.anio = a; }
     return filas;
+  },
+  /** split posterior al último 10-K (HON 1:2 en 2026): las acciones del último trimestre lo muestran. TradingView reexpresa toda la
+   *  historia; acá también (acciones y EPS de cada año). El CAGR no cambia; sí el EPS de cada año. */
+  splitReciente(filas, trims) {
+    const u = filas[filas.length - 1]; if (!u || !(u.acciones > 0)) return 1;
+    const q = trims.filter(t => t.fin > u.fin && t.acciones > 0).pop(); if (!q) return 1;
+    const r = q.acciones / u.acciones; if (Math.abs(r - 1) < 0.15) return 1;
+    const SPL = [2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40, 50]; const k = SPL.find(x => Math.abs(r / x - 1) < 0.04) || SPL.map(x => 1 / x).find(x => Math.abs(r / x - 1) < 0.04);
+    if (!k) return 1;
+    for (const f of filas) { if (f.acciones > 0) f.acciones *= k; if (f.eps != null && f.epsCalc) f.eps /= k; }
+    return k;
   },
   /** una fila por año fiscal, de más viejo a más nuevo */
   anios(fin) {
@@ -1213,6 +1223,7 @@ const Fund = {
     if (!fin && previa && !previa.parcial) return previa;
     const m = (met && met.metric) || {}; const serie = (met && met.series && met.series.annual) || {};
     let filas = Fund.anios(fin);
+    const splitRec = Fund.splitReciente(filas, Fund.trimestres(finQ));
     // CEG: Finnhub trae los 10-K de la subsidiaria (Constellation Energy Generation LLC): ventas distintas a las de la empresa que cotiza
     const llc = (() => { const ds = (fin && fin.data || []).filter(x => x.report && x.report.bs).sort((a, b) => String(b.endDate).localeCompare(String(a.endDate))); const bs0 = ds[0] && ds[0].report.bs; if (!bs0) return false; const cs = bs0.map(x => Fund._c(x)); return !cs.includes('StockholdersEquity') && !cs.includes('StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest') && cs.some(c => /MembersEquity/.test(c)); })();
     if (llc) filas = [];
@@ -1400,7 +1411,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 13,
+  VERSION: 14,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
