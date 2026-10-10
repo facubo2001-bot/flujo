@@ -1173,3 +1173,8 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .dist-pick{display:flex;flex-direction:column;gap:8px}
 .ctx-est{margin:4px 0 2px}.ctx-est-h{font-size:12.5px;color:var(--ink-2);font-weight:600}
 .ctx-est ul.verif{border-top:0;padding-top:4px}
+.pz-ord{display:flex;flex-wrap:wrap;gap:2px 14px;margin:-2px 0 8px}
+.pz-ord button{background:none;border:0;padding:4px 0;font-size:12.5px;color:var(--ink-3);min-height:28px}
+.pz-ord button.on{color:var(--ink);font-weight:700}
+.pz-ord button i{font-style:normal;color:var(--accent)}
+.pz-cur{font-size:.72em;font-weight:600;color:var(--ink-3);margin-right:2px}

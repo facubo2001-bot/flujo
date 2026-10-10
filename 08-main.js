@@ -148,6 +148,7 @@ const Actions = {
   'fab-calc'() { fabMenu(false); formCalc(); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
+  'pz-orden'(id) { const o = state.settings.pzOrden || { k: 'valor', dir: -1 }; state.settings.pzOrden = o.k === id ? { k: id, dir: -o.dir } : { k: id, dir: id === 'az' ? 1 : -1 }; Persist.save(); render(); },
   'grupo-cambiar'(t) { formGrupo(t); },
   'grupo-set'(v) { const [t, g] = v.split('|'); if (!state.cartera.grupos) state.cartera.grupos = {}; state.cartera.grupos[t] = g; Persist.save(); Modal.close(); render(); },
   'cartera-info'(v) { infoEvolucion(v); },

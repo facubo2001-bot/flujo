@@ -508,3 +508,7 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - `ctxEstado()`: dólar, precios (por ticker según su plan), fundamentales (al día / por actualizar / faltan / sin datos en Finnhub), EMA 200, Bitcoin, valor cuota de cada fondo, inflación, zonas y tesis faltantes, control contra Balanz, lotes de año cero. Se ve en la ventana de Exportar (se rehace a medida que llegan las fichas) y va al principio del texto ("## Estado de los datos") para que Claude lo tenga en cuenta.
 - Al exportar también se baja la EMA 200 (`Tec.cargar`). Dólar, BTC y fondos ya los refrescaba `Precios.actualizar`.
 - Texto nuevo: "Ritmo de inversión y proyección" (aporte mensual, caja, patrimonio a 1/3/5/10 años con 6 %, 10 % y la TIR propia), "Historia anual de mis posiciones" (6 años de ventas, ganancia, caja libre y EPS; se omite si la ficha es vieja), todas las operaciones (antes las últimas 40), y en Fundamentales (2) márgenes promedio 5 años y medianas 10 años de P/S y P/FCF.
+
+## Posiciones: orden y signo $ (10-oct, build 202610102231)
+- Fila sutil arriba de la lista: Valor · Rendimiento · Ganado · Hoy · A-Z (`settings.pzOrden`, tocar de nuevo invierte el orden). Con "Ganado" la línea de abajo de "Tenés" muestra US$ ganados en vez del %.
+- El precio lleva un "$" chico y gris adelante (Facu: el número solo se veía raro).

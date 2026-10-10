@@ -1197,6 +1197,11 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .dist-pick{display:flex;flex-direction:column;gap:8px}
 .ctx-est{margin:4px 0 2px}.ctx-est-h{font-size:12.5px;color:var(--ink-2);font-weight:600}
 .ctx-est ul.verif{border-top:0;padding-top:4px}
+.pz-ord{display:flex;flex-wrap:wrap;gap:2px 14px;margin:-2px 0 8px}
+.pz-ord button{background:none;border:0;padding:4px 0;font-size:12.5px;color:var(--ink-3);min-height:28px}
+.pz-ord button.on{color:var(--ink);font-weight:700}
+.pz-ord button i{font-style:normal;color:var(--accent)}
+.pz-cur{font-size:.72em;font-weight:600;color:var(--ink-3);margin-right:2px}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1538,7 +1543,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610101939';
+const BUILD = '202610102231';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -4717,14 +4722,21 @@ function viewCartera() {
   html += `<div class="grid g-12 section">
     ${chartCard}
     <div class="card"><div class="card-head"><h2>Posiciones</h2><button class="btn sm" data-act="new-op">${ICONS.plus} Operación</button></div>
+      ${(() => { const o = state.settings.pzOrden || { k: 'valor', dir: -1 };
+        const op = [['valor', 'Valor'], ['rend', 'Rendimiento'], ['gan', 'Ganado'], ['hoy', 'Hoy'], ['az', 'A-Z']];
+        return `<div class="pz-ord" role="group" aria-label="Ordenar posiciones">${op.map(([id, l]) => `<button type="button" data-act="pz-orden" data-id="${id}" class="${o.k === id ? 'on' : ''}">${l}${o.k === id ? ` <i>${(id === 'az' ? o.dir > 0 : o.dir < 0) ? '\u2193' : '\u2191'}</i>` : ''}</button>`).join('')}</div>`; })()}
       <div class="pz-list"><div class="pz-cols"><span>Empresa</span><span>Precio</span><span>Ten\u00e9s</span></div>
       ${(() => {
-      const valTxt = p => fmtU(p.valor != null ? p.valor : p.costo, 0), pxTxt = p => p.precio != null ? MENOS(Number(p.precio).toLocaleString('es-AR', { minimumFractionDigits: p.precio < 100 ? 2 : 0, maximumFractionDigits: p.precio < 100 ? 2 : 0 })) : '';  // sin US$: la columna ya dice precio
-      return k.posiciones.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balanceCerca(p.ticker, true);
+      const valTxt = p => fmtU(p.valor != null ? p.valor : p.costo, 0), pxTxt = p => p.precio != null ? MENOS(Number(p.precio).toLocaleString('es-AR', { minimumFractionDigits: p.precio < 100 ? 2 : 0, maximumFractionDigits: p.precio < 100 ? 2 : 0 })) : '';  // con un $ chico adelante (Facu: el numero solo se ve raro)
+      const o = state.settings.pzOrden || { k: 'valor', dir: -1 };
+      const clave = { valor: p => p.valor != null ? p.valor : p.costo, rend: p => p.rendTotal, gan: p => p.gpTotal, hoy: p => p.dp, az: p => p.ticker }[o.k] || (p => p.valor);
+      const lista = k.posiciones.slice().sort((a, b) => { const x = clave(a), y = clave(b); if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * o.dir; });
+      const sub = p => p.gpTotal == null ? '' : o.k === 'gan' ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${p.gpTotal >= 0 ? '+' : '\u2212'}${fmtU(Math.abs(p.gpTotal), 0)}</span>` : `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>`;
+      return lista.map(p => { const avisos = []; if (conc && conc.items[p.ticker] && !conc.items[p.ticker].ok) avisos.push(`Balanz dice ${fmtAcc(conc.items[p.ticker].balanz)}`); const bal = Fund.balanceCerca(p.ticker, true);
       return `<div class="pz" data-act="pos" data-id="${esc(p.ticker)}">
         <div class="pz-l"><div class="pz-t"><b>${esc(p.ticker)}</b>${p.estado ? `<i class="pz-dot ${p.estado}" title="${p.estado}"></i>` : ''}${bal ? `<i class="pz-dot bal" title="balance en ${bal.dias} d"></i>` : ''}</div><span class="pz-s">${(Math.round(p.acciones * 100) / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 })} acc \u00b7 PPC ${MENOS(Number(p.ppc).toLocaleString('es-AR', { maximumFractionDigits: p.ppc < 100 ? 2 : 0 }))}</span></div>
-        <div class="pz-m">${p.precio != null ? `<span class="pz-px">${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '\u2014'}</span>` : `<span class="pz-px muted">${Precios.sinFuente(p.ticker) ? 'sin fuente' : 'sin precio'}</span>`}</div>
-        <div class="pz-r"><b>${esc(valTxt(p))}</b>${p.gpTotal != null ? `<span class="pz-rt ${p.gpTotal >= 0 ? 'up' : 'down'}">${pctS(p.rendTotal)}</span>` : ''}</div>
+        <div class="pz-m">${p.precio != null ? `<span class="pz-px"><small class="pz-cur">$</small>${esc(pxTxt(p))}</span><span class="pz-dp ${p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : 'flat'}">${p.dp != null ? (p.dp > 0 ? '+' : '') + MENOS(p.dp.toLocaleString('es-AR', { maximumFractionDigits: 1 })) + ' %' : '\u2014'}</span>` : `<span class="pz-px muted">${Precios.sinFuente(p.ticker) ? 'sin fuente' : 'sin precio'}</span>`}</div>
+        <div class="pz-r"><b>${esc(valTxt(p))}</b>${sub(p)}</div>
         ${avisos.length ? `<div class="pz-f warn-text">${avisos.join(' · ')}</div>` : ''}
       </div>`; }).join(''); })()}
       </div>
@@ -6711,6 +6723,7 @@ const Actions = {
   'fab-calc'() { fabMenu(false); formCalc(); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
+  'pz-orden'(id) { const o = state.settings.pzOrden || { k: 'valor', dir: -1 }; state.settings.pzOrden = o.k === id ? { k: id, dir: -o.dir } : { k: id, dir: id === 'az' ? 1 : -1 }; Persist.save(); render(); },
   'grupo-cambiar'(t) { formGrupo(t); },
   'grupo-set'(v) { const [t, g] = v.split('|'); if (!state.cartera.grupos) state.cartera.grupos = {}; state.cartera.grupos[t] = g; Persist.save(); Modal.close(); render(); },
   'cartera-info'(v) { infoEvolucion(v); },
