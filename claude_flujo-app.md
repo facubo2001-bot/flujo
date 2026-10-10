@@ -492,3 +492,7 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Cartera → gráfico: tercer modo "Grupos" (`distCartera`, selector Mapa / Grupos / vs S&P). Anillo + lista con % y US$ por grupo y las empresas de cada uno.
 - `Grupo` (01-core): grupos a la mirada de Facu, no GICS — MELI, NU, PBR, VIST, etc. van a "Emergentes" por país. Orden: elección manual (`state.cartera.grupos[t]`, se cambia tocando la empresa) > tabla fija > sector de Finnhub > Otros.
 - Pendiente posible: objetivo de % por grupo para "respetar algo" (Facu lo mencionó; no definió los %).
+
+## Chequeo CAGR ronda 2 (10-oct, build 202610101842, Fund.VERSION 13)
+- Página "Chequeo CAGR 2" (artefacto) con GOOGL, NVDA, HON, TSLA, HD: extremos de ventas, ganancia, EPS diluido y FCF que da la app (calculados con el código de la app sobre SEC del 10-oct + Finnhub de prueba; HON y TSLA solo SEC). GOOGL ya tiene EPS (2,90 → 10,81). Contrastados a mano con lo que conozco de los 10-K 2020: todos coinciden.
+- `Fund.capexPropio`: si no hay capex estándar, toma un concepto propio "Purchase…Property…Equipment" (NVDA FY2021-23 usa `nvda_PurchasesRelatedToPropertyAndEquipmentAndIntangibleAssets`, que la SEC no publica en companyfacts). Sin verificar con Finnhub real: ver si NVDA FCF deja de dar "—".

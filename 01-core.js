@@ -917,6 +917,8 @@ const Fund = {
   /** concepto de un balance SEC: primer match por nombre exacto o parcial */
   /** Finnhub manda los conceptos de los 10-K nuevos con prefijo de taxonomia ("us-gaap_Revenues", "ifrs-full_Revenue") y los viejos sin prefijo.
    *  Sin sacarlo, ningun concepto matcheaba y la ficha quedaba sin balances (o con los de 2012). */
+  /** capex con etiqueta propia de la empresa (NVDA FY2021-23: nvda_PurchasesRelatedToPropertyAndEquipmentAndIntangibleAssets): solo si no hay la estándar */
+  capexPropio(cf) { const x = (cf || []).find(y => /^Purchase.*Property.*Equipment/i.test(Fund._c(y)) && Number.isFinite(Number(y.value))); return x ? Number(x.value) : null; },
   _c(x) { return String((x && x.concept) || '').replace(/^[A-Za-z][A-Za-z0-9-]*_/, ''); },
   _v(arr, nombres) {
     if (!Array.isArray(arr)) return null;
@@ -978,7 +980,7 @@ const Fund = {
       const ic = d.report.ic || [], bs = d.report.bs || [], cf = d.report.cf || [];
       const opi = V(ic, C.operativo), imp = V(ic, C.impuesto), pre = V(ic, C.antesImp);
       const pat = V(bs, C.patrimonio), deu = V(bs, C.deuda) || 0, caj = V(bs, C.caja) || 0;
-      const cfo = V(cf, C.cfo), cpx = V(cf, C.capex);
+      const cfo = V(cf, C.cfo), cpx = (V(cf, C.capex) ?? Fund.capexPropio(cf));
       const tasa = pre && imp != null && pre > 0 ? clamp(imp / pre, 0, 0.6) : 0.21;
       const invertido = pat != null ? pat + deu - caj : null;
       return {
@@ -1072,7 +1074,7 @@ const Fund = {
       const ic = d.report.ic || [], bs = d.report.bs || [];
       const fin = String(d.endDate).slice(0, 10), ini = String(d.startDate || '').slice(0, 10);
       const meses = ini && D.parse(ini) ? Math.round((D.parse(fin) - D.parse(ini)) / (30.4 * 86400000)) : null;
-      const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = V(cf, C.capex); const abs = v => v != null ? Math.abs(v) : null;
+      const cf = d.report.cf || ic; const cfo = V(cf, C.cfo), cpx = (V(cf, C.capex) ?? Fund.capexPropio(cf)); const abs = v => v != null ? Math.abs(v) : null;
       let acc = V(ic, ['WeightedAverageNumberOfDilutedSharesOutstanding', 'WeightedAverageNumberOfSharesOutstandingBasic']); if (acc > 0 && acc < 1e5) acc *= 1e6;
       const opi = V(ic, C.operativo);
       return { fin, ini, meses, anio: Number(d.year) || Number(fin.slice(0, 4)), trim: Number(d.quarter) || null, neto: V(ic, C.neto), ventas: V(ic, C.ventas), operativo: opi, antesImp: V(ic, C.antesImp), impuesto: V(ic, C.impuesto), bruto: Fund.bruto(ic, opi), capital: Fund.capitalTotal(bs),
@@ -1359,7 +1361,7 @@ const Fund = {
     const s = encodeURIComponent(Precios.simbolo(t)); const hoy = D.today();
     const get = async q => { try { const r = await fetch(`https://finnhub.io/api/v1/${q}&token=${encodeURIComponent(key)}`, { cache: 'no-store' }); if (!r.ok) return { error: r.status }; return await r.json(); } catch (e) { return { error: String(e) }; } };
     const [met, fin, finQ] = await Promise.all([get(`stock/metric?symbol=${s}&metric=all`), get(`stock/financials-reported?symbol=${s}&freq=annual&from=${D.addDays(hoy, -2200)}&to=${hoy}`), get(`stock/financials-reported?symbol=${s}&freq=quarterly&from=${D.addDays(hoy, -800)}&to=${hoy}`)]);
-    const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
+    const recorte = fin => fin && Array.isArray(fin.data) ? fin.data.map(d => ({ year: d.year, quarter: d.quarter, form: d.form, startDate: d.startDate, endDate: d.endDate, ic: (d.report && d.report.ic || []).filter(x => /Revenue|Sales|NetIncome|ProfitLoss|OperatingIncome|EarningsPerShare|IncomeTax|Shares/.test(x.concept)).map(x => [x.concept, x.value]), bs: (d.report && d.report.bs || []).filter(x => /Equity|Debt|Borrow|CommercialPaper|Lease|Cash|Minority|Noncontrolling/.test(x.concept)).map(x => [x.concept, x.value]), cf: (d.report && d.report.cf || []).filter(x => /OperatingActivities|PaymentsToAcquire|Purchase|Capital/.test(x.concept)).map(x => [x.concept, x.value]) })) : fin;
     return { ticker: t, fecha: hoy, calculado: Fund.de(t), metric: met && met.metric, seriesAnual: met && met.series && met.series.annual ? Object.fromEntries(Object.entries(met.series.annual).filter(([k]) => /pe|roi|roe|eps/i.test(k))) : null, anual: recorte(fin), trimestral: recorte(finQ) };
   },
   /** Barata contra su propia historia (Facu: "GOOGL con P/E 17 contra su historia, como no lo vimos"):
@@ -1398,7 +1400,7 @@ const Fund = {
   yieldDe(t, d = Fund.de(t)) { if (!d) return null; const px = state.cartera.precios[t] && state.cartera.precios[t].c; if ((d.v || 1) >= 5) { const dps = d.divAnual || (d.ttm && d.ttm.div > 0 && d.ttm.acciones > 0 && (!d.moneda || d.moneda === 'USD') ? d.ttm.div / d.ttm.acciones : null); return dps && px ? dps / px : null; } return d.yieldDiv || null; },
   /** cuanto dura una ficha: tenencias y A 7 dias, B 30, C / Ciclica / Especulativa 90 */
   /** sube cuando cambia como se arma la ficha: las anteriores se rehacen solas */
-  VERSION: 12,
+  VERSION: 13,
   ttl(t, tengo) { const tier = Tier.de(t); return (tengo || tier === 'A' ? 7 : tier === 'B' ? 30 : 90) * 86400000; },
   sinDatos(t) { const x = (state.cartera.fundSinDatos || {})[t]; return !!(x && Date.now() - x < 30 * 86400000); },
   /** fichas pendientes, en orden: cerca de zona, tenencias, A, B, C/Ciclica, Especulativa. Vence por tiempo (segun tier)
