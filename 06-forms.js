@@ -932,7 +932,7 @@ const Intercambio = {
     const realCerr = sum(k.cerradas.map(p => p.realizado)), realParc = sum(parciales.map(p => p.realizado));
     const ventasDe = t => k.ops.filter(o => o.tipo === 'venta' && o.ticker === t).map(o => `${o.fecha} ${fmtAcc(o.acciones)} acc a ${n(o.precio)}`).join('; ');
     const cerrRows = k.cerradas.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${n(p.dividendos)} | ${p.alfaUSD != null ? n(p.alfaUSD) : ''} |`).join('\n');
-    const ops = k.ops.slice().reverse().slice(0, 40).map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
+    const ops = k.ops.slice().reverse().map(o => `| ${o.fecha} | ${o.tipo} | ${o.ticker} | ${o.tipo === 'dividendo' ? '' : fmtAcc(o.acciones)} | ${o.tipo === 'dividendo' ? n(o.monto) : n(o.precio)} | ${o.modo === 'cedear' ? `${o.cedears} CEDEARs a $${fmtARS.format(o.precioCedear)} (CCL ${fmtARS.format(o.ccl)})` : ''}${o.legado ? 'fecha estimada' : ''} |`).join('\n');
     const json = {
       tipo: 'gestor-gastos-cartera', version: Intercambio.VERSION, generado: hora.toISOString(), app: BUILD,
       dolar: { mep: k.mep, ccl: k.ccl, spy: k.spyHoy, preciosAl: k.preciosFecha },
@@ -948,6 +948,10 @@ const Intercambio = {
     const md = `# Cartera y mercado de ${esc(s.nombre || 'mi cartera')} \u2014 ${c.cuando}
 
 App "Gestor de gastos" v${BUILD}. ${c.estado}
+
+## Estado de los datos (qué está al día y qué no)
+${ctxEstado().map(e => `- ${e.nivel === 'ok' ? 'AL DÍA' : e.nivel === 'viejo' ? 'VIEJO' : 'FALTA'} · **${e.que}**: ${e.det}`).join('\n')}
+Si algo dice VIEJO o FALTA, tenelo en cuenta antes de concluir y pedime el dato si lo necesitás.
 
 ${c.verdad}
 
@@ -980,12 +984,20 @@ Contra alternativas con la misma plata desde cada suscripci\u00f3n: Mercado Pago
 |---|---|---|
 ${r.lotes.map(l => `| ${l.fecha} | ${l.tipo === 'rescate' ? 'rescate' : 'suscripci\u00f3n'} | ${fmtARS.format(Math.round(l.monto))} |`).join('\n')}`; }).join('\n')}
 
-`; })()}## Posiciones cerradas
+`; })()}${(() => { // ritmo de ahorro y proyeccion (la misma cuenta que la tarjeta de Cartera)
+      const pt = E.patrimonio(k); const v0 = pt.total || k.valor || 0; if (!(v0 > 0)) return '';
+      const ap = E.aporteMensual(k); const aporte = s.proyAporte != null ? Number(s.proyAporte) : Math.max(0, Math.round(ap.mensual)); const tir = k.ventanas.inicio && k.ventanas.inicio.disponible ? k.ventanas.inicio.rend.tirRealDiv : null;
+      const esc3 = [['prudente 6 %', 0.06], ['S&P 500 histórico 10 %', 0.10], ...(tir != null && tir > 0 ? [[`mi ritmo ${pct(tir)}`, tir]] : [])];
+      return `## Ritmo de inversión y proyección\n- Plata nueva invertida por mes (promedio desde ${ap.desde}): **US$ ${n(ap.mensual)}** (CEDEARs US$ ${n(ap.ced)} + fondo US$ ${n(ap.fondo)} en ${ap.meses.toFixed(1)} meses; dividendos y reinversiones no cuentan)${s.proyAporte != null ? ` · para proyectar uso US$ ${n(aporte)} (fijado a mano)` : ''}\n- Caja en Balanz sin invertir: US$ ${n(k.caja || 0)} (dividendos US$ ${n(k.cajaDiv || 0)} + ventas US$ ${n(k.cajaVentas || 0)})\n| Patrimonio estimado (US$) | ${esc3.map(e => e[0]).join(' | ')} |\n|---|${esc3.map(() => '---').join('|')}|\n${[1, 3, 5, 10].map(a => `| en ${a} año${a > 1 ? 's' : ''} | ${esc3.map(e => n(E.proyectar(v0, aporte, e[1], a)[a])).join(' | ')} |`).join('\n')}\n\n`; })()}${(() => { // historia anual de lo que tengo: ventas, ganancia, caja libre y EPS de cada ejercicio (como TradingView)
+      const rows = []; const mm = v => v == null || !Number.isFinite(v) ? '—' : Math.round(v / 1e6).toLocaleString('es-AR'); const e2 = v => v == null || !Number.isFinite(v) ? '—' : v.toFixed(2);
+      for (const p of k.posiciones) { const d = Fund.de(p.ticker); if (!d || !d.filas || !d.filas.length) continue; const fs = d.filas.slice(-6); if (fs[fs.length - 1].anio < Number(D.today().slice(0, 4)) - 2) continue;  // ficha vieja: mejor nada que años equivocados
+        rows.push(`| ${p.ticker} | ${fs.map(f => f.anio).join(' · ')} | ${fs.map(f => mm(f.ventas)).join(' · ')} | ${fs.map(f => mm(f.neto)).join(' · ')} | ${fs.map(f => mm(f.fcf)).join(' · ')} | ${fs.map(f => e2(f.eps)).join(' · ')} |`); }
+      return rows.length ? `## Historia anual de mis posiciones (US$ millones; EPS diluido ajustado por splits; años como TradingView)\n| Ticker | Años | Ventas | Ganancia neta | Caja libre | EPS |\n|---|---|---|---|---|---|\n${rows.join('\n')}\n\n` : ''; })()}## Posiciones cerradas
 | Ticker | Realizado USD | Dividendos | Alfa vs SPY |
 |---|---|---|---|
 ${cerrRows || '| \u2014 | | | |'}
 ${parciales.length ? `\n## Ventas parciales de posiciones abiertas (realizado US$ ${n(realParc)})\n| Ticker | Realizado USD | Ventas |\n|---|---|---|\n${parciales.map(p => `| ${p.ticker} | ${n(p.realizado)} | ${ventasDe(p.ticker)} |`).join('\n')}\n` : ''}
-## \u00daltimas operaciones (${Math.min(40, k.ops.length)} de ${k.ops.length})
+## Todas las operaciones (${k.ops.length})
 | Fecha | Tipo | Ticker | Acciones | Precio USD (o monto) | Detalle |
 |---|---|---|---|---|---|
 ${ops}
@@ -1077,6 +1089,7 @@ async function ctxActualizar(paso) {
   const t0 = Date.now(); ui.ctxT0 = t0;
   // tenencias, tier A y lo cerca de zona se traen si o si; el resto solo si esta vencido (todo pasa por la cola de Finnhub)
   const okPrecios = await Precios.actualizar(true, 'rapidos');
+  try { await Tec.cargar(); } catch (e) {}
   const viejos = () => Precios.plan().filter(x => x.edad >= x.cada).map(x => x.t);
   // las fichas las completa el motor en segundo plano; el texto se rehace solo a medida que llegan
   Motor.arrancar();
@@ -1111,9 +1124,9 @@ function ctxPartes(pendientes = []) {
 
   // segunda tabla: lo que la ficha muestra y la primera no (crecimiento de ganancia y caja, márgenes, balance, riesgo)
   const filasF2 = todas.map(p => {
-    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto' : 'sin datos todav\u00eda'} | | | | | | | | |`;
+    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto' : 'sin datos todav\u00eda'} | | | | | | | | | | |`;
     const mu = Fund.mult(p.ticker, d);
-    return `| ${p.ticker} | ${pc(d.cagrNeto5)}${tnTxt(d, 'neto')} | ${pc(d.cagrFcf5)}${tnTxt(d, 'fcf')} | ${pc(d.cagrAcc5)} | ${pc(d.margenBruto)} \u00b7 ${pc(d.margenOper)} | ${n2(d.deudaPat)} | ${n2(d.currentRatio)} | ${d.interesCob != null ? n1(d.interesCob) + '\u00d7' : '\u2014'} | ${pc(mu.fcfY)} \u00b7 ${pc(mu.payout)} \u00b7 ${pc(mu.recompras)} | ${pc(d.divCrec5)} | ${n2(d.beta)} |`;
+    return `| ${p.ticker} | ${pc(d.cagrNeto5)}${tnTxt(d, 'neto')} | ${pc(d.cagrFcf5)}${tnTxt(d, 'fcf')} | ${pc(d.cagrAcc5)} | ${pc(d.margenBruto)} \u00b7 ${pc(d.margenOper)}${d.margenOper5 != null ? ` (prom. 5 a: ${pc(d.margenBruto5)} \u00b7 ${pc(d.margenOper5)})` : ''} | ${n1(d.psMed)} \u00b7 ${n1(d.pfcfMed)} | ${n2(d.deudaPat)} | ${n2(d.currentRatio)} | ${d.interesCob != null ? n1(d.interesCob) + '\u00d7' : '\u2014'} | ${pc(mu.fcfY)} \u00b7 ${pc(mu.payout)} \u00b7 ${pc(mu.recompras)} | ${pc(d.divCrec5)} | ${n2(d.beta)} |`;
   }).join('\n');
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
@@ -1131,8 +1144,8 @@ function ctxPartes(pendientes = []) {
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
     tablaF2: `## Fundamentales (2): crecimiento, m\u00e1rgenes y balance
-| Ticker | Ganancia neta CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Acciones en circulaci\u00f3n CAGR 5 a\u00f1os (negativo = recompra) | Margen bruto \u00b7 operativo | Deuda / patrimonio | Liquidez corriente | Cobertura de intereses (EBIT / inter\u00e9s) | FCF yield \u00b7 payout \u00b7 recompras 12 m sobre valor | Dividendo CAGR 5 a\u00f1os | Beta |
-|---|---|---|---|---|---|---|---|---|---|---|
+| Ticker | Ganancia neta CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Acciones en circulaci\u00f3n CAGR 5 a\u00f1os (negativo = recompra) | Margen bruto \u00b7 operativo (prom. 5 a\u00f1os) | Mediana 10 a\u00f1os de P/S \u00b7 P/FCF | Deuda / patrimonio | Liquidez corriente | Cobertura de intereses (EBIT / inter\u00e9s) | FCF yield \u00b7 payout \u00b7 recompras 12 m sobre valor | Dividendo CAGR 5 a\u00f1os | Beta |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasF2}${(() => { const dg = Grupo.distribucion(k); return dg.grupos.length ? `\n\n**Distribuci\u00f3n de los CEDEARs por grupo** (mi agrupaci\u00f3n; Emergentes = por pa\u00eds): ${dg.grupos.map(g => `${g.nombre} ${pc(g.pct)} (${g.items.map(i => i.t).join(', ')})`).join(' \u00b7 ')}` : ''; })()}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
 | Ticker | P/E (con * = inflado por ganancias fuera del negocio; \"limpio\" = precio / resultado operativo despu\u00e9s de impuestos) | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
@@ -1153,6 +1166,45 @@ ${filasF}${(() => { // lo que falta, para que Claude no suponga datos (Facu: el 
 }
 
 /** cuantas fichas utiles hay (las parciales no cuentan) y cuales faltan */
+/** Qué está al día, qué está viejo y qué falta antes de exportar (Facu: "que me diga esto está actualizado, esto no, esto falta").
+ *  [{nivel:'ok'|'viejo'|'falta', que, det}] */
+function ctxEstado() {
+  const k = E.cartera(); const s = state.settings; const out = []; const add = (nivel, que, det) => out.push({ nivel, que, det });
+  const edad = ms => ms ? (Date.now() - ms) / 60000 : Infinity; const hace = m => m === Infinity ? 'sin dato' : m < 2 ? 'recién' : m < 60 ? `hace ${Math.round(m)} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
+  const ny = mercadoNY();
+  // dólar
+  const mc = edad(s.cclHora ? new Date(s.cclHora).getTime() : 0); add(mc < 180 || (!ny.habil && mc < 4320) ? 'ok' : 'viejo', 'Dólar CCL y MEP', `CCL $ ${fmtARS.format(k.ccl || 0)} · ${hace(mc)}`);
+  // precios
+  const plan = Precios.plan(); const viejos = plan.filter(x => x.edad >= x.cada && !Precios.sinFuente(x.t)).map(x => x.t); const sinPx = [...k.posiciones, ...k.watch].filter(p => p.precio == null).map(p => p.ticker);
+  const pf = k.preciosFecha ? new Date(k.preciosFecha).getTime() : 0;
+  if (sinPx.length) add('falta', 'Precios', `sin precio: ${sinPx.join(', ')}`);
+  if (viejos.length) add('viejo', 'Precios', `${plan.length - viejos.length} de ${plan.length} al día · por actualizar: ${viejos.join(', ')}`);
+  if (!sinPx.length && !viejos.length) add('ok', 'Precios', `${plan.length} tickers · último ${hace(edad(pf))}${ny.abierto ? '' : ' (NY cerrado: cierre del día)'}`);
+  // fundamentales
+  const ts = [...k.posiciones, ...k.watch].map(p => p.ticker); const pend = new Set(Fund.pendientes());
+  const faltan = ts.filter(t => !Fund.de(t) && !Fund.sinDatos(t)); const viejas = ts.filter(t => Fund.de(t) && pend.has(t)); const sinD = ts.filter(t => Fund.sinDatos(t));
+  const alDia = ts.length - faltan.length - viejas.length - sinD.length;
+  add(faltan.length ? 'falta' : viejas.length ? 'viejo' : 'ok', 'Fundamentales', `${alDia} de ${ts.length} al día${viejas.length ? ` · por actualizar: ${viejas.join(', ')}` : ''}${faltan.length ? ` · faltan: ${faltan.join(', ')}` : ''}`);
+  if (sinD.length) add('falta', 'Sin fundamentales en Finnhub', `${sinD.join(', ')} (OTC o Brasil: no hay de dónde sacarlos)`);
+  // EMA 200
+  { const f = Tec.datos ? Object.values(Tec.datos).map(x => x && x.fecha).filter(Boolean).sort().pop() : null; add(!f ? 'falta' : D.daysBetween(f, D.today()) <= 4 ? 'ok' : 'viejo', 'EMA 200', f ? `serie al ${D.fmt(f)}` : 'sin cargar (se baja una vez por día)'); }
+  // bitcoin y fondos
+  if ((state.cartera.activos || []).some(a => a.tipo === 'btc')) { const b = state.cartera.btc; const m = edad(b && b.t); add(m < 180 ? 'ok' : 'viejo', 'Bitcoin', b ? `US$ ${fmtARS.format(Math.round(b.c))} · ${hace(m)}` : 'sin precio'); }
+  for (const a of (state.cartera.activos || []).filter(a => a.tipo === 'fci' && a.slug)) { const u = AD.vcUltimo(a.slug); add(!u ? 'falta' : D.daysBetween(u.fecha, D.today()) <= 4 ? 'ok' : 'viejo', `Fondo ${a.nombre || a.slug}`, u ? `valor cuota al ${D.fmt(u.fecha)}` : 'sin valor cuota'); }
+  { const ipc = Object.keys(AD.box().ipc || {}).sort().pop(); if ((state.cartera.activos || []).some(a => a.tipo === 'fci')) add(!ipc ? 'falta' : ipc >= D.addMonths(D.thisMonth(), -2) ? 'ok' : 'viejo', 'Inflación (INDEC)', ipc ? `último dato ${ipc}` : 'sin dato'); }
+  // lo que depende de vos
+  const sinZona = [...k.posiciones, ...k.watch].filter(p => !(p.alerta && (p.alerta.mirala || p.alerta.urgente))).map(p => p.ticker);
+  if (sinZona.length) add('falta', 'Zonas de compra', `sin zona: ${sinZona.join(', ')}`);
+  const sinTesis = k.posiciones.filter(p => !(p.alerta && (p.alerta.desc || p.alerta.nota))).map(p => p.ticker);
+  if (sinTesis.length) add('falta', 'Tesis', `posiciones sin tesis: ${sinTesis.join(', ')}`);
+  const cc = state.cartera.conciliacion; add(!cc ? 'falta' : D.daysBetween(cc.fecha, D.today()) <= 31 ? 'ok' : 'viejo', 'Control contra Balanz', cc ? `último ${D.fmt(cc.fecha)}${cc.dif ? ` · ${cc.dif} con diferencias` : ''}` : 'nunca hecho');
+  if (k.legados) add('ok', 'Lotes sin fecha real', `${k.legados} cuentan desde el 31/12/25 (año cero)`);
+  return out;
+}
+function ctxEstadoHTML() {
+  const es = ctxEstado(); const ic = { ok: G.ok, viejo: G.warn, falta: G.no }; const n = { ok: 0, viejo: 0, falta: 0 }; es.forEach(e => n[e.nivel]++);
+  return `<div class="ctx-est"><div class="ctx-est-h">${n.ok} al día · ${n.viejo} viejos · ${n.falta} faltan</div><ul class="verif">${es.map(e => `<li class="${e.nivel === 'ok' ? 'ok' : e.nivel === 'viejo' ? 'warn' : 'block'}"><i>${ic[e.nivel]}</i><span><b>${esc(e.que)}</b> · ${esc(e.det)}</span></li>`).join('')}</ul></div>`;
+}
 function ctxCobertura() {
   const k = E.cartera(); const ts = [...k.posiciones, ...k.watch].map(p => p.ticker);
   const pend = new Set(Fund.pendientes()); const faltan = ts.filter(t => pend.has(t) || (!Fund.de(t) && !Fund.sinDatos(t)));
@@ -1179,10 +1231,9 @@ function formExportar() {
     const puedeCompartir = !!navigator.share;
     box.innerHTML = `
       <div class="hoja"><div class="f-sec">
-        <div class="r"><span class="k">Precios</span><span class="v ${okPrecios && !preciosViejos.length ? '' : 'mid'}">${!okPrecios ? 'sin actualizar' : preciosViejos.length ? `${Precios.tickers().length - preciosViejos.length} de ${Precios.tickers().length}` : minutos != null && minutos < 2 ? 'reci\u00e9n' : `hace ${minutos} min`}</span>${sinClave ? '<span class="por">Sin clave de Finnhub: el texto usa los \u00faltimos precios guardados.</span>' : !okPrecios ? '<span class="por">No se pudo consultar Finnhub: el texto usa los \u00faltimos precios guardados, cada uno con su hora.</span>' : preciosViejos.length ? `<span class="por">No se pudo actualizar ${preciosViejos.join(', ')}: en el texto van con la hora de su \u00faltimo precio, para que Claude no los tome como de hoy.</span>` : ''}</div>
         <div class="r"><span class="k">Empresas</span><span class="v">${k.posiciones.length + k.watch.length}</span><span class="por">${k.posiciones.length} en cartera \u00b7 ${k.watch.length} en watchlist \u00b7 ${k.ops.length} operaciones</span></div>
-        <div class="r"><span class="k">Con fundamentales</span><span class="v" id="ctx-fund-v"></span><span class="por" id="ctx-fund-por"></span></div>
       </div></div>
+      <div id="ctx-estado">${ctxEstadoHTML()}</div>
       <div class="row" style="gap:8px">${puedeCompartir ? '<button type="button" class="btn primary" data-act="export-share">Compartir archivo</button>' : ''}<button type="button" class="btn ${puedeCompartir ? '' : 'primary'}" data-act="export-copy">Copiar texto</button></div>
       <p class="ob-nota aclara" style="margin-top:0">Pegalo o adjuntalo al empezar un chat del proyecto Inversiones: sirve para preguntar por una acci\u00f3n o para la revisi\u00f3n completa. Si Claude cambia niveles, us\u00e1 "Cargar actualizaciones".</p>
       <textarea class="input textarea" id="export-md" readonly style="min-height:180px">${esc(md)}</textarea>`;
@@ -1192,7 +1243,7 @@ function formExportar() {
 }
 window.addEventListener('fund-listo', () => {
   const t = $('#export-md'); if (!t) return;
-  ctxResumenFund(); t.value = Intercambio.exportar(Fund.pendientes());
+  ctxResumenFund(); t.value = Intercambio.exportar(Fund.pendientes()); const e = $('#ctx-estado'); if (e) e.innerHTML = ctxEstadoHTML();
 });
 
 /* Calendario de balances: proximos earnings de todo lo que se sigue (cartera + watchlist), por fecha.

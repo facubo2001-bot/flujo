@@ -502,3 +502,9 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 
 ## Export: segunda tabla de fundamentales (10-oct, build 202610101926)
 - Facu preguntó si el export trae todos los fundamentales: no traía todo lo de la ficha. Nueva tabla "Fundamentales (2)": CAGR 5a de ganancia neta y caja libre (con tendencia), acciones en circulación, márgenes bruto/operativo, deuda/patrimonio, liquidez corriente, cobertura de intereses, FCF yield · payout · recompras, CAGR del dividendo, beta. Abajo, la distribución por grupos.
+
+## Export completo + estado de los datos (10-oct, build 202610101939)
+- Pedido de Facu: que el export lleve todo (enriquece el análisis en el chat de Inversiones) y que avise qué está al día, qué está viejo y qué falta.
+- `ctxEstado()`: dólar, precios (por ticker según su plan), fundamentales (al día / por actualizar / faltan / sin datos en Finnhub), EMA 200, Bitcoin, valor cuota de cada fondo, inflación, zonas y tesis faltantes, control contra Balanz, lotes de año cero. Se ve en la ventana de Exportar (se rehace a medida que llegan las fichas) y va al principio del texto ("## Estado de los datos") para que Claude lo tenga en cuenta.
+- Al exportar también se baja la EMA 200 (`Tec.cargar`). Dólar, BTC y fondos ya los refrescaba `Precios.actualizar`.
+- Texto nuevo: "Ritmo de inversión y proyección" (aporte mensual, caja, patrimonio a 1/3/5/10 años con 6 %, 10 % y la TIR propia), "Historia anual de mis posiciones" (6 años de ventas, ganancia, caja libre y EPS; se omite si la ficha es vieja), todas las operaciones (antes las últimas 40), y en Fundamentales (2) márgenes promedio 5 años y medianas 10 años de P/S y P/FCF.
