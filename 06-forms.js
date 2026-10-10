@@ -965,6 +965,8 @@ ${tesis || '\u2014'}
 
 ${c.tablaF}
 
+${c.tablaF2}
+
 ${(() => { const pt = E.patrimonio(k); if (!pt.activos.length) return ''; return `## Toda mi plata (patrimonio)
 Total **US$ ${n(pt.total)}** \u00b7 ${pt.grupos.map(g => `${g.nombre} ${pct(g.valor / pt.total)}`).join(' \u00b7 ')} \u00b7 reserva (efectivo + fondos) contra los CEDEARs ${pt.reservaPct != null ? pct(pt.reservaPct) : 's/d'} (objetivo ${pct(pt.reservaObjetivo)}). Pesos convertidos al CCL $ ${fmtARS.format(pt.mep || 0)}.
 | Activo | Tipo | Valor USD | Detalle |
@@ -1087,7 +1089,7 @@ function ctxPartes(pendientes = []) {
   const k = E.cartera(); const s = state.settings; const ahora = new Date(); const ny = mercadoNY();
   const n2 = v => v == null || !Number.isFinite(v) ? '\u2014' : Number(v).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const n1 = v => v == null || !Number.isFinite(v) ? '\u2014' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 });
-  const pc = v => v == null || !Number.isFinite(v) ? '\u2014' : `${(v * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+  const pc = v => v == null || !Number.isFinite(v) ? '\u2014' : `${(Math.abs(v) < 0.0005 ? 0 : v * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
   const pcS = v => v == null || !Number.isFinite(v) ? '\u2014' : `${v > 0 ? '+' : ''}${(v).toLocaleString('es-AR', { maximumFractionDigits: 2 })} %`;
   const ars = v => v == null || !Number.isFinite(v) ? '\u2014' : `$ ${fmtARS.format(Math.round(v))}`;
   const hhmm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
@@ -1107,6 +1109,12 @@ function ctxPartes(pendientes = []) {
     return `| ${p.ticker} | ${al.desc ? al.desc.replace(/\|/g, '/') : '\u2014'} | ${p.tengo ? `tengo \u00b7 ${pc(p.peso)}` : 'watchlist'} | ${pxTxt} | ${p.dp != null && !viejo ? pcS(p.dp) : '\u2014'} | ${p.tengo ? n2(p.ppc) : '\u2014'} | ${p.tengo && p.valor != null ? `${n2(p.valor)}${p.alfaUSD != null ? ` (${p.alfaUSD >= 0 ? '+' : '\u2212'}${n2(Math.abs(p.alfaUSD))})` : ''}` : '\u2014'} | ${p.tengo && p.rendTotal != null ? `${p.rendTotal >= 0 ? '+' : ''}${pc(p.rendTotal)}` : '\u2014'} | ${c ? `${ars(porCedear != null ? porCedear * k.ccl : null)} (${Cedears.ratioTxt(c)})` : 'no es CEDEAR'} | ${d.min52 != null ? `${n2(d.min52)}\u2013${n2(d.max52)}` : '\u2014'} | ${rango != null ? pc(rango) : '\u2014'} | ${zonas}${estado} | ${al.objetivo ? n2(al.objetivo) : '\u2014'} | ${b ? `${D.fmt(b.fecha, { year: true })} (en ${b.dias} d)` : '\u2014'} |`;
   }).join('\n');
 
+  // segunda tabla: lo que la ficha muestra y la primera no (crecimiento de ganancia y caja, márgenes, balance, riesgo)
+  const filasF2 = todas.map(p => {
+    const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto' : 'sin datos todav\u00eda'} | | | | | | | | |`;
+    const mu = Fund.mult(p.ticker, d);
+    return `| ${p.ticker} | ${pc(d.cagrNeto5)}${tnTxt(d, 'neto')} | ${pc(d.cagrFcf5)}${tnTxt(d, 'fcf')} | ${pc(d.cagrAcc5)} | ${pc(d.margenBruto)} \u00b7 ${pc(d.margenOper)} | ${n2(d.deudaPat)} | ${n2(d.currentRatio)} | ${d.interesCob != null ? n1(d.interesCob) + '\u00d7' : '\u2014'} | ${pc(mu.fcfY)} \u00b7 ${pc(mu.payout)} \u00b7 ${pc(mu.recompras)} | ${pc(d.divCrec5)} | ${n2(d.beta)} |`;
+  }).join('\n');
   const filasF = todas.map(p => {
     const d = Fund.de(p.ticker); if (!d || d.parcial) return `| ${p.ticker} | ${d ? 'incompleto, Finnhub cort\u00f3' : 'sin datos todav\u00eda'} | | | | | | | | | | | |`;
     return `| ${p.ticker} | ${n1(Fund.pe(p.ticker, d))}${(aj => aj ? `* (limpio ${n1(aj.aj)})` : '')(Fund.peAj(p.ticker, d))} | ${n1(d.peMediana)} | ${n2(d.peg)} | ${d.roicAct != null ? `${pc(d.roicAct)}${d.roicFuente === 'ttm' ? '' : d.roicFuente === 'anual' ? ' (FY)' : ' (ROI Finnhub)'}${d.roicFY != null && d.roicFuente === 'ttm' ? ` \u00b7 FY ${pc(d.roicFY)}` : ''}${d.roicProm5 != null ? ` \u00b7 prom 5a ${pc(d.roicProm5)}` : ''}` : '\u2014'} | ${(mu => [mu.ps != null ? n1(mu.ps) : '\u2014', mu.pfcf != null ? n1(mu.pfcf) : '\u2014', mu.pcf != null ? n1(mu.pcf) : '\u2014'].join(' \u00b7 '))(Fund.mult(p.ticker, d))} | ${pc(d.roe)} | ${pc(d.margenNeto)}${d.margenNeto5 != null ? ` (${pc(d.margenNeto5)})` : ''} | ${pc(d.cagrVentas5 ?? d.crecVentas5)}${tnTxt(d, 'ventas')} | ${pc(d.cagrEps5)}${tnTxt(d, 'eps')} | ${d.fcfSobreNeto != null ? n2(d.fcfSobreNeto) + '\u00d7' : '\u2014'} | ${Fund.yieldDe(p.ticker, d) ? pc(Fund.yieldDe(p.ticker, d)) : '\u2014'} | ${d.at ? D.fmt(D.iso(new Date(d.at))) : '\u2014'} |`;
@@ -1122,6 +1130,10 @@ function ctxPartes(pendientes = []) {
 | Ticker | Qu\u00e9 hace | Estado \u00b7 peso | Precio USD | Hoy | Mi PPC | Mi valor USD (alfa vs SPY) | Mi resultado | CEDEAR en pesos (ratio) | 52 semanas | Posici\u00f3n en el rango | Mis zonas de compra | Objetivo | Pr\u00f3ximo balance |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${filasPx}`,
+    tablaF2: `## Fundamentales (2): crecimiento, m\u00e1rgenes y balance
+| Ticker | Ganancia neta CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Acciones en circulaci\u00f3n CAGR 5 a\u00f1os (negativo = recompra) | Margen bruto \u00b7 operativo | Deuda / patrimonio | Liquidez corriente | Cobertura de intereses (EBIT / inter\u00e9s) | FCF yield \u00b7 payout \u00b7 recompras 12 m sobre valor | Dividendo CAGR 5 a\u00f1os | Beta |
+|---|---|---|---|---|---|---|---|---|---|---|
+${filasF2}${(() => { const dg = Grupo.distribucion(k); return dg.grupos.length ? `\n\n**Distribuci\u00f3n de los CEDEARs por grupo** (mi agrupaci\u00f3n; Emergentes = por pa\u00eds): ${dg.grupos.map(g => `${g.nombre} ${pc(g.pct)} (${g.items.map(i => i.t).join(', ')})`).join(' \u00b7 ')}` : ''; })()}`,
     tablaF: `## Fundamentales (Finnhub, balances presentados a la SEC)
 | Ticker | P/E (con * = inflado por ganancias fuera del negocio; \"limpio\" = precio / resultado operativo despu\u00e9s de impuestos) | P/E mediana 10 a\u00f1os | PEG | ROIC (actual = \u00faltimos 12 meses, como el \"Current\" de TradingView; FY; prom 5 a\u00f1os) | P/S \u00b7 P/FCF \u00b7 P/CF (caja operativa) (precio de hoy / \u00faltimos 12 meses) | ROE | Margen neto de los \u00faltimos 12 meses (prom. 5 a\u00f1os por ejercicio) | Ventas CAGR 5 a\u00f1os (tend. con los 6 a\u00f1os; a\u00f1os en suba) | EPS CAGR 5 a\u00f1os (tend.; a\u00f1os en suba) | Caja libre / ganancia | Dividendo (con el precio de hoy) | Dato al |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|

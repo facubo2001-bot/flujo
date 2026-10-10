@@ -499,3 +499,6 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - **Resultado del chequeo CAGR 2 (10-oct, build 202610101912, Fund.VERSION 14)**: TradingView gratis muestra solo 2021-2025, así que el año 2020 no se pudo ver; todo lo visible coincide (último año de las 5 y, cruzando lo que Facu anotó como 2021, también ese año).
   - **Años como TradingView** (`Fund.rotular`): año = el del cierre menos 45 días, sin offset del 10-K. NVDA (cierra ene-26) pasa de "2026" a "2025"; HD sigue igual; MSFT (jun) igual.
   - **Split posterior al último 10-K** (`Fund.splitReciente`): HON hizo 1:2 en 2026 (acciones del Q2-26 = 319 M vs 643 M); TradingView reexpresa la historia (EPS 2021 15,83, 2025 14,71). Ahora la app también. CAGR sin cambios.
+
+## Export: segunda tabla de fundamentales (10-oct, build 202610101926)
+- Facu preguntó si el export trae todos los fundamentales: no traía todo lo de la ficha. Nueva tabla "Fundamentales (2)": CAGR 5a de ganancia neta y caja libre (con tendencia), acciones en circulación, márgenes bruto/operativo, deuda/patrimonio, liquidez corriente, cobertura de intereses, FCF yield · payout · recompras, CAGR del dividendo, beta. Abajo, la distribución por grupos.
