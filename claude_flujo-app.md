@@ -473,7 +473,7 @@ Campos: movimientos, remove, scrub, updateTarjetas, updateRecurrentes, removeRec
 
 ## Backlog (después del rediseño)
 **Cola de Facu (pedidos pendientes, en orden):**
-1. (29-sep, PRIORITARIO) Chequeo del CAGR 5 años contra TradingView después de los arreglos de splits y años fiscales: GOOGL, NVDA, HON, TSLA, HD (EPS, ventas, ganancia, FCF).
+1. ~~(29-sep) Chequeo del CAGR 5 años contra TradingView: GOOGL, NVDA, HON, TSLA, HD~~ HECHO 10-oct: coincide todo lo visible (2021 y 2025); Facu da por buenos los datos. Solo falta ver si NVDA muestra FCF.
 
 Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "Otras tenencias" (letra $600k, ONs, pesos) para cuadrar con el total de Balanz · sueldo real vs inflación (IPC INDEC) y meta de tasa de inversión por mes · fechar los 12 lotes previos · módulo impositivo (Ganancias cedular, costo FIFO) · riesgo (concentración por sector, beta) · rebalanceo contra pesos objetivo · segundo benchmark (QQQ / Merval USD) · importar tenencia de Balanz para conciliar sin tipear · 18 tickers de "Capa 2" de alertas pendientes.
 
