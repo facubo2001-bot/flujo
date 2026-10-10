@@ -477,7 +477,8 @@ const E = {
       return f;
     };
     const mpHoy = AD.vcEn(AD.MP_SLUG, hoy); const cclCorte = AD.cclEn(hoy) || Number(state.settings.ccl) || null; const cclHoy = Number(state.settings.ccl) || cclCorte;
-    let cuotapartes = 0, invertido = 0, diasPond = 0, mpCuotas = 0, usd = 0, ipcVal = 0, faltan = [];
+    const ix = Hist.indice(E.cartera()); const ixCorte = ix ? Hist.en(ix, hoy) : null;
+    let cuotapartes = 0, invertido = 0, diasPond = 0, mpCuotas = 0, usd = 0, ipcVal = 0, cartUnid = ix && ixCorte ? 0 : NaN, faltan = []; const flujos = [];
     for (const l of lotes) {
       const signo = l.tipo === 'rescate' ? -1 : 1; const monto = Number(l.monto);
       // la CNV publica el valor cuota por cada 1.000 cuotapartes (2.140,15) y Balanz por cuotaparte (2,140265):
@@ -485,24 +486,33 @@ const E = {
       const ref = AD.vcEn(a.slug, l.fecha); let vcM = l.vc ? Number(l.vc) : null;
       if (vcM && ref) { const esc10 = Math.round(Math.log10(ref.v / vcM)); if (Math.abs(esc10) >= 2) vcM *= Math.pow(10, esc10); }
       const vc = vcM ? { v: vcM, fecha: l.fecha } : ref; if (!vc) { faltan.push(l.fecha); continue; }
-      const q = monto / vc.v; cuotapartes += signo * q; invertido += signo * monto; diasPond += signo * monto * D.daysBetween(l.fecha, hoy);
+      const q = monto / vc.v; cuotapartes += signo * q; invertido += signo * monto; diasPond += signo * monto * D.daysBetween(l.fecha, hoy); flujos.push({ fecha: l.fecha, v: -signo * monto });
       const mp = AD.vcEn(AD.MP_SLUG, l.fecha); if (mp) mpCuotas += signo * monto / mp.v; else mpCuotas = NaN;
       const ccl = AD.cclEn(l.fecha); if (ccl) usd += signo * monto / ccl; else usd = NaN;
+      // tu cartera de CEDEARs: la misma plata pasada a dolares ese dia y movida con el indice diario de la cartera (con dividendos)
+      if (Number.isFinite(cartUnid)) { const I = Hist.en(ix, l.fecha); if (ccl && I) cartUnid += signo * monto / ccl / I; else cartUnid = NaN; }
       const fi = factorIpc(l.fecha); if (fi != null) ipcVal += signo * monto * fi; else ipcVal = NaN;
     }
     const valor = cuotapartes * vcHoy.v; const dias = invertido > 0 ? diasPond / invertido : 0;
-    const temDe = v => invertido > 0 && v > 0 && dias >= 1 ? Math.pow(v / invertido, 30 / dias) - 1 : null;
+    // TEM por TIR de los lotes (suscripciones y rescates en su fecha + valor de hoy): con varios lotes y rescates da bien; si no converge, la cuenta simple
+    const temDe = v => {
+      if (!(v > 0) || !flujos.length) return null; const f0 = flujos[0].fecha; const T = D.daysBetween(f0, hoy); if (T < 1) return null;
+      const x = E.xirr([...flujos.map(f => ({ t: D.daysBetween(f0, f.fecha), v: f.v })), { t: T, v }]);
+      if (x != null && Number.isFinite(x)) return Math.pow(1 + x, 30 / 365) - 1;
+      return invertido > 0 && dias >= 1 ? Math.pow(v / invertido, 30 / dias) - 1 : null;
+    };
     const tem = temDe(valor);
     const mpValor = Number.isFinite(mpCuotas) && mpHoy ? mpCuotas * mpHoy.v : null;
     const cclValor = Number.isFinite(usd) && cclCorte ? usd * cclCorte : null;
     const ipcValor = Number.isFinite(ipcVal) && ipcVal > 0 ? ipcVal : null;
+    const cartValor = Number.isFinite(cartUnid) && cclCorte ? cartUnid * ixCorte * cclCorte : null;
     // con menos de 7 dias la diferencia mensualizada es ruido (un dia de CCL × 30): se muestra, pero no se juzga
     // con menos de 7 dias los numeros tienen ruido: se muestran igual, con aviso en la tarjeta (Facu)
     const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
     return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem, tna: tem != null ? tem * 12 : null, sucio: dias < 7, vcHoy, faltan, corte: hoy,
       usdHoy: cclHoy ? valor / cclHoy : null, usdCompra: Number.isFinite(usd) ? usd : null,
-      mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
-      fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
+      mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor), cartera: bench('Tu cartera', cartValor),
+      fuentes: { cartera: ix ? (Hist.datos.fechas[Hist.datos.fechas.length - 1]) : null, mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
   },
   /** Todo el patrimonio: CEDEARs + otros activos + caja de la cartera (dividendos sin reinvertir y ventas sin usar: la compra siguiente usa lo de las ventas sola) */
   patrimonio(k) {

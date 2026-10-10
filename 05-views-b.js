@@ -637,9 +637,12 @@ function renderReservaCard(pt) {
   const a = fondos[0]; const r = a.reserva; const act = (state.cartera.activos || []).find(x => x.id === a.id);
   const pc2 = v => `${v >= 0 ? '+' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
   const sem = b => b.dif == null ? { cls: 'off', txt: '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
-  const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
-  const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
+  if (!Hist.datos && !Hist._p && Hist.dia !== D.today()) Hist.cargar().then(d => { if (d && ui.view === 'cartera') render(); });
+  const chips = [['MP', r.mp], ['CCL', r.ccl], ['Tu cartera', r.cartera]].map(([k, b]) => { const x = b ? sem(b) : { cls: 'off', txt: '\u2014' }; return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
+  const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['tu cartera de CEDEARs', r.cartera]].filter(([, b]) => b && b.dif != null && b.dif < -0.0005);
+  const cart = r.cartera && r.cartera.difPesos != null && r.dias >= 7 ? (r.cartera.difPesos >= 0 ? `Estacionada le gan\u00f3 a tu cartera: $ ${fmtARS.format(Math.round(r.cartera.difPesos))} m\u00e1s que si la hubieras puesto en tus CEDEARs.` : `Estacionada rindi\u00f3 menos que tu cartera: en tus CEDEARs tendr\u00edas $ ${fmtARS.format(Math.round(-r.cartera.difPesos))} m\u00e1s.`) : '';
   const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
+  const infl = r.ipc && r.ipc.dif != null ? `<div class="rsv-ipc">Contra la inflaci\u00f3n: ${pc2(r.ipc.dif)} pp por mes${r.fuentes.ipc ? ` \u00b7 IPC hasta ${r.fuentes.ipc}` : ''}</div>` : '';
   const ced = (pt.grupos.find(g => g.id === 'cedears') || {}).valor || 0; const pesoPct = ced ? a.valorUSD / ced : null;  // contra los CEDEARs
   return `<div class="card kpi rsv tap" data-act="activo" data-id="${a.id}">
     <div class="label">Reserva en pesos <span class="soft">\u00b7 ${esc(a.nombre)}</span></div>
@@ -647,6 +650,8 @@ function renderReservaCard(pt) {
     <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
     <div class="rsv-sem">${chips}</div>
     ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : alerta}
+    ${cart ? `<div class="rsv-cart ${r.cartera.difPesos >= 0 ? 'pos' : 'neg'}">${cart}</div>` : ''}
+    ${infl}
     ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
   </div>`;
 }

@@ -512,3 +512,9 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 ## Posiciones: orden y signo $ (10-oct, build 202610102231)
 - Fila sutil arriba de la lista: Valor · Rendimiento · Ganado · Hoy · A-Z (`settings.pzOrden`, tocar de nuevo invierte el orden). Con "Ganado" la línea de abajo de "Tenés" muestra US$ ganados en vez del %.
 - El precio lleva un "$" chico y gris adelante (Facu: el número solo se veía raro).
+
+## Reserva vs tu cartera (10-oct, build 202610102247)
+- Pedido de Facu: la inflación pasa a una línea chica; en su lugar, "Tu cartera": la misma plata de cada suscripción pasada a dólares (CCL de ese día) y movida con el **índice diario de su cartera de CEDEARs** (`Hist.indice`: tenencia del día anterior × cierre ajustado por splits y dividendos; base 1 en la primera compra), vuelta a pesos al CCL del corte. Frase: "Estacionada le ganó a tu cartera: $ X más" / "en tus CEDEARs tendrías $ X más" (desde 7 días).
+- Datos: el Action (`tools/tecnico.mjs`) ahora también publica `sec/hist.json` (~420 ruedas de cierres ajustados de todo el universo, alineados a SPY). La app lo baja una vez por día (`Hist.cargar`).
+- TEM de la reserva ahora por TIR de los lotes (`E.xirr`: suscripciones y rescates en su fecha + valor de hoy); los comparativos (MP, CCL, cartera, inflación) usan la misma cuenta. Antes era plata × días promedio (con rescates daba mal).
+- Verificado con precios sintéticos: índice y comparación coinciden con una cuenta independiente en Python.

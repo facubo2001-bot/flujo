@@ -846,6 +846,37 @@ const Precios = {
 };
 
 /* ---------- EMA 200 (la baja la tarea diaria del repo: tools/tecnico.mjs -> sec/tecnico.json) ---------- */
+/* ---------- Cierres diarios ajustados (splits y dividendos) de ~20 meses, que baja el Action junto con la EMA 200 ----------
+ * Sirven para el índice diario de la cartera (rendimiento por tiempo, con dividendos): reserva vs cartera. */
+const Hist = {
+  datos: null, dia: null, _p: null,
+  cargar() {
+    const hoy = D.today(); if (Hist.dia === hoy && Hist.datos) return Promise.resolve(Hist.datos);
+    if (Hist._p) return Hist._p;
+    Hist._p = (async () => { try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/hist.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.fechas) && j.c) Hist.datos = j; } } } catch (e) {} Hist.dia = hoy; Hist._p = null; return Hist.datos; })();
+    return Hist._p;
+  },
+  /** índice diario de tus CEDEARs como los tuviste cada día (base 1 el día de la primera compra): {fechas, v} o null.
+   *  Cada rueda: tenencia del día anterior × cierre de hoy / × cierre de ayer. Tickers sin serie quedan afuera ese día. */
+  indice(k) {
+    const h = Hist.datos; if (!h || !k || !k.ops || !k.ops.length) return null;
+    if (k._indice && k._indice.gen === h.generado) return k._indice;
+    const ops = k.ops.filter(o => o.tipo !== 'dividendo').slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const F = h.fechas; const i0 = F.findIndex(f => f >= ops[0].fecha); if (i0 < 0) return null;
+    const esc = {}; for (const t of Object.keys(h.c)) { const ser = h.c[t]; const ult = ser[ser.length - 1]; const pr = state.cartera.precios[t]; esc[t] = pr && pr.c && ult ? pr.c / ult : 1; }
+    const q = {}; let j = 0; const aplicar = f => { while (j < ops.length && ops[j].fecha <= f) { const o = ops[j++]; q[o.ticker] = (q[o.ticker] || 0) + (o.tipo === 'compra' ? 1 : -1) * (Number(o.acciones) || 0); } };
+    aplicar(F[i0]); const v = new Array(F.length).fill(null); v[i0] = 1; let I = 1;
+    for (let i = i0 + 1; i < F.length; i++) {
+      let a = 0, b = 0;
+      for (const [t, n] of Object.entries(q)) { if (!(n > 1e-9)) continue; const s = h.c[t]; if (!s || s[i - 1] == null || s[i] == null) continue; a += n * s[i - 1] * esc[t]; b += n * s[i] * esc[t]; }
+      if (a > 0) I *= b / a; v[i] = I; aplicar(F[i]);
+    }
+    return (k._indice = { gen: h.generado, fechas: F, v, desde: F[i0] });
+  },
+  /** valor del índice en una fecha (la última rueda ≤ fecha) */
+  en(ix, fecha) { if (!ix) return null; let r = null; for (let i = 0; i < ix.fechas.length && ix.fechas[i] <= fecha; i++) if (ix.v[i] != null) r = ix.v[i]; return r; },
+};
+
 const Tec = {
   datos: null, dia: null,
   async cargar() {

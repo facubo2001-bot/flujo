@@ -1202,6 +1202,8 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .pz-ord button.on{color:var(--ink);font-weight:700}
 .pz-ord button i{font-style:normal;color:var(--accent)}
 .pz-cur{font-size:.72em;font-weight:600;color:var(--ink-3);margin-right:2px}
+.rsv-cart{font-size:12.5px;margin-top:6px;line-height:1.35}.rsv-cart.pos{color:var(--good-text)}.rsv-cart.neg{color:var(--warn-text)}
+.rsv-ipc{font-size:11.5px;color:var(--ink-3);margin-top:6px}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1543,7 +1545,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610102231';
+const BUILD = '202610102247';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2091,6 +2093,37 @@ const Precios = {
 };
 
 /* ---------- EMA 200 (la baja la tarea diaria del repo: tools/tecnico.mjs -> sec/tecnico.json) ---------- */
+/* ---------- Cierres diarios ajustados (splits y dividendos) de ~20 meses, que baja el Action junto con la EMA 200 ----------
+ * Sirven para el índice diario de la cartera (rendimiento por tiempo, con dividendos): reserva vs cartera. */
+const Hist = {
+  datos: null, dia: null, _p: null,
+  cargar() {
+    const hoy = D.today(); if (Hist.dia === hoy && Hist.datos) return Promise.resolve(Hist.datos);
+    if (Hist._p) return Hist._p;
+    Hist._p = (async () => { try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/hist.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.fechas) && j.c) Hist.datos = j; } } } catch (e) {} Hist.dia = hoy; Hist._p = null; return Hist.datos; })();
+    return Hist._p;
+  },
+  /** índice diario de tus CEDEARs como los tuviste cada día (base 1 el día de la primera compra): {fechas, v} o null.
+   *  Cada rueda: tenencia del día anterior × cierre de hoy / × cierre de ayer. Tickers sin serie quedan afuera ese día. */
+  indice(k) {
+    const h = Hist.datos; if (!h || !k || !k.ops || !k.ops.length) return null;
+    if (k._indice && k._indice.gen === h.generado) return k._indice;
+    const ops = k.ops.filter(o => o.tipo !== 'dividendo').slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const F = h.fechas; const i0 = F.findIndex(f => f >= ops[0].fecha); if (i0 < 0) return null;
+    const esc = {}; for (const t of Object.keys(h.c)) { const ser = h.c[t]; const ult = ser[ser.length - 1]; const pr = state.cartera.precios[t]; esc[t] = pr && pr.c && ult ? pr.c / ult : 1; }
+    const q = {}; let j = 0; const aplicar = f => { while (j < ops.length && ops[j].fecha <= f) { const o = ops[j++]; q[o.ticker] = (q[o.ticker] || 0) + (o.tipo === 'compra' ? 1 : -1) * (Number(o.acciones) || 0); } };
+    aplicar(F[i0]); const v = new Array(F.length).fill(null); v[i0] = 1; let I = 1;
+    for (let i = i0 + 1; i < F.length; i++) {
+      let a = 0, b = 0;
+      for (const [t, n] of Object.entries(q)) { if (!(n > 1e-9)) continue; const s = h.c[t]; if (!s || s[i - 1] == null || s[i] == null) continue; a += n * s[i - 1] * esc[t]; b += n * s[i] * esc[t]; }
+      if (a > 0) I *= b / a; v[i] = I; aplicar(F[i]);
+    }
+    return (k._indice = { gen: h.generado, fechas: F, v, desde: F[i0] });
+  },
+  /** valor del índice en una fecha (la última rueda ≤ fecha) */
+  en(ix, fecha) { if (!ix) return null; let r = null; for (let i = 0; i < ix.fechas.length && ix.fechas[i] <= fecha; i++) if (ix.v[i] != null) r = ix.v[i]; return r; },
+};
+
 const Tec = {
   datos: null, dia: null,
   async cargar() {
@@ -3295,7 +3328,8 @@ const E = {
       return f;
     };
     const mpHoy = AD.vcEn(AD.MP_SLUG, hoy); const cclCorte = AD.cclEn(hoy) || Number(state.settings.ccl) || null; const cclHoy = Number(state.settings.ccl) || cclCorte;
-    let cuotapartes = 0, invertido = 0, diasPond = 0, mpCuotas = 0, usd = 0, ipcVal = 0, faltan = [];
+    const ix = Hist.indice(E.cartera()); const ixCorte = ix ? Hist.en(ix, hoy) : null;
+    let cuotapartes = 0, invertido = 0, diasPond = 0, mpCuotas = 0, usd = 0, ipcVal = 0, cartUnid = ix && ixCorte ? 0 : NaN, faltan = []; const flujos = [];
     for (const l of lotes) {
       const signo = l.tipo === 'rescate' ? -1 : 1; const monto = Number(l.monto);
       // la CNV publica el valor cuota por cada 1.000 cuotapartes (2.140,15) y Balanz por cuotaparte (2,140265):
@@ -3303,24 +3337,33 @@ const E = {
       const ref = AD.vcEn(a.slug, l.fecha); let vcM = l.vc ? Number(l.vc) : null;
       if (vcM && ref) { const esc10 = Math.round(Math.log10(ref.v / vcM)); if (Math.abs(esc10) >= 2) vcM *= Math.pow(10, esc10); }
       const vc = vcM ? { v: vcM, fecha: l.fecha } : ref; if (!vc) { faltan.push(l.fecha); continue; }
-      const q = monto / vc.v; cuotapartes += signo * q; invertido += signo * monto; diasPond += signo * monto * D.daysBetween(l.fecha, hoy);
+      const q = monto / vc.v; cuotapartes += signo * q; invertido += signo * monto; diasPond += signo * monto * D.daysBetween(l.fecha, hoy); flujos.push({ fecha: l.fecha, v: -signo * monto });
       const mp = AD.vcEn(AD.MP_SLUG, l.fecha); if (mp) mpCuotas += signo * monto / mp.v; else mpCuotas = NaN;
       const ccl = AD.cclEn(l.fecha); if (ccl) usd += signo * monto / ccl; else usd = NaN;
+      // tu cartera de CEDEARs: la misma plata pasada a dolares ese dia y movida con el indice diario de la cartera (con dividendos)
+      if (Number.isFinite(cartUnid)) { const I = Hist.en(ix, l.fecha); if (ccl && I) cartUnid += signo * monto / ccl / I; else cartUnid = NaN; }
       const fi = factorIpc(l.fecha); if (fi != null) ipcVal += signo * monto * fi; else ipcVal = NaN;
     }
     const valor = cuotapartes * vcHoy.v; const dias = invertido > 0 ? diasPond / invertido : 0;
-    const temDe = v => invertido > 0 && v > 0 && dias >= 1 ? Math.pow(v / invertido, 30 / dias) - 1 : null;
+    // TEM por TIR de los lotes (suscripciones y rescates en su fecha + valor de hoy): con varios lotes y rescates da bien; si no converge, la cuenta simple
+    const temDe = v => {
+      if (!(v > 0) || !flujos.length) return null; const f0 = flujos[0].fecha; const T = D.daysBetween(f0, hoy); if (T < 1) return null;
+      const x = E.xirr([...flujos.map(f => ({ t: D.daysBetween(f0, f.fecha), v: f.v })), { t: T, v }]);
+      if (x != null && Number.isFinite(x)) return Math.pow(1 + x, 30 / 365) - 1;
+      return invertido > 0 && dias >= 1 ? Math.pow(v / invertido, 30 / dias) - 1 : null;
+    };
     const tem = temDe(valor);
     const mpValor = Number.isFinite(mpCuotas) && mpHoy ? mpCuotas * mpHoy.v : null;
     const cclValor = Number.isFinite(usd) && cclCorte ? usd * cclCorte : null;
     const ipcValor = Number.isFinite(ipcVal) && ipcVal > 0 ? ipcVal : null;
+    const cartValor = Number.isFinite(cartUnid) && cclCorte ? cartUnid * ixCorte * cclCorte : null;
     // con menos de 7 dias la diferencia mensualizada es ruido (un dia de CCL × 30): se muestra, pero no se juzga
     // con menos de 7 dias los numeros tienen ruido: se muestran igual, con aviso en la tarjeta (Facu)
     const bench = (nombre, v) => ({ nombre, valor: v, tem: v != null ? temDe(v) : null, dif: v != null && tem != null && temDe(v) != null ? tem - temDe(v) : null, difPesos: v != null ? valor - v : null });
     return { lotes, cuotapartes, invertido, valor, ganado: valor - invertido, dias, tem, tna: tem != null ? tem * 12 : null, sucio: dias < 7, vcHoy, faltan, corte: hoy,
       usdHoy: cclHoy ? valor / cclHoy : null, usdCompra: Number.isFinite(usd) ? usd : null,
-      mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor),
-      fuentes: { mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
+      mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor), cartera: bench('Tu cartera', cartValor),
+      fuentes: { cartera: ix ? (Hist.datos.fechas[Hist.datos.fechas.length - 1]) : null, mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
   },
   /** Todo el patrimonio: CEDEARs + otros activos + caja de la cartera (dividendos sin reinvertir y ventas sin usar: la compra siguiente usa lo de las ventas sola) */
   patrimonio(k) {
@@ -5031,9 +5074,12 @@ function renderReservaCard(pt) {
   const a = fondos[0]; const r = a.reserva; const act = (state.cartera.activos || []).find(x => x.id === a.id);
   const pc2 = v => `${v >= 0 ? '+' : '\u2212'}${(Math.abs(v) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
   const sem = b => b.dif == null ? { cls: 'off', txt: '\u2014' } : { cls: b.dif >= 0 ? 'pos' : 'neg', txt: `${pc2(b.dif)} pp` };
-  const chips = [['MP', r.mp], ['CCL', r.ccl], ['Inflaci\u00f3n', r.ipc]].map(([k, b]) => { const x = sem(b); return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
-  const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['la inflaci\u00f3n', r.ipc]].filter(([, b]) => b.dif != null && b.dif < -0.0005);
+  if (!Hist.datos && !Hist._p && Hist.dia !== D.today()) Hist.cargar().then(d => { if (d && ui.view === 'cartera') render(); });
+  const chips = [['MP', r.mp], ['CCL', r.ccl], ['Tu cartera', r.cartera]].map(([k, b]) => { const x = b ? sem(b) : { cls: 'off', txt: '\u2014' }; return `<span class="rsv-c ${x.cls}">${k}<b>${x.txt}</b></span>`; }).join('');
+  const pierde = [['Mercado Pago', r.mp], ['el d\u00f3lar CCL', r.ccl], ['tu cartera de CEDEARs', r.cartera]].filter(([, b]) => b && b.dif != null && b.dif < -0.0005);
+  const cart = r.cartera && r.cartera.difPesos != null && r.dias >= 7 ? (r.cartera.difPesos >= 0 ? `Estacionada le gan\u00f3 a tu cartera: $ ${fmtARS.format(Math.round(r.cartera.difPesos))} m\u00e1s que si la hubieras puesto en tus CEDEARs.` : `Estacionada rindi\u00f3 menos que tu cartera: en tus CEDEARs tendr\u00edas $ ${fmtARS.format(Math.round(-r.cartera.difPesos))} m\u00e1s.`) : '';
   const alerta = pierde.length ? `<div class="rsv-alerta">La reserva pierde contra ${pierde.map(([n, b]) => `${n} (${pc2(b.dif)} pp por mes${b.difPesos != null ? `, $ ${fmtARS.format(Math.round(Math.abs(b.difPesos)))} menos` : ''})`).join(' y ')}.</div>` : (r.dias >= 7 ? `<div class="rsv-ok">La reserva le gana a las tres alternativas desde que la pusiste.</div>` : '');
+  const infl = r.ipc && r.ipc.dif != null ? `<div class="rsv-ipc">Contra la inflaci\u00f3n: ${pc2(r.ipc.dif)} pp por mes${r.fuentes.ipc ? ` \u00b7 IPC hasta ${r.fuentes.ipc}` : ''}</div>` : '';
   const ced = (pt.grupos.find(g => g.id === 'cedears') || {}).valor || 0; const pesoPct = ced ? a.valorUSD / ced : null;  // contra los CEDEARs
   return `<div class="card kpi rsv tap" data-act="activo" data-id="${a.id}">
     <div class="label">Reserva en pesos <span class="soft">\u00b7 ${esc(a.nombre)}</span></div>
@@ -5041,6 +5087,8 @@ function renderReservaCard(pt) {
     <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
     <div class="rsv-sem">${chips}</div>
     ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : alerta}
+    ${cart ? `<div class="rsv-cart ${r.cartera.difPesos >= 0 ? 'pos' : 'neg'}">${cart}</div>` : ''}
+    ${infl}
     ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
   </div>`;
 }
@@ -6027,7 +6075,7 @@ ${pt.activos.map(a => `| ${a.nombre} | ${E.TIPOS_ACTIVO[a.tipo] || a.tipo} | ${a
 ${pt.activos.filter(a => a.reserva).map(a => { const r = a.reserva; const pp = b => b.dif != null ? `${b.dif >= 0 ? '+' : '\u2212'}${(Math.abs(b.dif) * 100).toFixed(2)} pp/mes (en $: ${b.difPesos >= 0 ? '+' : '\u2212'}${fmtARS.format(Math.round(Math.abs(b.difPesos)))})` : 's/d'; return `
 ### Reserva en pesos: ${a.nombre}
 Valor cuota real (CNV via ArgentinaDatos). Invertido $ ${fmtARS.format(Math.round(r.invertido))} \u00b7 hoy **$ ${fmtARS.format(Math.round(r.valor))}** (US$ ${r.usdHoy != null ? n(r.usdHoy) : 's/d'} al CCL) \u00b7 ${Math.round(r.dias)} d\u00edas \u00b7 TEM realizada ${r.tem != null ? (r.tem * 100).toFixed(2) + ' %' : 's/d'} (TNA ${r.tna != null ? (r.tna * 100).toFixed(1) + ' %' : 's/d'}).
-Contra alternativas con la misma plata desde cada suscripci\u00f3n: Mercado Pago ${pp(r.mp)} \u00b7 d\u00f3lar CCL ${pp(r.ccl)} \u00b7 inflaci\u00f3n ${pp(r.ipc)}${r.fuentes.ipc ? ` (IPC hasta ${r.fuentes.ipc}, mes en curso con el \u00faltimo dato)` : ''}.
+Contra alternativas con la misma plata desde cada suscripci\u00f3n: Mercado Pago ${pp(r.mp)} \u00b7 d\u00f3lar CCL ${pp(r.ccl)} \u00b7 mi cartera de CEDEARs (misma plata pasada a d\u00f3lares ese d\u00eda, con el rendimiento diario de la cartera y dividendos) ${r.cartera ? pp(r.cartera) : 's/d'} \u00b7 inflaci\u00f3n ${pp(r.ipc)}${r.fuentes.ipc ? ` (IPC hasta ${r.fuentes.ipc}, mes en curso con el \u00faltimo dato)` : ''}.
 | Fecha | Movimiento | Monto $ |
 |---|---|---|
 ${r.lotes.map(l => `| ${l.fecha} | ${l.tipo === 'rescate' ? 'rescate' : 'suscripci\u00f3n'} | ${fmtARS.format(Math.round(l.monto))} |`).join('\n')}`; }).join('\n')}

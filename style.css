@@ -1178,3 +1178,5 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .pz-ord button.on{color:var(--ink);font-weight:700}
 .pz-ord button i{font-style:normal;color:var(--accent)}
 .pz-cur{font-size:.72em;font-weight:600;color:var(--ink-3);margin-right:2px}
+.rsv-cart{font-size:12.5px;margin-top:6px;line-height:1.35}.rsv-cart.pos{color:var(--good-text)}.rsv-cart.neg{color:var(--warn-text)}
+.rsv-ipc{font-size:11.5px;color:var(--ink-3);margin-top:6px}

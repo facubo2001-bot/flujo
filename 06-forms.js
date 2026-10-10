@@ -979,7 +979,7 @@ ${pt.activos.map(a => `| ${a.nombre} | ${E.TIPOS_ACTIVO[a.tipo] || a.tipo} | ${a
 ${pt.activos.filter(a => a.reserva).map(a => { const r = a.reserva; const pp = b => b.dif != null ? `${b.dif >= 0 ? '+' : '\u2212'}${(Math.abs(b.dif) * 100).toFixed(2)} pp/mes (en $: ${b.difPesos >= 0 ? '+' : '\u2212'}${fmtARS.format(Math.round(Math.abs(b.difPesos)))})` : 's/d'; return `
 ### Reserva en pesos: ${a.nombre}
 Valor cuota real (CNV via ArgentinaDatos). Invertido $ ${fmtARS.format(Math.round(r.invertido))} \u00b7 hoy **$ ${fmtARS.format(Math.round(r.valor))}** (US$ ${r.usdHoy != null ? n(r.usdHoy) : 's/d'} al CCL) \u00b7 ${Math.round(r.dias)} d\u00edas \u00b7 TEM realizada ${r.tem != null ? (r.tem * 100).toFixed(2) + ' %' : 's/d'} (TNA ${r.tna != null ? (r.tna * 100).toFixed(1) + ' %' : 's/d'}).
-Contra alternativas con la misma plata desde cada suscripci\u00f3n: Mercado Pago ${pp(r.mp)} \u00b7 d\u00f3lar CCL ${pp(r.ccl)} \u00b7 inflaci\u00f3n ${pp(r.ipc)}${r.fuentes.ipc ? ` (IPC hasta ${r.fuentes.ipc}, mes en curso con el \u00faltimo dato)` : ''}.
+Contra alternativas con la misma plata desde cada suscripci\u00f3n: Mercado Pago ${pp(r.mp)} \u00b7 d\u00f3lar CCL ${pp(r.ccl)} \u00b7 mi cartera de CEDEARs (misma plata pasada a d\u00f3lares ese d\u00eda, con el rendimiento diario de la cartera y dividendos) ${r.cartera ? pp(r.cartera) : 's/d'} \u00b7 inflaci\u00f3n ${pp(r.ipc)}${r.fuentes.ipc ? ` (IPC hasta ${r.fuentes.ipc}, mes en curso con el \u00faltimo dato)` : ''}.
 | Fecha | Movimiento | Monto $ |
 |---|---|---|
 ${r.lotes.map(l => `| ${l.fecha} | ${l.tipo === 'rescate' ? 'rescate' : 'suscripci\u00f3n'} | ${fmtARS.format(Math.round(l.monto))} |`).join('\n')}`; }).join('\n')}
