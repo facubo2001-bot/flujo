@@ -873,6 +873,27 @@ const Hist = {
     }
     return (k._indice = { gen: h.generado, fechas: F, v, desde: F[i0] });
   },
+  /** Riesgo y rendimiento por tiempo de una ventana (desde una fecha hasta el último cierre):
+   *  TWR de la cartera y de SPY (ambos con dividendos), beta realizada (rendimientos diarios contra SPY), alfa de Jensen
+   *  con una tasa libre de riesgo en dólares de 4 % anual, y caída máxima. Beta y alfa solo con 60 ruedas o más. */
+  RF: 0.04,
+  riesgo(k, desde) {
+    const h = Hist.datos; const ix = Hist.indice(k); if (!h || !ix || !h.c.SPY) return null;
+    const F = ix.fechas, S = h.c.SPY; let i0 = F.findIndex(f => f >= (desde < ix.desde ? ix.desde : desde)); if (i0 < 0) return null;
+    while (i0 < F.length && (ix.v[i0] == null || S[i0] == null)) i0++;
+    let i1 = F.length - 1; while (i1 > i0 && (ix.v[i1] == null || S[i1] == null)) i1--; if (i1 - i0 < 5) return null;
+    const twr = ix.v[i1] / ix.v[i0] - 1, spy = S[i1] / S[i0] - 1; const dias = D.daysBetween(F[i0], F[i1]);
+    const rp = [], rm = []; for (let i = i0 + 1; i <= i1; i++) { if (ix.v[i - 1] && S[i - 1]) { rp.push(ix.v[i] / ix.v[i - 1] - 1); rm.push(S[i] / S[i - 1] - 1); } }
+    const n = rp.length; let beta = null, alfa = null; const rf = Math.pow(1 + Hist.RF, dias / 365) - 1;
+    if (n >= 60) { const mp = sum(rp) / n, mm = sum(rm) / n; let cov = 0, vm = 0; for (let i = 0; i < n; i++) { cov += (rp[i] - mp) * (rm[i] - mm); vm += (rm[i] - mm) ** 2; } beta = vm > 0 ? cov / vm : null; if (beta != null) alfa = twr - (rf + beta * (spy - rf)); }
+    // caida maxima: del pico al piso dentro de la ventana; si ya recupero el pico, cuando
+    let pico = ix.v[i0], fPico = F[i0], dd = 0, ddPico = null, ddPiso = null, rec = null;
+    for (let i = i0; i <= i1; i++) { const x = ix.v[i]; if (x == null) continue; if (x > pico) { pico = x; fPico = F[i]; } const d = x / pico - 1; if (d < dd) { dd = d; ddPico = fPico; ddPiso = F[i]; rec = null; } if (ddPiso && rec == null && F[i] > ddPiso && x >= ix.v[F.indexOf(ddPico)]) rec = F[i]; }
+    const actual = ix.v[i1] / pico - 1;
+    return { desde: F[i0], hasta: F[i1], dias, ruedas: n, twr, spy, beta, alfa, rf, rfAnual: Hist.RF, dd, ddPico, ddPiso, recuperada: rec, ddActual: actual };
+  },
+  /** beta de hoy según Finnhub (5 años de cada empresa), ponderada por lo que vale cada posición */
+  betaPonderada(k) { let a = 0, w = 0; for (const p of k.posiciones) { const d = Fund.de(p.ticker); const v = p.valor; if (d && Number.isFinite(d.beta) && v > 0) { a += d.beta * v; w += v; } } return w ? { beta: a / w, cubre: w / (k.valor || w) } : null; },
   /** valor del índice en una fecha (la última rueda ≤ fecha) */
   en(ix, fecha) { if (!ix) return null; let r = null; for (let i = 0; i < ix.fechas.length && ix.fechas[i] <= fecha; i++) if (ix.v[i] != null) r = ix.v[i]; return r; },
 };

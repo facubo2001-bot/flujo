@@ -1204,6 +1204,13 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .pz-cur{font-size:.72em;font-weight:600;color:var(--ink-3);margin-right:2px}
 .rsv-cart{font-size:12.5px;margin-top:6px;line-height:1.35}.rsv-cart.pos{color:var(--good-text)}.rsv-cart.neg{color:var(--warn-text)}
 .rsv-ipc{font-size:11.5px;color:var(--ink-3);margin-top:6px}
+.riesgo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;margin:10px 0 4px;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative}
+.riesgo .rk{display:flex;flex-direction:column;min-width:0}
+.riesgo .rk .l{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.riesgo .rk b{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:14.5px;font-weight:800;line-height:1.5}
+.riesgo .rk .s{font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.riesgo .rk-i{position:absolute;right:0;top:4px}
+@media (min-width:640px){.riesgo{grid-template-columns:repeat(4,minmax(0,1fr))}}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1545,7 +1552,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610102247';
+const BUILD = '202610112334';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2120,6 +2127,27 @@ const Hist = {
     }
     return (k._indice = { gen: h.generado, fechas: F, v, desde: F[i0] });
   },
+  /** Riesgo y rendimiento por tiempo de una ventana (desde una fecha hasta el último cierre):
+   *  TWR de la cartera y de SPY (ambos con dividendos), beta realizada (rendimientos diarios contra SPY), alfa de Jensen
+   *  con una tasa libre de riesgo en dólares de 4 % anual, y caída máxima. Beta y alfa solo con 60 ruedas o más. */
+  RF: 0.04,
+  riesgo(k, desde) {
+    const h = Hist.datos; const ix = Hist.indice(k); if (!h || !ix || !h.c.SPY) return null;
+    const F = ix.fechas, S = h.c.SPY; let i0 = F.findIndex(f => f >= (desde < ix.desde ? ix.desde : desde)); if (i0 < 0) return null;
+    while (i0 < F.length && (ix.v[i0] == null || S[i0] == null)) i0++;
+    let i1 = F.length - 1; while (i1 > i0 && (ix.v[i1] == null || S[i1] == null)) i1--; if (i1 - i0 < 5) return null;
+    const twr = ix.v[i1] / ix.v[i0] - 1, spy = S[i1] / S[i0] - 1; const dias = D.daysBetween(F[i0], F[i1]);
+    const rp = [], rm = []; for (let i = i0 + 1; i <= i1; i++) { if (ix.v[i - 1] && S[i - 1]) { rp.push(ix.v[i] / ix.v[i - 1] - 1); rm.push(S[i] / S[i - 1] - 1); } }
+    const n = rp.length; let beta = null, alfa = null; const rf = Math.pow(1 + Hist.RF, dias / 365) - 1;
+    if (n >= 60) { const mp = sum(rp) / n, mm = sum(rm) / n; let cov = 0, vm = 0; for (let i = 0; i < n; i++) { cov += (rp[i] - mp) * (rm[i] - mm); vm += (rm[i] - mm) ** 2; } beta = vm > 0 ? cov / vm : null; if (beta != null) alfa = twr - (rf + beta * (spy - rf)); }
+    // caida maxima: del pico al piso dentro de la ventana; si ya recupero el pico, cuando
+    let pico = ix.v[i0], fPico = F[i0], dd = 0, ddPico = null, ddPiso = null, rec = null;
+    for (let i = i0; i <= i1; i++) { const x = ix.v[i]; if (x == null) continue; if (x > pico) { pico = x; fPico = F[i]; } const d = x / pico - 1; if (d < dd) { dd = d; ddPico = fPico; ddPiso = F[i]; rec = null; } if (ddPiso && rec == null && F[i] > ddPiso && x >= ix.v[F.indexOf(ddPico)]) rec = F[i]; }
+    const actual = ix.v[i1] / pico - 1;
+    return { desde: F[i0], hasta: F[i1], dias, ruedas: n, twr, spy, beta, alfa, rf, rfAnual: Hist.RF, dd, ddPico, ddPiso, recuperada: rec, ddActual: actual };
+  },
+  /** beta de hoy según Finnhub (5 años de cada empresa), ponderada por lo que vale cada posición */
+  betaPonderada(k) { let a = 0, w = 0; for (const p of k.posiciones) { const d = Fund.de(p.ticker); const v = p.valor; if (d && Number.isFinite(d.beta) && v > 0) { a += d.beta * v; w += v; } } return w ? { beta: a / w, cubre: w / (k.valor || w) } : null; },
   /** valor del índice en una fecha (la última rueda ≤ fecha) */
   en(ix, fecha) { if (!ix) return null; let r = null; for (let i = 0; i < ix.fechas.length && ix.fechas[i] <= fecha; i++) if (ix.v[i] != null) r = ix.v[i]; return r; },
 };
@@ -4988,8 +5016,25 @@ function renderEvolucion(k, seg) {
       ${box('Sombra S&P', pctS(r.sombra), r.sombra >= 0 ? 'up' : 'down', fmtU(v.sombraValor, 0))}
       ${box('Alfa', r.alfa != null ? `${r.alfa >= 0 ? '+' : '−'}${(Math.abs(r.alfa) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} pp` : '—', r.alfa != null ? (alfaOk ? 'up' : 'down') : '', r.alfaUSD != null ? `${r.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(r.alfaUSD), 0)}` : '')}
     </div>
+    ${riesgoRow(k, v)}
     ${chart}
     ${conAlfa.length ? `<div class="divider"></div><div class="card-head" style="margin-bottom:6px"><h3>Alfa por posición</h3><span class="hint">vs SPY, desde el inicio</span></div>${top.map(alfaRow).join('')}${bottom.length ? `<div class="divider" style="margin:6px 0"></div>${bottom.map(alfaRow).join('')}` : ''}` : ''}
+  </div>`;
+}
+/** renglón de riesgo debajo de los 3 números: por tiempo, beta, alfa ajustado por riesgo y caída máxima (Hist.riesgo) */
+function riesgoRow(k, v) {
+  if (!Hist.datos) { if (!Hist._p && Hist.dia !== D.today()) Hist.cargar().then(d => { if (d && ui.view === 'cartera') render(); }); return ''; }
+  const x = Hist.riesgo(k, v.desde); if (!x) return '';
+  const pp = y => `${y >= 0 ? '+' : '−'}${(Math.abs(y) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
+  const bp = Hist.betaPonderada(k);
+  const it = (l, val, cls, sub) => `<div class="rk"><span class="l">${l}</span><b class="${cls || ''}">${val}</b><span class="s">${sub}</span></div>`;
+  const info = `Medidas desde el ${D.fmt(x.desde, { year: true })} hasta el cierre del ${D.fmt(x.hasta)} (${x.ruedas} ruedas), con los cierres diarios ajustados por splits y dividendos.\n\nPor tiempo (TWR): lo que rindió tu cartera sin importar cuándo pusiste plata, como lo informa un fondo. Se compara con SPY con dividendos.\n\nBeta: cuánto se mueve tu cartera cuando se mueve el S&P 500, medida con tus rendimientos diarios reales (1 = igual; 1,3 = 30 % más). ${bp ? `La de Finnhub ponderada por posición da ${bp.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 })}.` : ''}\n\nAlfa ajustado (Jensen): lo que ganaste por encima de lo que el mercado "te debía" por el riesgo que tomaste: tu rendimiento menos [tasa libre de riesgo + beta × (S&P − tasa libre)], con ${Math.round(x.rfAnual * 100)} % anual en dólares. Si da cerca de cero, le ganás al S&P por tomar más riesgo, no por elegir mejor. Con menos de un año de datos es orientativo.\n\nCaída máxima: lo más que cayó tu cartera desde un pico en este período. Para un inversor de largo plazo es la medida de riesgo que importa: si aguantás eso sin vender.`;
+  return `<div class="riesgo">
+    ${it('Por tiempo', `${pp(x.twr)} %`, x.twr >= 0 ? 'up' : 'down', `S&P ${pp(x.spy)} %`)}
+    ${it('Beta', x.beta != null ? x.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—', '', x.beta != null ? 'vs S&P, diaria' : 'pocos datos')}
+    ${it('Alfa ajustado', x.alfa != null ? `${pp(x.alfa)} pp` : '—', x.alfa != null ? (x.alfa >= 0 ? 'up' : 'down') : '', x.alfa != null ? 'por riesgo' : 'desde 60 ruedas')}
+    ${it('Caída máx.', `${pp(x.dd)} %`, x.dd < -0.1 ? 'down' : '', x.ddPiso ? (x.recuperada ? `recuperada ${D.fmt(x.recuperada)}` : `piso ${D.fmt(x.ddPiso)}`) : 'sin caídas')}
+    <span class="rk-i">${infoBtn(info)}</span>
   </div>`;
 }
 /** ⓘ de la comparación: las tres medidas que usan los pros (acumulado money-weighted, TIR anual, TWR), cómo se arma la sombra y salvedades */
@@ -5000,7 +5045,7 @@ function infoEvolucion(modo) {
   const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
     <tr><td>Acumulado<small>${r.metodo === 'tir' ? 'ponderado por dinero (TIR)' : 'ponderado por dinero (Dietz)'}</small></td><td>${p(r.real)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
     <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirReal) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
-    <tr><td>Ponderado por tiempo<small>${r.twr == null && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr)}</td><td>${p(r.spyDirecto)}</td><td>${p(r.spyDirecto)}</td></tr>
+    <tr><td>Ponderado por tiempo<small>${r.twr == null && !Hist.riesgo(k, v.desde) && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr != null ? r.twr : (Hist.riesgo(k, v.desde) || {}).twr)}</td><td>${p(r.twr != null ? r.spyDirecto : (Hist.riesgo(k, v.desde) || {}).spy)}</td><td>${p(r.spyDirecto)}</td></tr>
   </tbody></table>`;
   Modal.open({ title: 'Cómo se calcula', submit: '', body: `<div class="stack small" style="line-height:1.5">
     ${tabla}
@@ -6033,6 +6078,7 @@ const Intercambio = {
       tipo: 'gestor-gastos-cartera', version: Intercambio.VERSION, generado: hora.toISOString(), app: BUILD,
       dolar: { mep: k.mep, ccl: k.ccl, spy: k.spyHoy, preciosAl: k.preciosFecha },
       resumen: { valorUSD: k.valor, valorTotalUSD: valorTot != null ? +valorTot.toFixed(2) : null, realizadoCerradasUSD: +realCerr.toFixed(2), realizadoVentasParcialesUSD: +realParc.toFixed(2), twrDiario: twrR, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
+      riesgo: Object.fromEntries([['anio', 'YTD'], ['inicio', 'Todo']].map(([m]) => [m, k.ventanas[m] && k.ventanas[m].disponible ? Hist.riesgo(k, k.ventanas[m].desde) : null])),
       rendimiento: Object.fromEntries(E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
       posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
       watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
@@ -6054,7 +6100,9 @@ ${c.verdad}
 ## Resumen
 - Valor: **US$ ${n(k.valor)}** \u00b7 costo (lotes FIFO) US$ ${n(k.costo)} \u00b7 resultado no realizado ${k.gp != null ? (k.gp >= 0 ? '+' : '') + n(k.gp) : 's/d'} USD (${pct(k.gpPct)}) \u00b7 **resultado total** (precio + dividendos + realizado) ${k.gpTotal != null ? (k.gpTotal >= 0 ? '+' : '') + n(k.gpTotal) : 's/d'} USD \u00b7 rendimiento total sobre el costo de lo que ten\u00e9s ${pct(k.rendTotal)} \u00b7 valor total (acciones + otros activos, como la pantalla) US$ ${n(valorTot)}
 - Dividendos cobrados US$ ${n(k.dividendos)} \u00b7 resultado realizado US$ ${n(k.realizado)} = posiciones cerradas US$ ${n(realCerr)} + ventas parciales de posiciones abiertas US$ ${n(realParc)}${twrR ? `\n- TWR con valuaciones diarias reales (desde ${twrR.desde}, ${twrR.n} valuaciones): cartera ${pctO(twrR.twr)} vs SPY ${pctO(twrR.spy)}. En los rangos que arrancan antes no se informa TWR.` : ''}
-${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operaci\u00f3n)' : l)).join('\n')}
+${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operaci\u00f3n)' : l)).join('\n')}${(() => { const bp = Hist.betaPonderada(k); const ls = [['anio', 'YTD'], ['inicio', 'Todo']].map(([m, l]) => { const v = k.ventanas[m]; const x = v && v.disponible ? Hist.riesgo(k, v.desde) : null; if (!x) return null; const p1 = y => `${(y * 100).toFixed(1)} %`;
+      return `- **Riesgo y rendimiento por tiempo (${l}, ${x.desde} a ${x.hasta}, ${x.ruedas} ruedas)**: TWR cartera ${p1(x.twr)} vs SPY con dividendos ${p1(x.spy)} \u00b7 beta realizada ${x.beta != null ? x.beta.toFixed(2) : 's/d (menos de 60 ruedas)'} \u00b7 alfa de Jensen ${x.alfa != null ? `${(x.alfa * 100).toFixed(1)} pp` : 's/d'} (tasa libre ${Math.round(x.rfAnual * 100)} % anual) \u00b7 ca\u00edda m\u00e1xima ${p1(x.dd)}${x.ddPiso ? ` (pico ${x.ddPico}, piso ${x.ddPiso}${x.recuperada ? `, recuperada ${x.recuperada}` : ', sin recuperar'})` : ''}`; }).filter(Boolean);
+      return ls.length ? '\n' + ls.join('\n') + (bp ? `\n- Beta de Finnhub ponderada por posici\u00f3n (5 a\u00f1os de cada empresa): ${bp.beta.toFixed(2)}` : '') : ''; })()}
 - "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo d\u00eda. La comparaci\u00f3n es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera \u2212 sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por a\u00f1o); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posici\u00f3n = (precio hoy \u2212 PPC + dividendos cobrados) / costo.
 - Sueldo neto $ ${fmtARS.format(Number(s.ingreso) || 0)} por mes \u00b7 presupuesto de gasto $ ${fmtARS.format(Number(s.presupuesto) || 0)}
 
@@ -6784,7 +6832,7 @@ const Actions = {
   'pat-dist'() { verDistribucion(); },
   'import-claude'() { formImportar(); },
   'balances'() { formBalances(); },
-  'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t))}</p>` }); $('#modal').classList.add('rs-modal'); },
+  'info'(t) { Modal.open({ title: '', submit: '', body: `<p class="info-txt">${esc(decodeURIComponent(t)).replace(/\n/g, '<br>')}</p>` }); $('#modal').classList.add('rs-modal'); },
   'fund-chart'(k) { ui.fundChart = k; const box = $('#fch-box'); const d = box && Fund.de(box.dataset.t); if (box && d) box.innerHTML = fundChartHTML(d); },
   'ficha-tab'(k) { ui.fichaTab = k; const m = $('#modal'); m.dataset.ftab = k; $$('#modal .seg3 button').forEach(b => b.classList.toggle('on', b.dataset.id === k)); const mb = m.querySelector('.m-body') || m; mb.scrollTop = 0; },
   'ga-grupo'(id) { ui.gaGrupo = ui.gaGrupo === id ? null : id; render(); },  // 1er toque abre, 2do cierra; los gastos se ven tocando una categoria

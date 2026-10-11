@@ -551,8 +551,25 @@ function renderEvolucion(k, seg) {
       ${box('Sombra S&P', pctS(r.sombra), r.sombra >= 0 ? 'up' : 'down', fmtU(v.sombraValor, 0))}
       ${box('Alfa', r.alfa != null ? `${r.alfa >= 0 ? '+' : '−'}${(Math.abs(r.alfa) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} pp` : '—', r.alfa != null ? (alfaOk ? 'up' : 'down') : '', r.alfaUSD != null ? `${r.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(r.alfaUSD), 0)}` : '')}
     </div>
+    ${riesgoRow(k, v)}
     ${chart}
     ${conAlfa.length ? `<div class="divider"></div><div class="card-head" style="margin-bottom:6px"><h3>Alfa por posición</h3><span class="hint">vs SPY, desde el inicio</span></div>${top.map(alfaRow).join('')}${bottom.length ? `<div class="divider" style="margin:6px 0"></div>${bottom.map(alfaRow).join('')}` : ''}` : ''}
+  </div>`;
+}
+/** renglón de riesgo debajo de los 3 números: por tiempo, beta, alfa ajustado por riesgo y caída máxima (Hist.riesgo) */
+function riesgoRow(k, v) {
+  if (!Hist.datos) { if (!Hist._p && Hist.dia !== D.today()) Hist.cargar().then(d => { if (d && ui.view === 'cartera') render(); }); return ''; }
+  const x = Hist.riesgo(k, v.desde); if (!x) return '';
+  const pp = y => `${y >= 0 ? '+' : '−'}${(Math.abs(y) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`;
+  const bp = Hist.betaPonderada(k);
+  const it = (l, val, cls, sub) => `<div class="rk"><span class="l">${l}</span><b class="${cls || ''}">${val}</b><span class="s">${sub}</span></div>`;
+  const info = `Medidas desde el ${D.fmt(x.desde, { year: true })} hasta el cierre del ${D.fmt(x.hasta)} (${x.ruedas} ruedas), con los cierres diarios ajustados por splits y dividendos.\n\nPor tiempo (TWR): lo que rindió tu cartera sin importar cuándo pusiste plata, como lo informa un fondo. Se compara con SPY con dividendos.\n\nBeta: cuánto se mueve tu cartera cuando se mueve el S&P 500, medida con tus rendimientos diarios reales (1 = igual; 1,3 = 30 % más). ${bp ? `La de Finnhub ponderada por posición da ${bp.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 })}.` : ''}\n\nAlfa ajustado (Jensen): lo que ganaste por encima de lo que el mercado "te debía" por el riesgo que tomaste: tu rendimiento menos [tasa libre de riesgo + beta × (S&P − tasa libre)], con ${Math.round(x.rfAnual * 100)} % anual en dólares. Si da cerca de cero, le ganás al S&P por tomar más riesgo, no por elegir mejor. Con menos de un año de datos es orientativo.\n\nCaída máxima: lo más que cayó tu cartera desde un pico en este período. Para un inversor de largo plazo es la medida de riesgo que importa: si aguantás eso sin vender.`;
+  return `<div class="riesgo">
+    ${it('Por tiempo', `${pp(x.twr)} %`, x.twr >= 0 ? 'up' : 'down', `S&P ${pp(x.spy)} %`)}
+    ${it('Beta', x.beta != null ? x.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—', '', x.beta != null ? 'vs S&P, diaria' : 'pocos datos')}
+    ${it('Alfa ajustado', x.alfa != null ? `${pp(x.alfa)} pp` : '—', x.alfa != null ? (x.alfa >= 0 ? 'up' : 'down') : '', x.alfa != null ? 'por riesgo' : 'desde 60 ruedas')}
+    ${it('Caída máx.', `${pp(x.dd)} %`, x.dd < -0.1 ? 'down' : '', x.ddPiso ? (x.recuperada ? `recuperada ${D.fmt(x.recuperada)}` : `piso ${D.fmt(x.ddPiso)}`) : 'sin caídas')}
+    <span class="rk-i">${infoBtn(info)}</span>
   </div>`;
 }
 /** ⓘ de la comparación: las tres medidas que usan los pros (acumulado money-weighted, TIR anual, TWR), cómo se arma la sombra y salvedades */
@@ -563,7 +580,7 @@ function infoEvolucion(modo) {
   const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
     <tr><td>Acumulado<small>${r.metodo === 'tir' ? 'ponderado por dinero (TIR)' : 'ponderado por dinero (Dietz)'}</small></td><td>${p(r.real)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
     <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirReal) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
-    <tr><td>Ponderado por tiempo<small>${r.twr == null && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr)}</td><td>${p(r.spyDirecto)}</td><td>${p(r.spyDirecto)}</td></tr>
+    <tr><td>Ponderado por tiempo<small>${r.twr == null && !Hist.riesgo(k, v.desde) && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr != null ? r.twr : (Hist.riesgo(k, v.desde) || {}).twr)}</td><td>${p(r.twr != null ? r.spyDirecto : (Hist.riesgo(k, v.desde) || {}).spy)}</td><td>${p(r.spyDirecto)}</td></tr>
   </tbody></table>`;
   Modal.open({ title: 'Cómo se calcula', submit: '', body: `<div class="stack small" style="line-height:1.5">
     ${tabla}
