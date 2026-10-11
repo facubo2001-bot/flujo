@@ -1,8 +1,8 @@
 {
- "corrida": "2026-10-10T22:56:48.706Z",
- "ok": 378,
+ "corrida": "2026-10-11T16:22:26.073Z",
+ "ok": 379,
  "stooq": 0,
- "yahoo": 378,
+ "yahoo": 379,
  "falla": [
   "AABA",
   "ADGO",
@@ -31,8 +31,7 @@
   "SPCX",
   "TTM",
   "TWTR",
-  "WBA",
-  "WBO"
+  "WBA"
  ],
- "segundos": 25
+ "segundos": 29
 }
