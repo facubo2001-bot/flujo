@@ -369,6 +369,8 @@ const Verif = {
       else if (fd !== o.fecha) add('warn', `Sin cierre de SPY del ${D.fmt(o.fecha)}: la sombra usa el del ${D.fmt(fd)} (${fmtU(cl)}).`);
       else add('ok', `Sombra: cierre de SPY del ${D.fmt(o.fecha)} ${fmtU(cl)}.`);
     }
+    // balance cerca (Facu): comprar o vender a pocos dias del balance es apostar al resultado; el precio puede moverse fuerte
+    if (o.ticker && o.fecha >= hoyH && (o.tipo === 'compra' || o.tipo === 'venta')) { const b = Fund.balance(o.ticker); if (b && b.dias <= 14) add('warn', `Ojo: ${o.ticker} presenta balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`} (${D.fmt(b.fecha)}${b.hora === 'bmo' ? ', antes de abrir' : b.hora === 'amc' ? ', despu\u00e9s del cierre' : ''}). El precio puede moverse fuerte ese d\u00eda: \u00bfquer\u00e9s esperar o entrar de a partes?`); }
     // venta > tenencia
     if (o.tipo === 'venta' && o.acciones) { const p = k.posiciones.find(x => x.ticker === o.ticker); const tengo = p ? p.acciones + (o.id ? (k.ops.find(x => x.id === o.id) || {}).acciones || 0 : 0) : 0; if (tengo + 1e-6 < o.acciones) add('block', `Vendés ${fmtAcc(o.acciones)} acciones y tenés ${fmtAcc(tengo)}.`); }
     // duplicado
@@ -526,6 +528,7 @@ function calcPintar() {
   const justo = mk ? mk * ccl * c.ratio[1] / c.ratio[0] : null; const ny = mercadoNY(); const cclMs = s.cclHora ? new Date(s.cclHora).getTime() : 0;
   let h = ''; const lim = ny.abierto ? 20 * 60000 : 96 * 3600000; const vCcl = !cclMs || Date.now() - cclMs > lim, vPr = mk && (!pr.t || Date.now() - pr.t > lim);
   if (calcFresco.fallo || vCcl || vPr) h += `<div class="callout amber small" style="margin-bottom:10px"><b>Ojo: datos sin actualizar.</b> ${calcFresco.fallo ? 'No pude traer los valores de ahora (¿sin conexión?). ' : ''}${vCcl ? `El CCL es de ${opEdad(cclMs)}. ` : ''}${vPr ? `El precio de NY es de ${opEdad(pr.t)}. ` : ''}No decidas con esto.</div>`;
+  { const b = Fund.balance(t); if (b && b.dias <= 14) h += `<div class="callout amber small" style="margin-bottom:10px"><b>Ojo: presenta balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}</b> (${D.fmt(b.fecha)}${b.hora === 'bmo' ? ', antes de abrir' : b.hora === 'amc' ? ', despu\u00e9s del cierre' : ''}). El precio puede moverse fuerte ese d\u00eda: pens\u00e1 si quer\u00e9s esperar o entrar de a partes.</div>`; }
   if (px) {
     const pu = Cedears.precioUSD(px, c, ccl); const v = opVeredicto(tipo, pu, t);
     h += `<div class="px-usd"><small>Precio real de la acción al que ${tipo === 'venta' ? 'vendés' : 'comprás'}</small><b>${fmtU(pu)}</b>${v ? `<strong class="${v.cls}">${v.txt}</strong>` : '<small>Sin precio de Nueva York para comparar (cargá la clave de Finnhub en Ajustes)</small>'}<small>${fmtARS.format(px)} × ${c.ratio[0]}${c.ratio[1] > 1 ? ` ÷ ${c.ratio[1]}` : ''} ÷ CCL ${fmtARS.format(ccl)}</small></div>`;

@@ -537,3 +537,4 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Balances: 2 semanas antes para todas, cartera y watchlist (Facu probó un mes y era mucho) (`Fund.balanceCerca`).
 - EMA 200: solo las que la están tocando (entre +3 % y −5 %, `Tec.cerca`), lo que tenés primero, hasta 6. Las muy por debajo ya no van en Novedades (siguen en la ficha y el export).
 - "Baratas" por P/E: hasta 4 (antes 8).
+- (12-oct, build 202610121624) Aviso de balance cerca al operar: si faltan 14 días o menos, el control del form de compra/venta suma "Ojo: presenta balance en N días… ¿esperar o entrar de a partes?" (ámbar, no bloquea) y la calculadora de CEDEAR muestra el mismo cartel arriba.
