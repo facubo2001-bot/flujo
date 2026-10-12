@@ -532,3 +532,8 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Facu: "no está mostrando empresas". Causas: (1) el calendario se pedía día por día para todo el mercado y Finnhub corta en ~1.000 por día: en temporada de balances se perdían empresas; (2) "Balances que vienen" leía solo la fecha guardada en la ficha (`d.balance`), no el calendario, y la ficha la tomaba del calendario global aunque le faltara la empresa → "Finnhub no tiene fecha".
 - Ahora `Fund.calendario` (v2): una consulta por empresa seguida (cartera + watchlist, sin ETF: `Fund.ETF`), 120 días adelante, una vez por día, retoma donde quedó si hay límite. `Fund.calEstado` para mostrar el avance. La vista usa `Fund.balance` (calendario o ficha), saca los fondos y dice "calendario cargando" mientras completa. La ficha usa la fecha del calendario o su propia consulta.
 - Referencia (12-oct): GOOGL 28-oct confirmado por Alphabet; MSFT/META ~28-oct, AMZN ~29-oct, NVDA ~18-nov (estimados).
+
+## Novedades con menos ruido (12-oct, build 202610121558)
+- Balances: aparecen un mes antes si la tenés en cartera y 3 semanas antes si es watchlist (antes 14 y 7 días) (`Fund.balanceCerca`).
+- EMA 200: solo las que la están tocando (entre +3 % y −5 %, `Tec.cerca`), lo que tenés primero, hasta 6. Las muy por debajo ya no van en Novedades (siguen en la ficha y el export).
+- "Baratas" por P/E: hasta 4 (antes 8).

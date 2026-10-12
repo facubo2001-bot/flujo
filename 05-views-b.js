@@ -293,7 +293,7 @@ function viewCartera() {
   const pt = E.patrimonio(k); const hayActivos = pt.activos.length > 0;
   const rendStr = v => v && v.disponible && v.rend.realDiv != null ? { v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { v: '—', cls: '' };
   const reparto = pt.grupos.filter(g => g.valor > 0).map(g => `${g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'fondo' : g.nombre.toLowerCase()} ${M.pct(g.valor / pt.total, 0)}`).join(' · ');
-  // balances cerca: 14 dias antes si la tenes, 7 si es watchlist; primero los mas proximos, entre iguales lo que tenes
+  // balances cerca: un mes antes si la tenes, 3 semanas si es watchlist; primero los mas proximos, entre iguales lo que tenes
   const balSemana = [...k.posiciones.map(x => ({ t: x.ticker, tengo: true, peso: x.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(x => ({ t: x.ticker, tengo: false, peso: 0 }))]
     .map(x => ({ ...x, b: Fund.balanceCerca(x.t, x.tengo) })).filter(x => x.b).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
   // chips: "MELI 25/09 pm" (pm = tras el cierre, am = antes de abrir)
@@ -301,9 +301,11 @@ function viewCartera() {
   const balLineas = balSemana.length ? `<div class="nov-l nov-z"><span class="nov-chips">${balSemana.map(x => `<span class="nov-chip bal" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)} ${ddmm(x.b.fecha)}${x.b.hora === 'bmo' ? '<i>am</i>' : x.b.hora === 'amc' ? '<i>pm</i>' : ''}</span>`).join('')}</span></div>` : '';
   const zona = [...k.posiciones, ...k.watch].filter(x => x.estado).sort((x, y) => (x.estado === 'urgente' ? 0 : 1) - (y.estado === 'urgente' ? 0 : 1) || ((k.posiciones.some(p => p.ticker === y.ticker) ? 1 : 0) - (k.posiciones.some(p => p.ticker === x.ticker) ? 1 : 0)));
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
-  const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 8);
-  // todas las que estan en su EMA 200 o por debajo, de la mas lejos abajo a la mas cerca; mas de 5 % abajo en rojo
-  const emaCerca = [...k.posiciones, ...k.watch].map(p => ({ t: p.ticker, e: Tec.de(p.ticker) })).filter(x => x.e && x.e.dist <= 0.005).sort((a, b) => a.e.dist - b.e.dist);
+  const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 4);  // Facu: menos ruido, las 4 mas baratas
+  // solo las que estan tocando su EMA 200 (entre 3 % arriba y 5 % abajo: pasa pocas veces), lo que tenes primero, hasta 6.
+  // Las que estan muy por debajo ya no van aca (Facu: hacia ruido); siguen en la ficha y en el export
+  const tengoSet = new Set(k.posiciones.map(p => p.ticker));
+  const emaCerca = [...k.posiciones, ...k.watch].map(p => ({ t: p.ticker, e: Tec.cerca(p.ticker) })).filter(x => x.e).sort((a, b) => (tengoSet.has(b.t) - tengoSet.has(a.t)) || Math.abs(a.e.dist) - Math.abs(b.e.dist)).slice(0, 6);
   const emaLinea = emaCerca.length ? `<div class="nov-l nov-z"><span class="nov-chips">${emaCerca.map(x => `<span class="nov-chip tec${x.e.dist < -0.05 ? ' abajo' : ''}" data-act="pos" data-id="${esc(x.t)}" title="EMA 200 ${x.e.ema.toFixed(2)} \u00b7 ${Tec.toquesTxt(x.e)}${x.e.pctAbajo10 != null ? ` \u00b7 estuvo abajo el ${Math.round(x.e.pctAbajo10 * 100)} % de los d\u00edas` : ''}">${esc(x.t)}<i>EMA ${Tec.distTxt(x.e.dist)}</i></span>`).join('')}</span></div>` : '';
   const barLinea = baratas.length ? `<div class="nov-l nov-z"><span class="nov-chips">${baratas.map(x => `<span class="nov-chip val" data-act="pos" data-id="${esc(x.t)}" title="P/E ${x.b.pe.toFixed(1)} vs mediana 10 a\u00f1os ${x.b.med.toFixed(1)}">${esc(x.t)}<i>P/E \u2212${Math.round(x.b.desc * 100)}%</i></span>`).join('')}</span></div>` : '';
   const pxHora = k.preciosFecha ? new Date(k.preciosFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
