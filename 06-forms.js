@@ -907,12 +907,33 @@ function formComparar(t) {
   $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.dataset.dim); if (b) cmpToggle(b.dataset.id); else { const q = e.target.value.trim().toUpperCase(); if (q && Cedears.de(q)) cmpToggle(Cedears.ticker(Cedears.de(q))); } };
   cmpTraer();
 }
+/** Agregar a la watchlist: buscar el CEDEAR, zonas opcionales. Al guardar trae la ficha (fundamentales, balance, EMA) y la abre */
 function formWatch() {
-  Modal.open({ title: 'Vigilar un ticker', body: `<div class="form-grid">${F.field('Ticker', F.input('w-ticker', '', 'placeholder="TSM" autofocus autocapitalize="characters" style="text-transform:uppercase"'), 'Sin tenerlo: solo para que la app y el bot te avisen.', 'full')}${F.field('<span class="dot warn"></span>Che, mirala ' + G.le + ' (USD)', F.input('w-mirala', '', 'inputmode="decimal"'))}${F.field('<span class="dot crit"></span>Comprá urgente ' + G.le + ' (USD)', F.input('w-urgente', '', 'inputmode="decimal"'))}</div>`, submit: 'Guardar', onSubmit: () => {
-    const t = Modal.val('w-ticker').trim().toUpperCase(); const mirala = M.parse(Modal.val('w-mirala')), urgente = M.parse(Modal.val('w-urgente'));
-    if (!t || (!mirala && !urgente)) { toast('Ticker y al menos un nivel'); return false; }
-    state.cartera.alertas[t] = { mirala: mirala || null, urgente: urgente || null }; Persist.save(); render();
+  const body = `<div class="form-grid">
+    ${F.field('Empresa', `<input type="hidden" id="o-tk" value="">
+      <input class="input" id="o-ticker" value="" placeholder="Buscá el CEDEAR: Apple, TSM, Uber…" autocomplete="off" autocapitalize="characters">
+      <div class="sug-list" id="o-sug"></div><div class="small muted" id="o-info" style="margin-top:4px"></div>`, '', 'full')}
+    ${F.field('<span class="dot warn"></span>Che, mirala ' + G.le + ' (USD)', F.input('w-mirala', '', 'inputmode="decimal" placeholder="opcional"'))}
+    ${F.field('<span class="dot crit"></span>Urgente ' + G.le + ' (USD)', F.input('w-urgente', '', 'inputmode="decimal" placeholder="opcional"'))}
+    <p class="small muted full" style="margin:0">Las zonas son opcionales: sin ellas la sigue igual (fundamentales, balances, EMA 200, comparador y export). Después las podés poner vos o pedirle al chat de Inversiones.</p>
+  </div>`;
+  Modal.open({ title: 'Seguir una empresa', body, submit: 'Seguir', onSubmit: () => {
+    const t = (formOpTicker() || Modal.val('o-ticker')).trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, '');
+    if (!t) { toast('Elegí una empresa'); return false; }
+    if (E.cartera().posiciones.some(p => p.ticker === t) && !state.cartera.alertas[t]) { /* la tenes: igual se le pueden poner zonas */ }
+    const mirala = M.parse(Modal.val('w-mirala')), urgente = M.parse(Modal.val('w-urgente'));
+    const prev = state.cartera.alertas[t] || {};
+    state.cartera.alertas[t] = { ...prev, mirala: mirala || prev.mirala || null, urgente: urgente || prev.urgente || null };
+    if (state.cartera.fundSinDatos) delete state.cartera.fundSinDatos[t];
+    Persist.save(); render(); toast(`${t} agregada: trayendo precio, fundamentales y balance…`, 3500);
+    (async () => { try { await Precios.quote(t); } catch (e) {} try { await Fund.traer(t); } catch (e) {} const c = state.cartera.calendario; if (c && c.hechos) delete c.hechos[t]; if (c) c.ok = false; Motor.arrancar(); render(); })();
+    setTimeout(() => formPosicion(t), 0);
   } });
+  $('#modal').oninput = e => {
+    if (e.target.id !== 'o-ticker') return; const q = e.target.value.trim(); $('#o-tk').value = '';
+    $('#o-sug').innerHTML = Cedears.buscar(q).map(c => `<button type="button" data-act="pick-ced" data-id="${esc(c.code)}"><b>${esc(c.code)}</b><span>${esc(c.nombre)}</span><i>${Cedears.ratioTxt(c)}</i></button>`).join('');
+    $('#o-info').innerHTML = '';
+  };
 }
 
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */

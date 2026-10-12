@@ -538,3 +538,6 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - EMA 200: solo las que la están tocando (entre +3 % y −5 %, `Tec.cerca`), lo que tenés primero, hasta 6. Las muy por debajo ya no van en Novedades (siguen en la ficha y el export).
 - "Baratas" por P/E: hasta 4 (antes 8).
 - (12-oct, build 202610121624) Aviso de balance cerca al operar: si faltan 14 días o menos, el control del form de compra/venta suma "Ojo: presenta balance en N días… ¿esperar o entrar de a partes?" (ámbar, no bloquea) y la calculadora de CEDEAR muestra el mismo cartel arriba.
+
+## Seguir una empresa desde la app (12-oct, build 202610122100)
+- "+ Ticker" en Alertas de precio (`formWatch`): buscador de CEDEARs (mismo de las operaciones), zonas opcionales (antes eran obligatorias). Al guardar: trae precio y ficha, la suma al calendario de balances del día y abre la ficha.
