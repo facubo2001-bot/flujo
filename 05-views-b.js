@@ -52,6 +52,13 @@ function renderResumenDetalle(tarjetaId, ym) {
 
 /* ---------- PLAN: presupuesto e inversión ---------- */
 /** Proyeccion: patrimonio de hoy + aporte mensual, a tres ritmos de retorno (Facu: "cantidad de guita estimada para el anio que viene y asi") */
+/** lectura del año elegido en la proyeccion: cada escenario, lo puesto de tu bolsillo y la renta al 4 % */
+function proySel(d, i) {
+  const f0 = x => fmtU(x, 0); const base = d.series[1] || d.series[0]; const puesto = d.puesto[i];
+  return `<div class="ps-h"><b>${i ? d.anio0 + i : 'Hoy'}</b><span>${i ? `en ${i} a\u00f1o${i > 1 ? 's' : ''}` : ''}</span></div>
+    <div class="ps-rows">${d.series.map(e => `<div class="ps-r"><i style="background:${e.c}"></i><span>${esc(e.k)}</span><b>${f0(e.v[i])}</b></div>`).join('')}</div>
+    <div class="ps-f">Puesto de tu bolsillo ${f0(puesto)}${i ? ` \u00b7 ganado al ritmo del S&amp;P ${f0(base.v[i] - puesto)} \u00b7 renta al 4 %: ${f0(base.v[i] * d.renta / 12)}/mes` : ''}</div>`;
+}
 function proyeccionCard() {
   const k = E.cartera(); const pt = E.patrimonio(k); const v0 = pt.total || k.valor || 0; if (!(v0 > 0)) return '';
   const ap = E.aporteMensual(k); const auto = Math.max(0, Math.round(ap.mensual)); const aporte = state.settings.proyAporte != null ? Number(state.settings.proyAporte) : auto;
@@ -65,10 +72,12 @@ function proyeccionCard() {
   const tabla = `<div class="table-wrap"><table class="proy"><thead><tr><th>En US$</th>${series.map(e => `<th class="r">${e.k === 'S&P 500 hist\u00f3rico' ? 'S&amp;P 500' : e.k}<small>${(e.r * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} % anual</small></th>`).join('')}</tr></thead><tbody>
     ${filas.map(n => `<tr><td>${Number(D.today().slice(0, 4)) + n}<small>sin rendir ${n0(puesto[n])}</small></td>${series.map((e, i) => `<td class="r ${i === 1 ? 'b' : ''}">${n0(e.v[n])}</td>`).join('')}</tr>`).join('')}
   </tbody></table></div>`;
-  const labels = Array.from({ length: 11 }, (_, i) => i ? `+${i}` : 'hoy');
-  const chart = ChartQ.reg(w => Charts.line({ w, h: 200, labels, tipTitle: i => i ? `En ${i} a\u00f1o${i > 1 ? 's' : ''}` : 'Hoy', tipFmt: x => f0(x),
+  const anio0 = Number(D.today().slice(0, 4)); const labels = Array.from({ length: N + 1 }, (_, i) => i === 0 ? 'hoy' : i % 5 === 0 ? String(anio0 + i) : '');
+  // grafico para recorrer con el dedo (Facu: "toco el grafico, me muevo y veo el año a año"): sin cartelitos, lectura fija arriba
+  const datosProy = { anio0, puesto, renta: 0.04, series: series.map(e => ({ k: e.k, c: e.c, r: e.r, v: e.v })) };
+  const chart = `<div class="proy-sel" id="proy-sel">${proySel(datosProy, 1)}</div><div class="proy-chart" data-proy='${esc(JSON.stringify(datosProy))}' data-n="${N}">` + ChartQ.reg(w => Charts.line({ w, h: 200, labels, xSparse: true, tipTitle: i => labels[i], tipFmt: x => f0(x),
     yFmt: x => MENOS(Math.abs(x) >= 1000 ? (x / 1000).toLocaleString('es-AR', { maximumFractionDigits: 0 }) + ' k' : Math.round(x).toString()),
-    series: [{ name: 'Sin rendir', color: 'var(--ink-3)', values: puesto.slice(0, 11), dashed: true }, ...series.map((e, i) => ({ name: e.k, color: e.c, values: e.v.slice(0, 11), strong: i === 1 }))] }), 200)
+    series: [{ name: 'Sin rendir', color: 'var(--ink-3)', values: puesto, dashed: true }, ...series.map((e, i) => ({ name: e.k, color: e.c, values: e.v, strong: i === 1 }))] }).replace(/ data-tip="[^"]*"/g, ''), 200) + `</div><div class="proy-hint">Deslizá el dedo sobre el gráfico para ver cada año</div>`
     + Charts.legend([...series.map(e => ({ name: e.k, color: e.c, kind: 'line' })), { name: 'Sin rendir (hoy + aportes)', color: 'var(--ink-3)', kind: 'dash' }]);
   const info = infoBtn(`Parte de todo tu patrimonio de hoy (CEDEARs, fondo, bitcoin y caja: ${f0(v0)}) y le suma cada mes el aporte. El aporte autom\u00e1tico es la plata nueva que entr\u00f3 en los \u00faltimos ${Math.round(ap.meses)} meses (compras menos ventas de CEDEARs ${f0(ap.ced)} + dep\u00f3sitos al fondo ${f0(ap.fondo)} al CCL de cada d\u00eda): ${f0(ap.mensual)} por mes. Reinvertir ventas o dividendos no cuenta como plata nueva. Retornos: 6 % prudente, 10 % lo que hist\u00f3ricamente rindi\u00f3 el S&P 500 con dividendos, y tu TIR real de CEDEARs con dividendos${tir != null ? ` (${(tir * 100).toFixed(1)} %)` : ''}, que es dif\u00edcil de sostener muchos a\u00f1os. Todo en d\u00f3lares de hoy sin descontar inflaci\u00f3n de EE.UU. (~2-3 % por a\u00f1o) ni impuestos. La renta es la regla del 4 %: lo que podr\u00edas retirar por a\u00f1o sin comerte el capital.`);
   return `<div class="card section"><div class="card-head"><h2>Proyecci\u00f3n de tu patrimonio ${info}</h2></div>

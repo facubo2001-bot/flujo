@@ -249,6 +249,23 @@ const Actions = {
 };
 
 /* ---------- global events ---------- */
+/* proyeccion: recorrer el grafico con el dedo y ver cada año (lectura fija arriba + linea vertical) */
+let _proyDown = false;
+function proyMover(e) {
+  const box = e.target.closest && e.target.closest('.proy-chart'); if (!box) return;
+  const svg = box.querySelector('svg'); const sel = $('#proy-sel'); if (!svg || !sel) return;
+  const d = box._d || (box._d = JSON.parse(box.dataset.proy)); const n = Number(box.dataset.n);
+  const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; const k = vb.width / r.width;
+  const x = (e.clientX - r.left) * k; const padL = 44, padR = 16; const iw = vb.width - padL - padR;
+  const i = Math.max(0, Math.min(n, Math.round((x - padL) / iw * n))); if (box._i === i) return; box._i = i;
+  sel.innerHTML = proySel(d, i);
+  let ln = svg.querySelector('.proy-mk'); if (!ln) { ln = document.createElementNS('http://www.w3.org/2000/svg', 'line'); ln.setAttribute('class', 'proy-mk'); ln.setAttribute('y1', 14); ln.setAttribute('y2', vb.height - 26); svg.appendChild(ln); }
+  const xx = padL + i / n * iw; ln.setAttribute('x1', xx); ln.setAttribute('x2', xx);
+}
+document.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('.proy-chart')) { _proyDown = true; proyMover(e); } });
+document.addEventListener('pointermove', e => { if (_proyDown || e.pointerType === 'mouse') proyMover(e); });
+document.addEventListener('pointerup', () => { _proyDown = false; });
+document.addEventListener('pointercancel', () => { _proyDown = false; });
 document.addEventListener('click', e => {
   const go_ = e.target.closest('[data-go]'); if (go_) { e.preventDefault(); if (go_.dataset.go === 'movimientos' && (Object.values(ui.filtros || {}).some(Boolean) || ui.gaGrupo)) { ui.filtros = {}; ui.gaGrupo = null; if (ui.view === 'movimientos') { render(); arriba(); return; } }  // tocar Gastos abajo vuelve a la vista sin filtros
     if (go_.dataset.go === ui.view) { arriba(); return; } go(go_.dataset.go); return; }

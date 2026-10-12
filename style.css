@@ -1187,3 +1187,12 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .riesgo .rk .s{font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .riesgo .rk-i{position:absolute;right:0;top:4px}
 @media (min-width:640px){.riesgo{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.proy-chart{touch-action:pan-y;cursor:crosshair}
+.proy-chart .proy-mk{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:3 3}
+.proy-hint{font-size:11.5px;color:var(--ink-3);text-align:center;margin:2px 0 6px}
+.proy-sel{border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;margin:4px 0 8px}
+.proy-sel .ps-h{display:flex;align-items:baseline;gap:8px}.proy-sel .ps-h b{font-family:var(--font-display);font-size:20px;font-weight:900}.proy-sel .ps-h span{font-size:12.5px;color:var(--ink-3)}
+.proy-sel .ps-rows{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.proy-sel .ps-r{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;font-size:13.5px}
+.proy-sel .ps-r i{width:10px;height:3px;border-radius:2px;display:block}.proy-sel .ps-r b{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.proy-sel .ps-f{font-size:12px;color:var(--ink-3);margin-top:6px;line-height:1.35}
