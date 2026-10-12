@@ -1290,7 +1290,7 @@ const Fund = {
     const pos10 = k => serieK(k).slice(-10).filter(v => Number.isFinite(v) && v > 0);
     const med10 = k => { const xs = pos10(k); return xs.length >= 3 ? Fund.mediana(xs) : null; };
     const peHist = pos10('pe');
-    const bal = calGlobal ? Fund.calDe(t) : cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.slice().sort((a, b) => a.date.localeCompare(b.date))[0] : null;
+    const bal = Fund.calDe(t) || (cal && cal.earningsCalendar && cal.earningsCalendar.length ? cal.earningsCalendar.filter(e => e.date >= hoy).sort((a, b) => a.date.localeCompare(b.date))[0] : null);
     const d = {
       at: Date.now(), ticker: t, v: Fund.VERSION, fuenteBal: sec ? (fin0 && fin0.data && fin0.data.length ? 'finnhub+sec' : 'sec') : 'finnhub', moneda: sec && !(fin0 && fin0.data && fin0.data.length) ? sec.moneda || 'USD' : 'USD',
       nombre: perfil && perfil.name || null, sector: perfil && perfil.finnhubIndustry || null,
@@ -1482,28 +1482,32 @@ const Fund = {
     }).sort((a, b) => (orden.has(a) ? orden.get(a) : 1e6) - (orden.has(b) ? orden.get(b) : 1e6));
   },
   /** calendario de balances de TODO el mercado: una consulta por dia; se guardan solo los tickers que seguis */
-  calendarioFresco() { const c = state.cartera.calendario; return !!(c && c.ok && Date.now() - c.at < 26 * 3600000); },
-  calDe(t) { const c = state.cartera.calendario; if (!c || !c.ok) return null; const x = c.map[Precios.simbolo(t)] || c.map[t]; return x || null; },
-  /** calendario de balances. Finnhub corta la respuesta en ~1.000 entradas y se queda con las fechas MAS LEJANAS
-   *  (pedido de 75 dias devolvia solo del 17-nov en adelante: sin balances cercanos). Se pide dia por dia (60 consultas,
-   *  una vez por dia) y sigue donde quedo si se corta. */
+  calendarioFresco() { const c = state.cartera.calendario; return !!(c && c.ok && c.v === 2 && Date.now() - c.at < 26 * 3600000); },
+  calDe(t) { const c = state.cartera.calendario; if (!c || c.v !== 2) return null; const x = c.map[Precios.simbolo(t)] || c.map[t]; return x && x.fecha >= D.today() ? x : null; },
+  /** calendario de balances: una consulta por empresa que seguis (cartera + watchlist), 120 dias adelante, una vez por dia.
+   *  Antes se pedia dia por dia para todo el mercado y en temporada de balances Finnhub corta en ~1.000 por dia: se perdian
+   *  empresas (Facu: "no esta mostrando empresas"). Los fondos (SPY, GLD...) no presentan balances y no se piden. */
+  ETF: new Set(['SPY', 'QQQ', 'DIA', 'IWM', 'GLD', 'SLV', 'VOO', 'VTI', 'EEM', 'EWZ', 'XLE', 'XLF', 'ARKK', 'IBIT', 'ETHA']),
   async calendario() {
     const hoy = D.today(); let c = state.cartera.calendario;
-    if (c && c.ok && Date.now() - c.at < 24 * 3600000) return;
-    if (!c || c.hoy !== hoy || !c.hechos) c = state.cartera.calendario = { at: 0, ok: false, hoy, map: {}, hechos: {}, cortados: [] };
-    const seguir = new Set(Precios.tickers().map(Precios.simbolo));
-    for (let i = 0; i < 60; i++) {
-      const dia = D.addDays(hoy, i); if (c.hechos[dia]) continue;
-      if (document.hidden) return;
-      const r = await Finnhub.get(`calendar/earnings?from=${dia}&to=${dia}`);
-      if (!r.ok) return;  // 429 o error: sigue la proxima vuelta
-      const lista = r.json && Array.isArray(r.json.earningsCalendar) ? r.json.earningsCalendar : [];
-      if (lista.length >= 990) c.cortados.push(dia);
-      for (const e of lista) if (e && e.symbol && seguir.has(e.symbol) && e.date >= hoy && (!c.map[e.symbol] || e.date < c.map[e.symbol].date)) c.map[e.symbol] = { fecha: e.date, date: e.date, hour: e.hour || '', hora: e.hour || '', epsEstimate: e.epsEstimate ?? null, epsEst: e.epsEstimate ?? null, quarter: e.quarter ?? null, trimestre: e.quarter ?? null };
-      c.hechos[dia] = 1; Persist.save();
+    if (c && c.ok && c.v === 2 && c.hoy === hoy) return;
+    if (!c || c.hoy !== hoy || c.v !== 2) c = state.cartera.calendario = { v: 2, at: 0, ok: false, hoy, map: {}, hechos: {} };
+    const hasta = D.addDays(hoy, 120);
+    const lista = [...new Set(Precios.tickers())].filter(t => !Fund.ETF.has(t));
+    for (const t of lista) {
+      if (c.hechos[t]) continue; if (document.hidden) return;
+      const s = Precios.simbolo(t);
+      const r = await Finnhub.get(`calendar/earnings?from=${hoy}&to=${hasta}&symbol=${encodeURIComponent(s)}`);
+      if (!r.ok) return;  // 429 o error: sigue la proxima vuelta, donde quedo
+      const ev = (r.json && Array.isArray(r.json.earningsCalendar) ? r.json.earningsCalendar : []).filter(e => e && e.date >= hoy && (!e.symbol || e.symbol === s)).sort((a, b) => a.date.localeCompare(b.date));
+      const e = ev[0];
+      if (e) c.map[s] = { fecha: e.date, date: e.date, hour: e.hour || '', hora: e.hour || '', epsEstimate: e.epsEstimate ?? null, epsEst: e.epsEstimate ?? null, quarter: e.quarter ?? null, trimestre: e.quarter ?? null };
+      c.hechos[t] = 1; Persist.save();
     }
     c.at = Date.now(); c.ok = true; Persist.save(); Motor.pintar();
   },
+  /** estado del calendario para la vista: cuantas empresas ya se consultaron hoy */
+  calEstado() { const c = state.cartera.calendario; const lista = [...new Set(Precios.tickers())].filter(t => !Fund.ETF.has(t)); const hechos = c && c.v === 2 && c.hoy === D.today() ? lista.filter(t => c.hechos[t]).length : 0; return { total: lista.length, hechos, listo: !!(c && c.ok && c.v === 2 && c.hoy === D.today()) }; },
   /** compat: el export y la precarga vieja la llaman */
   async actualizarCartera(max = 8) { let n = 0; for (const t of Fund.pendientes().slice(0, max)) { try { if (await Fund.traer(t)) n++; } catch (e) {} } return n; },
   calentar() { return Motor.arrancar(); },

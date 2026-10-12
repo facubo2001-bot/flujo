@@ -527,3 +527,8 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 
 ## Proyección: recorrer año a año con el dedo (12-oct, build 202610120007)
 - El gráfico va a 20 años y se recorre deslizando el dedo (`proyMover`, pointer events, `touch-action: pan-y` para no trabar el scroll vertical): arriba, una lectura fija (`proySel`) con el año, cada escenario, lo puesto de tu bolsillo, lo ganado al ritmo del S&P y la renta al 4 %; línea vertical punteada en el año elegido. Sin cartelitos en este gráfico. Eje x: hoy, +5, +10, +15, +20.
+
+## Calendario de balances: una consulta por empresa (12-oct, build 202610121546)
+- Facu: "no está mostrando empresas". Causas: (1) el calendario se pedía día por día para todo el mercado y Finnhub corta en ~1.000 por día: en temporada de balances se perdían empresas; (2) "Balances que vienen" leía solo la fecha guardada en la ficha (`d.balance`), no el calendario, y la ficha la tomaba del calendario global aunque le faltara la empresa → "Finnhub no tiene fecha".
+- Ahora `Fund.calendario` (v2): una consulta por empresa seguida (cartera + watchlist, sin ETF: `Fund.ETF`), 120 días adelante, una vez por día, retoma donde quedó si hay límite. `Fund.calEstado` para mostrar el avance. La vista usa `Fund.balance` (calendario o ficha), saca los fondos y dice "calendario cargando" mientras completa. La ficha usa la fecha del calendario o su propia consulta.
+- Referencia (12-oct): GOOGL 28-oct confirmado por Alphabet; MSFT/META ~28-oct, AMZN ~29-oct, NVDA ~18-nov (estimados).

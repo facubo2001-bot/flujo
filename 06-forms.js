@@ -1256,11 +1256,10 @@ function formBalances() {
   const todos = [...k.posiciones.map(p => ({ t: p.ticker, tengo: true, peso: p.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(w => ({ t: w.ticker, tengo: false }))];
   const con = [], sin = [], pasados = [];
   for (const x of todos) {
-    const d = Fund.de(x.t); if (!d) { sin.push({ ...x, motivo: 'ficha todav\u00eda no cargada' }); continue; }
-    if (!d.balance) { sin.push({ ...x, motivo: 'Finnhub no tiene fecha' }); continue; }
-    const dias = D.daysBetween(hoy, d.balance.fecha);
-    if (dias < 0) { pasados.push({ ...x, b: d.balance, dias }); continue; }
-    con.push({ ...x, b: d.balance, dias });
+    if (Fund.ETF.has(x.t)) continue;  // fondos: no presentan balances
+    const b = Fund.balance(x.t);
+    if (!b) { const d = Fund.de(x.t); const ce = Fund.calEstado(); sin.push({ ...x, motivo: !ce.listo ? 'calendario cargando' : 'sin fecha anunciada en 120 d\u00edas' }); continue; }
+    con.push({ ...x, b, dias: b.dias });
   }
   con.sort((a, b) => a.b.fecha.localeCompare(b.b.fecha));
   const hora = h => h === 'bmo' ? 'antes de abrir' : h === 'amc' ? 'despu\u00e9s del cierre' : h === 'dmh' ? 'durante la rueda' : '';
@@ -1268,11 +1267,11 @@ function formBalances() {
   const grupo = (titulo, arr) => arr.length ? `<div class="f-sec"><div class="t">${titulo}</div>${arr.map(fila).join('')}</div>` : '';
   const semana = con.filter(x => x.dias <= 7), quincena = con.filter(x => x.dias > 7 && x.dias <= 30), luego = con.filter(x => x.dias > 30);
   const body = `<div class="hoja">
-    ${con.length ? '' : `<p class="ob-nota">Todav\u00eda no hay fechas: se cargan con la ficha de cada empresa (abrila o esper\u00e1 a que se completen solas).</p>`}
+    ${(ce => ce.listo ? `<p class="small muted" style="margin:0 0 8px">Calendario al d\u00eda: ${ce.total} empresas consultadas hoy, una por una.</p>` : `<p class="ob-nota">Consultando el calendario: ${ce.hechos} de ${ce.total} empresas. Se completa solo (Finnhub da 60 consultas por minuto).</p>`)(Fund.calEstado())}
     ${grupo('Esta semana', semana)}${grupo('Pr\u00f3ximos 30 d\u00edas', quincena)}${grupo('M\u00e1s adelante', luego)}
     ${sin.length ? `<div class="f-sec"><div class="t">Sin fecha</div><p class="small muted" style="margin:0">${sin.map(x => `${esc(x.t)} (${x.motivo})`).join(' \u00b7 ')}</p></div>` : ''}
     ${pasados.length ? `<div class="f-sec"><div class="t">Ya presentaron (ficha vieja)</div><p class="small muted" style="margin:0">${pasados.map(x => `${esc(x.t)} el ${D.fmt(x.b.fecha)}`).join(' \u00b7 ')}. Se actualiza al abrir la ficha.</p></div>` : ''}
-    <p class="ob-nota aclara">Fechas del calendario de resultados de Finnhub, que las toma de los anuncios de cada empresa y las estima cuando todav\u00eda no hay anuncio. Se traen junto con la ficha (hasta 200 d\u00edas adelante) y se refrescan cada vez que la ficha se actualiza. Toc\u00e1 una fila para abrir la ficha.</p>
+    <p class="ob-nota aclara">Fechas del calendario de resultados de Finnhub, que las toma de los anuncios de cada empresa y las estima cuando todav\u00eda no hay anuncio. Se consultan una por una, todos los d\u00edas, hasta 120 d\u00edas adelante. Toc\u00e1 una fila para abrir la ficha.</p>
   </div>`;
   Modal.open({ title: 'Balances que vienen', submit: '', body });
 }
