@@ -534,6 +534,6 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Referencia (12-oct): GOOGL 28-oct confirmado por Alphabet; MSFT/META ~28-oct, AMZN ~29-oct, NVDA ~18-nov (estimados).
 
 ## Novedades con menos ruido (12-oct, build 202610121558)
-- Balances: aparecen un mes antes si la tenés en cartera y 3 semanas antes si es watchlist (antes 14 y 7 días) (`Fund.balanceCerca`).
+- Balances: 2 semanas antes para todas, cartera y watchlist (Facu probó un mes y era mucho) (`Fund.balanceCerca`).
 - EMA 200: solo las que la están tocando (entre +3 % y −5 %, `Tec.cerca`), lo que tenés primero, hasta 6. Las muy por debajo ya no van en Novedades (siguen en la ficha y el export).
 - "Baratas" por P/E: hasta 4 (antes 8).

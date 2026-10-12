@@ -1561,7 +1561,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610121558';
+const BUILD = '202610121612';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2775,8 +2775,8 @@ const Fund = {
   async actualizarCartera(max = 8) { let n = 0; for (const t of Fund.pendientes().slice(0, max)) { try { if (await Fund.traer(t)) n++; } catch (e) {} } return n; },
   calentar() { return Motor.arrancar(); },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
-  /** balance "cerca": un mes antes si la tenes en cartera, 3 semanas si solo la vigilas (Facu, 12-oct: para ir mentalizandose) */
-  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= (tengo ? 30 : 21) ? b : null; },
+  /** balance "cerca": 2 semanas antes, para todas (Facu, 12-oct: un mes era un monton) */
+  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= 14 ? b : null; },
   balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
 };
 
@@ -4771,7 +4771,7 @@ function viewCartera() {
   const pt = E.patrimonio(k); const hayActivos = pt.activos.length > 0;
   const rendStr = v => v && v.disponible && v.rend.realDiv != null ? { v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { v: '—', cls: '' };
   const reparto = pt.grupos.filter(g => g.valor > 0).map(g => `${g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'fondo' : g.nombre.toLowerCase()} ${M.pct(g.valor / pt.total, 0)}`).join(' · ');
-  // balances cerca: un mes antes si la tenes, 3 semanas si es watchlist; primero los mas proximos, entre iguales lo que tenes
+  // balances cerca: 2 semanas antes, cartera y watchlist; primero los mas proximos, entre iguales lo que tenes
   const balSemana = [...k.posiciones.map(x => ({ t: x.ticker, tengo: true, peso: x.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(x => ({ t: x.ticker, tengo: false, peso: 0 }))]
     .map(x => ({ ...x, b: Fund.balanceCerca(x.t, x.tengo) })).filter(x => x.b).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
   // chips: "MELI 25/09 pm" (pm = tras el cierre, am = antes de abrir)

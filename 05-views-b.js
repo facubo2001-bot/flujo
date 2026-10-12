@@ -293,7 +293,7 @@ function viewCartera() {
   const pt = E.patrimonio(k); const hayActivos = pt.activos.length > 0;
   const rendStr = v => v && v.disponible && v.rend.realDiv != null ? { v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { v: '—', cls: '' };
   const reparto = pt.grupos.filter(g => g.valor > 0).map(g => `${g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'fondo' : g.nombre.toLowerCase()} ${M.pct(g.valor / pt.total, 0)}`).join(' · ');
-  // balances cerca: un mes antes si la tenes, 3 semanas si es watchlist; primero los mas proximos, entre iguales lo que tenes
+  // balances cerca: 2 semanas antes, cartera y watchlist; primero los mas proximos, entre iguales lo que tenes
   const balSemana = [...k.posiciones.map(x => ({ t: x.ticker, tengo: true, peso: x.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(x => ({ t: x.ticker, tengo: false, peso: 0 }))]
     .map(x => ({ ...x, b: Fund.balanceCerca(x.t, x.tengo) })).filter(x => x.b).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
   // chips: "MELI 25/09 pm" (pm = tras el cierre, am = antes de abrir)

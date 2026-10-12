@@ -1512,8 +1512,8 @@ const Fund = {
   async actualizarCartera(max = 8) { let n = 0; for (const t of Fund.pendientes().slice(0, max)) { try { if (await Fund.traer(t)) n++; } catch (e) {} } return n; },
   calentar() { return Motor.arrancar(); },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
-  /** balance "cerca": un mes antes si la tenes en cartera, 3 semanas si solo la vigilas (Facu, 12-oct: para ir mentalizandose) */
-  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= (tengo ? 30 : 21) ? b : null; },
+  /** balance "cerca": 2 semanas antes, para todas (Facu, 12-oct: un mes era un monton) */
+  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= 14 ? b : null; },
   balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
 };
 
