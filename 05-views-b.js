@@ -312,7 +312,8 @@ function viewCartera() {
   html += `<div class="grid g-kpi">
     ${kpi({ label: 'Portfolio', value: hayActivos ? fmtU(pt.total, 0) : valorTotTxt, cls: 'hero', act: hayActivos ? 'pat-dist' : '',
       stats: (hayActivos
-        ? pt.grupos.slice(0, 3).map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'Reserva' : g.id === 'renta' ? 'Bonos' : g.nombre, v: fmtARS.format(Math.round(g.valor)), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
+        ? pt.grupos.filter(g => g.id === 'cedears' || g.id === 'reserva').map(g => ({ k: g.id === 'cedears' ? 'CEDEARs' : 'Reserva', v: fmtARS.format(Math.round(g.valor)), cls: g.id === 'reserva' && pt.reservaPct != null && pt.reservaPct < pt.reservaObjetivo ? 'neg' : '' }))
+          .concat((rp => [{ k: rp.afuera.length ? 'Rend.*' : 'Rend.', v: rp.pct != null ? pctS(rp.pct) : '\u2014', cls: rp.pct != null ? (rp.pct >= 0 ? 'pos' : 'neg') : '' }])(E.rendPatrimonio(k, pt)))
         : [{ k: 'CEDEARs', v: fmtARS.format(Math.round(k.valor != null ? k.valor : k.costo)) }, { k: 'Otros', v: '<span class="soft">abajo</span>' }]
       ).concat([{ k: 'En $', v: pt.mep ? `$ ${abrevARS((hayActivos ? pt.total : (k.valorTotal != null ? k.valorTotal : k.costo)) * pt.mep)}` : '—' }]) })}
     ${kpi({ label: 'CEDEARs', value: valorTxt,
@@ -625,6 +626,7 @@ function verDistribucion() {
       <div class="pat-donut">${Charts.donut({ slices: pt.grupos.map(g => ({ name: g.nombre, value: g.valor, color: g.color })), size: 150, thick: 22, center: `Total|${fmtU(pt.total, 0)}` })}</div>
       <div class="pat-leg">${leyenda}</div>
     </div>
+    ${(rp => rp.pct != null ? `<div class="pat-res"><span>Rendimiento de todo (en d\u00f3lares)</span><b class="${rp.pct >= 0 ? 'ok' : 'bad'}">${pctS(rp.pct)}</b><span class="sub" style="white-space:normal;line-height:1.35">${rp.gan >= 0 ? '+' : '\u2212'}${fmtU(Math.abs(rp.gan), 0)} sobre ${fmtU(rp.base, 0)} invertidos: CEDEARs con dividendos y ventas, fondo en d\u00f3lares desde cada suscripci\u00f3n${rp.afuera.length ? ` \u00b7 sin contar ${rp.afuera.map(esc).join(', ')} (carg\u00e1 lo que pagaste)` : ', bitcoin con lo que pagaste'}</span></div>` : '')(E.rendPatrimonio(E.cartera(), pt))}
     <div class="pat-res"><span>Reserva (efectivo + fondos) vs CEDEARs</span><b class="${reservaCls}">${pt.reservaPct != null ? M.pct(pt.reservaPct, 1) : '\u2014'}</b><span class="sub">objetivo ${M.pct(pt.reservaObjetivo, 0)} \u00b7 <button type="button" class="link-btn" data-act="reserva-objetivo">cambiar</button></span></div>` });
 }
 /** boton chiquito de arriba: exportar o cargar */

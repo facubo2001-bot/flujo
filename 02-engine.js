@@ -515,6 +515,20 @@ const E = {
       mp: bench('Mercado Pago', mpValor), ccl: bench('D\u00f3lar CCL', cclValor), ipc: bench('Inflaci\u00f3n', ipcValor), cartera: bench('Tu cartera', cartValor),
       fuentes: { cartera: ix ? (Hist.datos.fechas[Hist.datos.fechas.length - 1]) : null, mp: mpHoy ? mpHoy.fecha : null, ccl: Object.keys(AD.box().ccl).length ? 'ok' : null, ipc: mesesIpc.length ? mesesIpc[mesesIpc.length - 1] : null } };
   },
+  /** Rendimiento de todo el patrimonio en dolares (Facu: "CEDEARs, bitcoin, reserva, dividendos, todo"):
+   *  ganancia = CEDEARs (precio + dividendos + ventas realizadas) + fondo (dolares hoy vs dolares al suscribir, CCL de cada dia)
+   *  + bitcoin (si tiene costo cargado) + letras/bonos (lo devengado); base = lo que costo cada cosa. El efectivo suma a la base sin ganancia.
+   *  Lo que no tiene costo (bitcoin sin "lo que pagaste") queda afuera y se avisa. */
+  rendPatrimonio(k, pt) {
+    let gan = k.gpTotal != null ? k.gpTotal : 0, base = k.costo || 0; const afuera = [];
+    for (const a of pt.activos) {
+      if (a.tipo === 'btc') { const c = (state.cartera.activos || []).find(x => x.id === a.id); const cB = c && Number(c.costo); if (cB > 0 && a.valorUSD != null) { gan += a.valorUSD - cB; base += cB; } else afuera.push(a.nombre); }
+      else if (a.reserva) { const r = a.reserva; if (r.usdHoy != null && r.usdCompra > 0) { gan += r.usdHoy - r.usdCompra; base += r.usdCompra; } else afuera.push(a.nombre); }
+      else if (a.tipo === 'efectivo') { if (a.valorUSD != null) base += a.valorUSD; }
+      else if (a.valorUSD != null) { const g = a.ganado != null ? (a.moneda === 'ARS' ? (pt.mep ? a.ganado / pt.mep : 0) : a.ganado) : 0; gan += g; base += a.valorUSD - g; }
+    }
+    return { pct: base > 0 ? gan / base : null, gan, base, afuera };
+  },
   /** Todo el patrimonio: CEDEARs + otros activos + caja de la cartera (dividendos sin reinvertir y ventas sin usar: la compra siguiente usa lo de las ventas sola) */
   patrimonio(k) {
     // pesos → dolares al CCL: es el dolar con el que se compran CEDEARs (antes MEP; la reserva y el patrimonio no coincidian)
