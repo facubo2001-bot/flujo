@@ -541,3 +541,7 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 
 ## Seguir una empresa desde la app (12-oct, build 202610122100)
 - "+ Ticker" en Alertas de precio (`formWatch`): buscador de CEDEARs (mismo de las operaciones), zonas opcionales (antes eran obligatorias). Al guardar: trae precio y ficha, la suma al calendario de balances del día y abre la ficha.
+
+## Otros activos: "% del total" y rendimiento de bitcoin (13-oct, build 202610131725)
+- Facu leyó el 27,8 % de la fila Bitcoin como rendimiento: era su peso en el patrimonio. Ahora dice "X % del total". Campo opcional "Lo que pagaste en total (US$)" en el activo bitcoin (`a.costo`): si está, la fila muestra su rendimiento y lo ganado.
+- Aclaración: el rendimiento de la tarjeta CEDEARs (YTD / Inicio) es solo CEDEARs (precio + dividendos); no incluye reserva ni bitcoin.

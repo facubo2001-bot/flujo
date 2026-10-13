@@ -1319,6 +1319,7 @@ function formActivo(id) {
       ${F.field('Valor hoy (correcci\u00f3n)', F.input('ac-vmanual', v.valorManual ? v.valorManual.v : '', 'inputmode="decimal" placeholder="lo que muestra Balanz"'), 'opcional: si lo carg\u00e1s, de ac\u00e1 en m\u00e1s devenga desde este valor', 'ac-f ac-tasa')}
       ${F.field('Fecha del valor', F.input('ac-vfecha', v.valorManual ? v.valorManual.fecha : D.today(), 'type="date"'), '', 'ac-f ac-tasa')}
       ${F.field('Cantidad de BTC', F.input('ac-cantidad', v.cantidad || '', 'inputmode="decimal" placeholder="ej. 0,0125"'), 'precio autom\u00e1tico (CoinGecko)', 'ac-f ac-btc')}
+      ${F.field('Lo que pagaste en total (US$)', F.input('ac-btccosto', v.costo || '', 'inputmode="decimal" placeholder="opcional"'), 'para ver cu\u00e1nto gan\u00e1s o perd\u00e9s con el bitcoin', 'ac-f ac-btc')}
       ${F.field('Precio a mano (US$)', F.input('ac-pxmanual', v.precioManual || '', 'inputmode="decimal" placeholder="solo si no llega el precio"'), '', 'ac-f ac-btc')}
       ${F.field('Fecha', F.input('ac-fecha', v.fecha || D.today(), 'type="date"'), '', 'ac-f ac-efectivo ac-otro')}
     </div>
@@ -1330,7 +1331,7 @@ function formActivo(id) {
       const n = k => M.parse(Modal.val(k)) || null;
       const nuevo = { id: a ? a.id : uid(), tipo, nombre, moneda: tipo === 'btc' ? 'USD' : Modal.val('ac-moneda'), nota: Modal.val('ac-nota').trim() || undefined };
       if (tipo === 'efectivo' || tipo === 'otro') { nuevo.monto = n('ac-monto'); nuevo.fecha = Modal.val('ac-fecha') || D.today(); if (!nuevo.monto) { toast('Falta el monto'); return false; } }
-      else if (tipo === 'btc') { nuevo.cantidad = n('ac-cantidad'); nuevo.precioManual = n('ac-pxmanual'); if (!nuevo.cantidad) { toast('Falta la cantidad'); return false; } }
+      else if (tipo === 'btc') { nuevo.cantidad = n('ac-cantidad'); nuevo.precioManual = n('ac-pxmanual'); nuevo.costo = n('ac-btccosto') || undefined; if (!nuevo.cantidad) { toast('Falta la cantidad'); return false; } }
       else { nuevo.capital = n('ac-capital'); nuevo.tna = n('ac-tna') || 0; nuevo.desde = Modal.val('ac-desde') || D.today(); nuevo.vence = Modal.val('ac-vence') || undefined; const vm = n('ac-vmanual'); if (vm) nuevo.valorManual = { v: vm, fecha: Modal.val('ac-vfecha') || D.today() }; if (!nuevo.capital && !vm) { toast('Falta el capital o el valor de hoy'); return false; } }
       const arr = state.cartera.activos = state.cartera.activos || [];
       const i = arr.findIndex(x => x.id === nuevo.id); if (i >= 0) arr[i] = nuevo; else arr.push(nuevo);

@@ -1561,7 +1561,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610122100';
+const BUILD = '202610131725';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -3327,6 +3327,7 @@ const E = {
       if (btcPx) { out.valorMoneda = q * btcPx.c; out.detalle = `${q} BTC \u00b7 US$ ${fmtARS.format(Math.round(btcPx.c))}${btcPx.dp ? ` (${btcPx.dp >= 0 ? '+' : '\u2212'}${Math.abs(btcPx.dp).toFixed(1)} % hoy)` : ''}`; }
       else if (a.precioManual) { out.valorMoneda = q * a.precioManual; out.detalle = `${q} BTC a US$ ${fmtARS.format(a.precioManual)} (precio cargado a mano)`; }
       else { out.sinPrecio = true; out.detalle = `${q} BTC \u00b7 sin precio todav\u00eda`; }
+      const cB = Number(a.costo) || 0; if (cB > 0 && out.valorMoneda != null) out.ganado = out.valorMoneda - cB, out.rend = out.valorMoneda / cB - 1;
     } else if (a.tipo === 'efectivo' || a.tipo === 'otro') {
       out.valorMoneda = Number(a.monto) || 0; out.detalle = a.tipo === 'otro' && a.nota ? a.nota : (a.fecha ? `al ${D.fmt(a.fecha)}` : '');
     } else if (a.tipo === 'fci' && a.slug && AD.vcUltimo(a.slug) && (a.lotes || []).length) {
@@ -5114,7 +5115,7 @@ function menuClaude() {
 function renderPatrimonio(k) {
   const pt = E.patrimonio(k); const hay = pt.activos.length > 0;
   const fmtM = (v, moneda) => moneda === 'ARS' ? `$ ${fmtARS.format(Math.round(v))}` : fmtU(v, 0);
-  const fila = a => `<div class="act-r" data-act="activo" data-id="${a.id}"><div class="act-l"><b>${esc(a.nombre)}</b><span class="sub">${esc(E.TIPOS_ACTIVO[a.tipo] || '')}${a.detalle ? ' \u00b7 ' + esc(a.detalle) : ''}</span></div><div class="act-v"><b>${a.valorUSD != null ? fmtU(a.valorUSD, 0) : '\u2014'}</b><span class="sub">${a.valorMoneda != null && a.moneda === 'ARS' ? fmtM(a.valorMoneda, 'ARS') : (pt.total && a.valorUSD != null ? M.pct(a.valorUSD / pt.total, 1) : '')}</span></div></div>`;
+  const fila = a => `<div class="act-r" data-act="activo" data-id="${a.id}"><div class="act-l"><b>${esc(a.nombre)}</b><span class="sub">${esc(E.TIPOS_ACTIVO[a.tipo] || '')}${a.detalle ? ' \u00b7 ' + esc(a.detalle) : ''}</span></div><div class="act-v"><b>${a.valorUSD != null ? fmtU(a.valorUSD, 0) : '\u2014'}</b><span class="sub">${a.rend != null ? `<span class="${a.rend >= 0 ? 'up' : 'down'}">${pctS(a.rend)} (${a.ganado >= 0 ? '+' : '\u2212'}${fmtU(Math.abs(a.ganado), 0)})</span>` : a.valorMoneda != null && a.moneda === 'ARS' ? fmtM(a.valorMoneda, 'ARS') : (pt.total && a.valorUSD != null ? `${M.pct(a.valorUSD / pt.total, 1)} del total` : '')}</span></div></div>`;
   return `<div class="card section"><div class="card-head"><h2>Otros activos ${pt.mep ? infoBtn(`Total en pesos al CCL ($ ${fmtARS.format(pt.mep)}): $ ${fmtARS.format(Math.round(pt.total * pt.mep))}. Los pesos se pasan a d\u00f3lares al CCL. La caja contable de la app (dividendos y ventas) no se suma: esa plata ya est\u00e1 en alguno de estos activos.`) : ''}</h2><button class="btn sm" data-act="new-activo">${ICONS.plus} Activo</button></div>
     ${hay ? `
     ${pt.sinPrecio.length ? `<p class="small warn-text" style="margin:0 0 6px">Sin precio: ${pt.sinPrecio.map(esc).join(', ')}. Se actualiza con los precios.</p>` : ''}
@@ -6484,6 +6485,7 @@ function formActivo(id) {
       ${F.field('Valor hoy (correcci\u00f3n)', F.input('ac-vmanual', v.valorManual ? v.valorManual.v : '', 'inputmode="decimal" placeholder="lo que muestra Balanz"'), 'opcional: si lo carg\u00e1s, de ac\u00e1 en m\u00e1s devenga desde este valor', 'ac-f ac-tasa')}
       ${F.field('Fecha del valor', F.input('ac-vfecha', v.valorManual ? v.valorManual.fecha : D.today(), 'type="date"'), '', 'ac-f ac-tasa')}
       ${F.field('Cantidad de BTC', F.input('ac-cantidad', v.cantidad || '', 'inputmode="decimal" placeholder="ej. 0,0125"'), 'precio autom\u00e1tico (CoinGecko)', 'ac-f ac-btc')}
+      ${F.field('Lo que pagaste en total (US$)', F.input('ac-btccosto', v.costo || '', 'inputmode="decimal" placeholder="opcional"'), 'para ver cu\u00e1nto gan\u00e1s o perd\u00e9s con el bitcoin', 'ac-f ac-btc')}
       ${F.field('Precio a mano (US$)', F.input('ac-pxmanual', v.precioManual || '', 'inputmode="decimal" placeholder="solo si no llega el precio"'), '', 'ac-f ac-btc')}
       ${F.field('Fecha', F.input('ac-fecha', v.fecha || D.today(), 'type="date"'), '', 'ac-f ac-efectivo ac-otro')}
     </div>
@@ -6495,7 +6497,7 @@ function formActivo(id) {
       const n = k => M.parse(Modal.val(k)) || null;
       const nuevo = { id: a ? a.id : uid(), tipo, nombre, moneda: tipo === 'btc' ? 'USD' : Modal.val('ac-moneda'), nota: Modal.val('ac-nota').trim() || undefined };
       if (tipo === 'efectivo' || tipo === 'otro') { nuevo.monto = n('ac-monto'); nuevo.fecha = Modal.val('ac-fecha') || D.today(); if (!nuevo.monto) { toast('Falta el monto'); return false; } }
-      else if (tipo === 'btc') { nuevo.cantidad = n('ac-cantidad'); nuevo.precioManual = n('ac-pxmanual'); if (!nuevo.cantidad) { toast('Falta la cantidad'); return false; } }
+      else if (tipo === 'btc') { nuevo.cantidad = n('ac-cantidad'); nuevo.precioManual = n('ac-pxmanual'); nuevo.costo = n('ac-btccosto') || undefined; if (!nuevo.cantidad) { toast('Falta la cantidad'); return false; } }
       else { nuevo.capital = n('ac-capital'); nuevo.tna = n('ac-tna') || 0; nuevo.desde = Modal.val('ac-desde') || D.today(); nuevo.vence = Modal.val('ac-vence') || undefined; const vm = n('ac-vmanual'); if (vm) nuevo.valorManual = { v: vm, fecha: Modal.val('ac-vfecha') || D.today() }; if (!nuevo.capital && !vm) { toast('Falta el capital o el valor de hoy'); return false; } }
       const arr = state.cartera.activos = state.cartera.activos || [];
       const i = arr.findIndex(x => x.id === nuevo.id); if (i >= 0) arr[i] = nuevo; else arr.push(nuevo);

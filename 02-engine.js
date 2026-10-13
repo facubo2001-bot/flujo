@@ -435,6 +435,7 @@ const E = {
       if (btcPx) { out.valorMoneda = q * btcPx.c; out.detalle = `${q} BTC \u00b7 US$ ${fmtARS.format(Math.round(btcPx.c))}${btcPx.dp ? ` (${btcPx.dp >= 0 ? '+' : '\u2212'}${Math.abs(btcPx.dp).toFixed(1)} % hoy)` : ''}`; }
       else if (a.precioManual) { out.valorMoneda = q * a.precioManual; out.detalle = `${q} BTC a US$ ${fmtARS.format(a.precioManual)} (precio cargado a mano)`; }
       else { out.sinPrecio = true; out.detalle = `${q} BTC \u00b7 sin precio todav\u00eda`; }
+      const cB = Number(a.costo) || 0; if (cB > 0 && out.valorMoneda != null) out.ganado = out.valorMoneda - cB, out.rend = out.valorMoneda / cB - 1;
     } else if (a.tipo === 'efectivo' || a.tipo === 'otro') {
       out.valorMoneda = Number(a.monto) || 0; out.detalle = a.tipo === 'otro' && a.nota ? a.nota : (a.fecha ? `al ${D.fmt(a.fecha)}` : '');
     } else if (a.tipo === 'fci' && a.slug && AD.vcUltimo(a.slug) && (a.lotes || []).length) {
