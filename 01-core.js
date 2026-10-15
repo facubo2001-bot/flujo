@@ -511,11 +511,17 @@ const Gist = {
     // el export completo para Claude, al dia con cada subida (Facu: que el chat lea la cartera sin exportar a mano)
     let diag = 'sin cartera';
     try { if (state.cartera && state.cartera.operaciones.length) { const txt = exportCompacto(); files[Gist.CLAUDE] = { content: txt }; diag = `ok ${txt.length}`; let b = null; try { b = localStorage.getItem('flujo.gist.mdViejo'); } catch (e) {} if (!b) files['cartera-para-claude.md'] = null; } } catch (e) { diag = 'error: ' + (e && e.message || e); }
-    try { localStorage.setItem('flujo.gist.claudeDiag', JSON.stringify({ t: Date.now(), diag })); } catch (e) {}
-    const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
+    let r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
+    if (!r.ok && r.status !== 401 && (files[Gist.CLAUDE] || 'cartera-para-claude.md' in files)) {
+      // si GitHub rechaza el archivo para Claude, que el respaldo suba igual y quede anotado por que
+      let msg = ''; try { msg = (await r.text()).slice(0, 160); } catch (e) {}
+      diag = `error GitHub ${r.status} ${msg}`;
+      const solo = { [Gist.FILE]: files[Gist.FILE] }; if (files[`respaldo-${mes}.json`]) solo[`respaldo-${mes}.json`] = files[`respaldo-${mes}.json`];
+      r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files: solo }) });
+    } else if (r.ok && files[Gist.CLAUDE]) { try { localStorage.setItem('flujo.gist.mdViejo', '1'); } catch (e) {} }
+    try { localStorage.setItem('flujo.gist.claudeDiag', JSON.stringify({ t: Date.now(), diag: r.ok || diag.startsWith('error') ? diag : `error GitHub ${r.status}` })); } catch (e) {}
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
     if (!c.owner) { try { const g = await r.json(); if (g && g.owner && g.owner.login) Gist.guardar({ ...c, owner: g.owner.login }); } catch (e) {} }
-    try { localStorage.setItem('flujo.gist.mdViejo', '1'); } catch (e) {}
     try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
     return true;
   },
