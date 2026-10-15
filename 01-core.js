@@ -468,9 +468,10 @@ const Persist = {
 
 /* ---------- sincronización vía Gist privado de GitHub (la config vive en ESTE dispositivo) ---------- */
 const Gist = {
-  FILE: 'gestor-gastos-datos.json', CLAUDE: 'cartera-para-claude.md', lastPull: 0,
+  FILE: 'gestor-gastos-datos.json', CLAUDE: 'a-cartera-para-claude.txt', lastPull: 0,
   /** link fijo al export para el chat de Inversiones (siempre la ultima version subida). El gist es secreto: no aparece en ningun lado, pero quien tenga el link lo lee */
-  linkClaude() { const c = Gist.cfg(); return c && c.owner ? `https://gist.githubusercontent.com/${c.owner}/${c.id}/raw/${Gist.CLAUDE}` : null; },
+  // la pagina del gist (no el link 'raw': GitHub no deja entrar a los lectores automaticos ahi). Es el primer archivo de la pagina
+  linkClaude() { const c = Gist.cfg(); return c && c.owner ? `https://gist.github.com/${c.owner}/${c.id}` : null; },
   cfg() { try { return JSON.parse(localStorage.getItem('flujo.gist') || 'null'); } catch (e) { return null; } },
   guardar(c) { try { localStorage.setItem('flujo.gist', JSON.stringify(c)); } catch (e) {} },
   clear() { try { localStorage.removeItem('flujo.gist'); } catch (e) {} },
@@ -508,10 +509,11 @@ const Gist = {
     let ultimo = null; try { ultimo = localStorage.getItem(marca); } catch (e) {}
     if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: liviano };
     // el export completo para Claude, al dia con cada subida (Facu: que el chat lea la cartera sin exportar a mano)
-    try { if (typeof Intercambio !== 'undefined' && state.cartera && state.cartera.operaciones.length) files[Gist.CLAUDE] = { content: Intercambio.exportar(Fund.pendientes()) }; } catch (e) {}
+    try { if (typeof Intercambio !== 'undefined' && state.cartera && state.cartera.operaciones.length) { files[Gist.CLAUDE] = { content: exportCompacto() }; let b = null; try { b = localStorage.getItem('flujo.gist.mdViejo'); } catch (e) {} if (!b) files['cartera-para-claude.md'] = null; } } catch (e) {}
     const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
     if (!c.owner) { try { const g = await r.json(); if (g && g.owner && g.owner.login) Gist.guardar({ ...c, owner: g.owner.login }); } catch (e) {} }
+    try { localStorage.setItem('flujo.gist.mdViejo', '1'); } catch (e) {}
     try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
     return true;
   },

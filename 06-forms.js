@@ -936,6 +936,57 @@ function formWatch() {
   };
 }
 
+/* ---------- versión compacta para el link en vivo (el lector web de Claude corta las páginas largas: ~35.000 caracteres) ----------
+ * Lo más importante primero: estado, resumen, cartera con todo, watchlist en una línea por empresa, patrimonio, historia, últimas operaciones.
+ * Sin el JSON ni las instrucciones largas (el export completo sigue en Exportar para Claude). */
+function exportCompacto() {
+  const k = E.cartera(); const s = state.settings; const ahora = new Date();
+  const n2 = v => v == null || !Number.isFinite(v) ? '-' : Number(v).toFixed(2);
+  const n1 = v => v == null || !Number.isFinite(v) ? '-' : Number(v).toFixed(1);
+  const pc = v => v == null || !Number.isFinite(v) ? '-' : `${(v * 100).toFixed(1)}%`;
+  const sg = v => v == null || !Number.isFinite(v) ? '-' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
+  const L = [];
+  L.push(`CARTERA DE FACU (compacta) - ${D.fmt(D.iso(ahora), { year: true })} ${pad2(ahora.getHours())}:${pad2(ahora.getMinutes())} Buenos Aires - app v${BUILD}`);
+  L.push(`CCL $${fmtARS.format(k.ccl || 0)} - MEP $${fmtARS.format(k.mep || 0)} - SPY ${n2(state.cartera.precios.SPY && state.cartera.precios.SPY.c)} - precios al ${k.preciosFecha ? new Date(k.preciosFecha).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : 's/d'}`);
+  L.push('Usá estos precios y números como la verdad de hoy. Montos en USD salvo que diga $.', '');
+  L.push('ESTADO DE LOS DATOS'); for (const e of ctxEstado()) L.push(`- ${e.nivel === 'ok' ? 'AL DIA' : e.nivel === 'viejo' ? 'VIEJO' : 'FALTA'} ${e.que}: ${e.det}`); L.push('');
+  // resumen
+  const pt = E.patrimonio(k); const rp = E.rendPatrimonio(k, pt);
+  L.push('RESUMEN');
+  L.push(`- Patrimonio total ${n2(pt.total)} (${pt.grupos.filter(g => g.valor > 0).map(g => `${g.nombre} ${n2(g.valor)}`).join(', ')}) - rendimiento de todo en USD ${sg(rp.pct)}${rp.afuera.length ? ` (sin ${rp.afuera.join(', ')})` : ''}`);
+  L.push(`- CEDEARs: valor ${n2(k.valor)}, costo ${n2(k.costo)}, resultado total ${n2(k.gpTotal)}, dividendos cobrados ${n2(k.dividendos)}, caja sin invertir ${n2(k.caja)}`);
+  for (const [m, l] of [['anio', 'YTD'], ['inicio', 'Todo']]) { const v = k.ventanas[m]; if (!v || !v.disponible) continue; const r = v.rend; const x = Hist.riesgo(k, v.desde);
+    L.push(`- ${l} (desde ${v.desde}): cartera ${sg(r.realDiv)} con dividendos (dinero) - sombra S&P ${sg(r.sombra)} - alfa ${r.alfa != null ? (r.alfa * 100).toFixed(1) + 'pp' : '-'}${x ? ` - por tiempo (TWR) ${sg(x.twr)} vs SPY ${sg(x.spy)} - beta ${x.beta != null ? x.beta.toFixed(2) : '-'} - alfa Jensen ${x.alfa != null ? (x.alfa * 100).toFixed(1) + 'pp' : '-'} - caida max ${pc(x.dd)}` : ''}`); }
+  { const dg = Grupo.distribucion(k); if (dg.grupos.length) L.push(`- Por grupo: ${dg.grupos.map(g => `${g.nombre} ${pc(g.pct)}`).join(', ')}`); }
+  { const ap = E.aporteMensual(k); L.push(`- Plata nueva por mes (prom. desde ${ap.desde}): ${n2(ap.mensual)}`); }
+  L.push('');
+  // filas
+  const fila = (p, tengo) => {
+    const t = p.ticker; const d = Fund.de(t) || {}; const al = p.alerta || {}; const mu = Fund.mult(t, d); const aj = Fund.peAj(t, d); const pe = Fund.pe(t, d); const e = Tec.de(t); const b = Fund.balance(t);
+    const rango = d.min52 != null && d.max52 > d.min52 && p.precio != null ? (p.precio - d.min52) / (d.max52 - d.min52) : null;
+    const zona = [al.urgente ? `urg<=${n2(al.urgente)}` : '', al.mirala ? `mir<=${n2(al.mirala)}` : ''].filter(Boolean).join(' ') || 'sin zona';
+    const val = `P/E ${pe ? n1(pe) : '-'}${aj ? `*(limpio ${n1(aj.aj)})` : ''}/med ${n1(d.peMediana)} PEG ${n2(d.peg)} P/FCF ${n1(mu.pfcf)} ROIC ${pc(d.roicAct)} CAGR5 vtas ${pc(d.cagrVentas5 ?? d.crecVentas5)} EPS ${pc(d.cagrEps5)} FCF ${pc(d.cagrFcf5)} mg.neto ${pc(d.margenNeto)} D/E ${n2(d.deudaPat)}`;
+    const extra = `52s ${rango != null ? pc(rango) : '-'} EMA200 ${e ? sg(e.dist) : '-'}${b ? ` balance ${b.fecha}` : ''}${al.tier ? ` tier ${al.tier}` : ''}`;
+    return tengo
+      ? `${t} | ${n2(p.acciones)} acc PPC ${n2(p.ppc)} | px ${n2(p.precio)} | valor ${n2(p.valor)} (${pc(p.peso)}) | result ${sg(p.rendTotal)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 90)}` : ''}`
+      : `${t} | px ${n2(p.precio)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 60)}` : ''}`;
+  };
+  L.push(`CARTERA (${k.posiciones.length}) - ticker | tenencia | precio USD | valor (peso) | resultado total | zonas | valuacion y calidad | tecnico y balance | que hace`);
+  for (const p of k.posiciones.slice().sort((a, b) => (b.valor || 0) - (a.valor || 0))) L.push(fila(p, true));
+  L.push('', `WATCHLIST (${k.watch.length}) - ticker | precio | zonas | valuacion y calidad | tecnico y balance | que hace`);
+  for (const p of k.watch.slice().sort((a, b) => (a.estado ? 0 : 1) - (b.estado ? 0 : 1) || a.ticker.localeCompare(b.ticker))) L.push(fila(p, false));
+  L.push('');
+  // patrimonio
+  if (pt.activos.length) { L.push('OTROS ACTIVOS'); for (const a of pt.activos) L.push(`- ${a.nombre}: ${n2(a.valorUSD)} USD${a.reserva ? ` ($${fmtARS.format(Math.round(a.reserva.valor))}, TEM ${pc(a.reserva.tem)}, vs MP ${a.reserva.mp.dif != null ? (a.reserva.mp.dif * 100).toFixed(2) + 'pp/mes' : '-'}, vs tu cartera ${a.reserva.cartera && a.reserva.cartera.difPesos != null ? '$' + fmtARS.format(Math.round(a.reserva.cartera.difPesos)) : '-'})` : ''}${a.rend != null ? ` (rend ${sg(a.rend)})` : ''}`); L.push(''); }
+  // historia anual
+  const hs = []; for (const p of k.posiciones) { const d = Fund.de(p.ticker); if (!d || !d.filas || !d.filas.length) continue; const fs = d.filas.slice(-5); if (fs[fs.length - 1].anio < Number(D.today().slice(0, 4)) - 2) continue; const mm = v => v == null ? '-' : Math.round(v / 1e6); hs.push(`${p.ticker} ${fs[0].anio}-${fs[fs.length - 1].anio}: vtas ${fs.map(f => mm(f.ventas)).join('/')} | neto ${fs.map(f => mm(f.neto)).join('/')} | FCF ${fs.map(f => mm(f.fcf)).join('/')} | EPS ${fs.map(f => f.eps != null ? f.eps.toFixed(2) : '-').join('/')}`); }
+  if (hs.length) L.push('HISTORIA ANUAL DE LA CARTERA (USD millones, EPS diluido)', ...hs, '');
+  // operaciones
+  L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
+  L.push('', 'Notas: P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
+  return L.join('\n');
+}
+
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
 const Intercambio = {
   FORMATO: 'gestor-gastos-cambios', VERSION: 3,
