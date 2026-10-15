@@ -1,5 +1,5 @@
 {
- "corrida": "2026-10-14T15:13:14.782Z",
+ "corrida": "2026-10-15T15:06:45.118Z",
  "ok": 378,
  "stooq": 0,
  "yahoo": 378,
@@ -31,8 +31,8 @@
   "SPCX",
   "TTM",
   "TWTR",
-  "WBO",
-  "WBA"
+  "WBA",
+  "WBO"
  ],
- "segundos": 35
+ "segundos": 27
 }
