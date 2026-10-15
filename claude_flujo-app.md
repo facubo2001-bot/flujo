@@ -546,3 +546,7 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Facu leyó el 27,8 % de la fila Bitcoin como rendimiento: era su peso en el patrimonio. Ahora dice "X % del total". Campo opcional "Lo que pagaste en total (US$)" en el activo bitcoin (`a.costo`): si está, la fila muestra su rendimiento y lo ganado.
 - Aclaración: el rendimiento de la tarjeta CEDEARs (YTD / Inicio) es solo CEDEARs (precio + dividendos); no incluye reserva ni bitcoin.
 - (13-oct, build 202610131804) Tarjeta Portfolio: la fila Bitcoin se reemplazó por **Rend.**: rendimiento de todo el patrimonio en dólares (`E.rendPatrimonio`): CEDEARs (precio + dividendos + realizado, sobre su costo) + fondo (USD hoy vs USD al suscribir) + bitcoin (con su costo) + letras/bonos (devengado); efectivo suma a la base. "Rend.*" si algo quedó afuera por falta de costo (bitcoin sin "lo que pagaste"). El detalle está al tocar la tarjeta.
+
+## Cartera en vivo para Claude (15-oct, build 202610151857)
+- Cada `Gist.push` sube también `cartera-para-claude.md` (= `Intercambio.exportar`, el mismo export) al gist secreto. Link fijo: `https://gist.githubusercontent.com/<owner>/<id>/raw/cartera-para-claude.md` (`Gist.linkClaude`; el owner se guarda de la respuesta del PATCH). Ajustes → Datos → "Cartera en vivo para Claude" → Copiar link.
+- Uso: Facu pega el link en las instrucciones del proyecto Inversiones; el chat lo lee cuando dice "mirá mi cartera". Los datos son de la última vez que abrió la app. Quien tenga el link lo lee (gist secreto, no público).
