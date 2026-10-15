@@ -509,7 +509,9 @@ const Gist = {
     let ultimo = null; try { ultimo = localStorage.getItem(marca); } catch (e) {}
     if (ultimo !== mes) files[`respaldo-${mes}.json`] = { content: liviano };
     // el export completo para Claude, al dia con cada subida (Facu: que el chat lea la cartera sin exportar a mano)
-    try { if (typeof Intercambio !== 'undefined' && state.cartera && state.cartera.operaciones.length) { files[Gist.CLAUDE] = { content: exportCompacto() }; let b = null; try { b = localStorage.getItem('flujo.gist.mdViejo'); } catch (e) {} if (!b) files['cartera-para-claude.md'] = null; } } catch (e) {}
+    let diag = 'sin cartera';
+    try { if (state.cartera && state.cartera.operaciones.length) { const txt = exportCompacto(); files[Gist.CLAUDE] = { content: txt }; diag = `ok ${txt.length}`; let b = null; try { b = localStorage.getItem('flujo.gist.mdViejo'); } catch (e) {} if (!b) files['cartera-para-claude.md'] = null; } } catch (e) { diag = 'error: ' + (e && e.message || e); }
+    try { localStorage.setItem('flujo.gist.claudeDiag', JSON.stringify({ t: Date.now(), diag })); } catch (e) {}
     const r = await fetch('https://api.github.com/gists/' + c.id, { method: 'PATCH', headers: Gist.hdr(c.token), body: JSON.stringify({ files }) });
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
     if (!c.owner) { try { const g = await r.json(); if (g && g.owner && g.owner.login) Gist.guardar({ ...c, owner: g.owner.login }); } catch (e) {} }
