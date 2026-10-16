@@ -5,4 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s https://api.github.com/gists/b45c054b37ad15b84adaa04489ed81a0 | jq '{updated_at, files: [.files[] | {filename, size, truncated}], tail: (.files["a-cartera-para-claude.txt"].content // "" | .[-60:] | test("Notas"))}'
+          out=$(curl -s https://api.github.com/gists/b45c054b37ad15b84adaa04489ed81a0 | jq -c '{updated_at, files: [.files[] | "\(.filename) \(.size) \(.truncated)"], notas: ((.files["a-cartera-para-claude.txt"].content // "") | test("Notas"))}')
+          echo "::notice::$out"
