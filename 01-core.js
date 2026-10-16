@@ -471,7 +471,8 @@ const Gist = {
   FILE: 'gestor-gastos-datos.json', CLAUDE: 'a-cartera-para-claude.txt', lastPull: 0,
   /** link fijo al export para el chat de Inversiones (siempre la ultima version subida). El gist es secreto: no aparece en ningun lado, pero quien tenga el link lo lee */
   // la pagina del gist (no el link 'raw': GitHub no deja entrar a los lectores automaticos ahi). Es el primer archivo de la pagina
-  linkClaude() { const c = Gist.cfg(); return c && c.owner ? `https://gist.github.com/${c.owner}/${c.id}` : null; },
+  // link a la version exacta (cambia con cada subida): el lector de Claude cachea la pagina fija y mostraba una vieja
+  linkClaude() { const c = Gist.cfg(); if (!c || !c.owner) return null; let sha = null; try { sha = localStorage.getItem('flujo.gist.sha'); } catch (e) {} return `https://gist.github.com/${c.owner}/${c.id}` + (sha ? '/' + sha : ''); },
   cfg() { try { return JSON.parse(localStorage.getItem('flujo.gist') || 'null'); } catch (e) { return null; } },
   guardar(c) { try { localStorage.setItem('flujo.gist', JSON.stringify(c)); } catch (e) {} },
   clear() { try { localStorage.removeItem('flujo.gist'); } catch (e) {} },
@@ -521,7 +522,7 @@ const Gist = {
     } else if (r.ok && files[Gist.CLAUDE]) { try { localStorage.setItem('flujo.gist.mdViejo', '1'); } catch (e) {} }
     try { localStorage.setItem('flujo.gist.claudeDiag', JSON.stringify({ t: Date.now(), diag: r.ok || diag.startsWith('error') ? diag : `error GitHub ${r.status}` })); } catch (e) {}
     if (!r.ok) { const e = new Error('gist ' + r.status); e.status = r.status; throw e; }
-    if (!c.owner) { try { const g = await r.json(); if (g && g.owner && g.owner.login) Gist.guardar({ ...c, owner: g.owner.login }); } catch (e) {} }
+    try { const g = await r.json(); if (!c.owner && g && g.owner && g.owner.login) Gist.guardar({ ...c, owner: g.owner.login }); const v = g && g.history && g.history[0] && g.history[0].version; if (v && diag.startsWith('ok')) localStorage.setItem('flujo.gist.sha', v); } catch (e) {}
     try { localStorage.setItem(marca, mes); localStorage.setItem('flujo.gist.push', String(Date.now())); } catch (e) {}
     return true;
   },
