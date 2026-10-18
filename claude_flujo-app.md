@@ -551,3 +551,10 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Cada `Gist.push` sube también `cartera-para-claude.md` (= `Intercambio.exportar`, el mismo export) al gist secreto. Link fijo: `https://gist.githubusercontent.com/<owner>/<id>/raw/cartera-para-claude.md` (`Gist.linkClaude`; el owner se guarda de la respuesta del PATCH). Ajustes → Datos → "Cartera en vivo para Claude" → Copiar link.
 - Uso: Facu pega el link en las instrucciones del proyecto Inversiones; el chat lo lee cuando dice "mirá mi cartera". Los datos son de la última vez que abrió la app. Quien tenga el link lo lee (gist secreto, no público).
 - (15-oct, build 202610151916) El link "raw" no sirve: GitHub prohíbe a los lectores automáticos (robots). La página del gist (`https://gist.github.com/<owner>/<id>`) sí abre, pero el lector corta ~35.000 caracteres. Ahora el gist lleva `a-cartera-para-claude.txt` (primer archivo de la página) con `exportCompacto()`: estado, resumen y riesgo, cartera con todo en una línea por empresa, watchlist en una línea, otros activos, historia anual, últimas 25 operaciones (~16-22 KB). El .md completo se borra del gist una vez. `Gist.linkClaude` devuelve la página del gist.
+
+## Pendientes (17-oct-2026, build 202610180209)
+- Icono de portapapeles arriba a la derecha (mobile-head; en escritorio, en la topbar) con globito ámbar = cantidad "para hacer".
+- state.pendientes [{id, texto, detalle, desde ISO|null, cuando texto|'', hecho, hechoEl, hechoT, t}]; viaja en el gist como el resto.
+- Grupos: Para hacer (sin fecha o fecha <= hoy), Más adelante (fecha futura; pasa sola a Para hacer), Si se da (sin fecha y con condición), Hechas (15 últimas, "Borrar hechas").
+- "Pegar lista": tablas markdown (una fila = un pendiente; columna Cargar/Cuándo/Fecha -> "Ya" = hoy, "Desde el 22-oct" = fecha, otro texto = condición; columna "Por qué" -> detalle; números sueltos llevan el nombre de su columna) y listas comunes (fecha "22-oct" o "5/11" en el renglón).
+- Tocar el texto edita (texto, detalle, fecha, condición, borrar). exportCompacto suma "MIS PENDIENTES".
