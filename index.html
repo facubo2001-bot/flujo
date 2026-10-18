@@ -115,6 +115,7 @@ p{margin:0}
     margin:0 -14px 12px;padding:calc(14px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid transparent}
   .mobile-head.scrolled{border-bottom-color:var(--line)}
   .mobile-head .brand{padding:0}
+  .desk-only{display:none!important}
   .tabbar{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:25}
   .tabbar button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:var(--ink-3);padding:4px 0;font-weight:700}
   .tabbar button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
@@ -1221,6 +1222,25 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .proy-sel .ps-r i{width:10px;height:3px;border-radius:2px;display:block}.proy-sel .ps-r b{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .proy-sel .ps-f{font-size:12px;color:var(--ink-3);margin-top:6px;line-height:1.35}
 
+/* pendientes */
+.pend-btn{position:relative;width:34px;height:34px;border:0;background:transparent}
+.pend-btn svg{width:20px;height:20px}
+.pend-n{position:absolute;top:1px;right:0;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--amber,#f5a524);color:#000;font-size:10px;font-weight:800;line-height:16px;text-align:center}
+.pend-n[hidden]{display:none}
+.pend-top{gap:6px;flex-wrap:wrap}
+.pend-sec{margin-top:16px}
+.pend-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.pend-borrar{margin-left:auto;border:0;background:transparent;color:var(--ink-3);font-size:11px;text-transform:none;letter-spacing:0;padding:2px 0;text-decoration:underline}
+.pend-it{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.pend-chk{flex:none;width:22px;height:22px;margin-top:1px;border-radius:6px;border:1.5px solid var(--ink-3);background:transparent;display:grid;place-items:center;padding:0;color:var(--ink)}
+.pend-chk svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.4}
+.pend-it.ok .pend-chk{background:var(--ink-3);border-color:var(--ink-3);color:var(--bg,#000)}
+.pend-txt{flex:1;min-width:0;border:0;background:transparent;text-align:left;padding:0;color:var(--ink);display:flex;flex-direction:column;gap:3px;font:inherit}
+.pend-t{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.pend-it.ok .pend-t{color:var(--ink-3);text-decoration:line-through}
+.pend-chip{align-self:flex-start;font-size:11px;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.pend-d{font-size:12px;color:var(--ink-3);line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1236,6 +1256,7 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
     <div class="mobile-head">
       <div class="brand"><div class="logo"></div><div><div class="name">Gastos</div></div></div>
       <div class="row" style="gap:6px">
+        <button class="icon-btn pend-btn" data-act="pend" aria-label="Pendientes"><svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9.5 3h5v3h-5z"/><path d="M9 13.2l2 2 4-4.2"/></svg><span class="pend-n" hidden></span></button>
         <div class="save-state" id="save-state-m" style="padding:0 4px;font-size:11px"><span class="save-dot"></span></div>
       </div>
     </div>
@@ -1555,13 +1576,14 @@ function defaultState() {
     ingresos: [],
     inversiones: [],
     pagos: [],
+    pendientes: [],
     sueldos: {},
     presets: [],
     aprendido: {},
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610161356';
+const BUILD = '202610180209';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -1649,7 +1671,7 @@ const Persist = {
     const base = defaultState();
     const s = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) } };
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
-    for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes']) if (!Array.isArray(s[k])) s[k] = [];
+    for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes','pendientes']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
     // lotes previos sin fecha real ("año cero"): van al último día hábil de 2025 (pedido de Facu, 6-oct)
     if (s.cartera && Array.isArray(s.cartera.operaciones)) for (const o of s.cartera.operaciones) if (o && o.legado && o.fecha === '2026-01-02') { o.fecha = '2025-12-31'; delete o.spy; }
@@ -6182,6 +6204,7 @@ function exportCompacto() {
   if (hs.length) L.push('HISTORIA ANUAL DE LA CARTERA (USD millones, EPS diluido)', ...hs, '');
   // operaciones
   L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
+  { const ps = (Array.isArray(state.pendientes) ? state.pendientes : []).filter(p => !p.hecho); if (ps.length) { L.push('', 'MIS PENDIENTES (lista que Facu edita en la app; no esta hecho)'); for (const p of ps) L.push(`- [${p.desde ? (p.desde <= D.today() ? 'para hacer' : 'desde ' + p.desde) : (p.cuando || 'para hacer')}] ${p.texto}${p.detalle ? ' -- ' + p.detalle : ''}`); } }
   L.push('', 'Notas: P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
   return L.join('\n');
 }
@@ -6739,6 +6762,120 @@ function formImportar() {
   $('#modal').onchange = e => { if (e.target.id === 'import-claude-file' && e.target.files[0]) { const fr = new FileReader(); fr.onload = () => { $('#import-txt').value = fr.result; }; fr.readAsText(e.target.files[0]); } };
 }
 
+/* ---------- Pendientes: la lista de cosas para hacer (Facu, 17-oct: "entro a la app, toco esto y digo: ah, tengo que hacer esto") ---------- */
+const Pend = {
+  MESES: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+  lista() { if (!Array.isArray(state.pendientes)) state.pendientes = []; return state.pendientes; },
+  /** en que grupo cae: hoy (para hacer), luego (con fecha futura), si (condicion sin fecha), hecho */
+  grupo(p) { if (p.hecho) return 'hecho'; if (p.desde && p.desde > D.today()) return 'luego'; if (!p.desde && p.cuando) return 'si'; return 'hoy'; },
+  cuantos() { return Pend.lista().filter(p => Pend.grupo(p) === 'hoy').length; },
+  fecha(iso) { if (!iso) return ''; const [, m, d] = iso.split('-').map(Number); return `${d}-${Pend.MESES[m - 1]}`; },
+  /** "22-oct", "22 de octubre", "22/10" -> ISO; si cae mas de 2 meses atras, es del anio que viene */
+  leerFecha(t) {
+    t = String(t || '').toLowerCase(); let d = null, m = null;
+    let x = t.match(/(\d{1,2})\s*(?:-|\/|\s|\sde\s)\s*(ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic)/);
+    if (x) { d = +x[1]; m = x[2] === 'set' ? 9 : Pend.MESES.indexOf(x[2]) + 1; }
+    else if ((x = t.match(/\b(\d{1,2})\/(\d{1,2})\b/))) { d = +x[1]; m = +x[2]; }
+    if (!d || !m || m > 12 || d > 31) return null;
+    const hoy = new Date(); let y = hoy.getFullYear();
+    let iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if ((hoy - new Date(iso + 'T12:00:00')) / 86400000 > 60) iso = `${y + 1}` + iso.slice(4);
+    return iso;
+  },
+  /** texto pegado -> pendientes. Entiende tablas markdown (una fila = un pendiente) y listas comunes */
+  leer(txt) {
+    const out = []; const lines = String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let head = null, headO = [];
+    const celdas = l => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+    for (const l of lines) {
+      if (l.startsWith('|')) {
+        const cs = celdas(l);
+        if (cs.every(c => /^:?-{2,}:?$/.test(c) || c === '')) continue;
+        if (!head) { headO = cs; head = cs.map(c => c.toLowerCase()); continue; }
+        const iCuando = head.findIndex(h => /cargar|cu[aá]ndo|fecha|desde/.test(h));
+        const iPorque = head.findIndex(h => /por qu[eé]|motivo|nota|detalle/.test(h));
+        const partes = []; let cuandoTxt = '';
+        cs.forEach((c, i) => {
+          if (i === iPorque || !c) return; if (i === iCuando) { cuandoTxt = c; return; }
+          if (head[i] === '#' || head[i] === 'n' || head[i] === 'nº') return;
+          // un numero suelto no se entiende sin su columna: "12" -> "Cantidad 12"
+          partes.push(headO[i] && /^[\d$.,\s%-]+$/.test(c) ? `${headO[i]} ${c}` : c);
+        });
+        if (!partes.length) continue;
+        const p = { texto: partes.join(' · '), detalle: iPorque >= 0 ? (cs[iPorque] || '') : '' };
+        Pend.fijarCuando(p, cuandoTxt); out.push(p);
+      } else {
+        head = null; const t = l.replace(/^(?:[-*•]|\d+[.)]|\[\s?[xX ]?\])\s+/, '').trim(); if (!t || t.length < 2) continue;
+        const p = { texto: t, detalle: '' }; const f = Pend.leerFecha(t); if (f) p.desde = f; out.push(p);
+      }
+    }
+    return out;
+  },
+  fijarCuando(p, c) {
+    c = String(c || '').trim(); if (!c) return;
+    if (/^(ya|hoy|ahora)\b/i.test(c)) { p.desde = D.today(); return; }
+    const f = Pend.leerFecha(c); if (f) { p.desde = f; return; }
+    p.cuando = c;
+  },
+  nuevo(p) { const n = { id: uid(), texto: String(p.texto || '').trim(), detalle: String(p.detalle || '').trim(), desde: p.desde || null, cuando: String(p.cuando || '').trim(), hecho: false, t: Date.now() }; Pend.lista().push(n); return n; },
+  de(id) { return Pend.lista().find(p => p.id === id); },
+};
+
+function pendItem(p) {
+  const g = Pend.grupo(p);
+  const chip = g === 'luego' ? `desde el ${Pend.fecha(p.desde)}` : g === 'si' ? esc(p.cuando) : g === 'hecho' ? (p.hechoEl ? `hecho el ${Pend.fecha(p.hechoEl)}` : 'hecho') : (p.desde && p.desde < D.today() ? `desde el ${Pend.fecha(p.desde)}` : (p.cuando ? esc(p.cuando) : ''));
+  return `<div class="pend-it ${g === 'hecho' ? 'ok' : ''}"><button class="pend-chk" data-act="pend-hecho" data-id="${p.id}" aria-label="${g === 'hecho' ? 'Marcar como pendiente' : 'Marcar como hecho'}">${g === 'hecho' ? ICONS.check : ''}</button><button class="pend-txt" data-act="pend-editar" data-id="${p.id}"><span class="pend-t">${esc(p.texto).replace(/(US\$|\$|≈) (?=\d)/g, (m, a) => a + '\u00a0') || '<i class="muted">(sin texto)</i>'}</span>${chip ? `<span class="pend-chip">${chip}</span>` : ''}${p.detalle ? `<span class="pend-d">${esc(p.detalle)}</span>` : ''}</button></div>`;
+}
+
+function formPend() {
+  const L = Pend.lista(); const por = { hoy: [], luego: [], si: [], hecho: [] };
+  for (const p of L) por[Pend.grupo(p)].push(p);
+  por.luego.sort((a, b) => a.desde < b.desde ? -1 : 1);
+  por.hoy.sort((a, b) => (a.desde || '') < (b.desde || '') ? -1 : 1);
+  por.hecho.sort((a, b) => (b.hechoT || 0) - (a.hechoT || 0));
+  const sec = (tit, arr, extra = '') => arr.length ? `<div class="pend-sec"><div class="pend-h">${tit}<span class="muted"> · ${arr.length}</span>${extra}</div>${arr.map(pendItem).join('')}</div>` : '';
+  const body = `<div class="row pend-top"><button class="btn sm" data-act="pend-nuevo">${ICONS.plus} Agregar</button><button class="btn sm" data-act="pend-pegar">${ICONS.copy} Pegar lista</button></div>`
+    + (L.length ? '' : `<p class="muted small" style="margin:14px 0 4px">Todavía no hay nada. Agregá una cosa, o pegá una lista o una tabla (por ejemplo, la de órdenes que te arma Claude): cada renglón queda como un pendiente que podés tocar para editar.</p>`)
+    + sec('Para hacer', por.hoy) + sec('Más adelante', por.luego) + sec('Si se da', por.si)
+    + sec('Hechas', por.hecho.slice(0, 15), `<button class="pend-borrar" data-act="pend-limpiar">Borrar hechas</button>`);
+  Modal.open({ title: 'Pendientes', submit: '', body });
+  $('#modal').classList.add('pend-modal');
+}
+
+function formPendEditar(id) {
+  const p = id ? Pend.de(id) : null; const n = p || { texto: '', detalle: '', desde: null, cuando: '' };
+  Modal.open({
+    title: p ? 'Editar pendiente' : 'Nuevo pendiente', submit: 'Guardar',
+    extra: p ? `<button class="btn danger" data-act="pend-borrar" data-id="${p.id}">Borrar</button>` : '',
+    body: F.field('Qué hay que hacer', `<textarea class="input textarea" id="pe-t" rows="3" placeholder="ej. Cargar orden PEP 12 a $ 11.770">${esc(n.texto)}</textarea>`)
+      + F.field('Detalle (opcional)', `<textarea class="input textarea" id="pe-d" rows="4" placeholder="ej. por qué, o qué mirar antes">${esc(n.detalle)}</textarea>`)
+      + `<div class="grid2">${F.field('Desde cuándo', `<input class="input" type="date" id="pe-f" value="${esc(n.desde || '')}">`, 'Vacío = ya')}${F.field('O si pasa algo', F.input('pe-c', n.cuando, 'placeholder="ej. solo si hay pánico"'), 'Sin fecha: queda en "Si se da"')}</div>`,
+    onSubmit() {
+      const t = Modal.val('pe-t').trim(); if (!t) { toast('Escribí qué hay que hacer'); return false; }
+      const datos = { texto: t, detalle: Modal.val('pe-d').trim(), desde: Modal.val('pe-f') || null, cuando: Modal.val('pe-c').trim() };
+      if (p) Object.assign(p, datos); else Pend.nuevo(datos);
+      Persist.save(); formPend(); pendBadge(); return false;
+    },
+  });
+}
+
+function formPendPegar() {
+  Modal.open({
+    title: 'Pegar lista', submit: 'Agregar',
+    body: `<p class="muted small" style="margin:0 0 10px">Pegá una tabla o una lista. Cada fila o renglón queda como un pendiente aparte, y después tocás cualquiera para editarlo. Si dice "Ya" o "Desde el 22-oct", la app lo pone en la fecha; si dice algo como "Solo si hay pánico", va a "Si se da".</p><textarea class="input textarea" id="pp-t" rows="9" placeholder="Pegá acá"></textarea><div id="pp-prev" class="muted small" style="margin-top:8px"></div>`,
+    onSubmit() {
+      const its = Pend.leer(Modal.val('pp-t')); if (!its.length) { toast('No encontré renglones para agregar'); return false; }
+      for (const it of its) Pend.nuevo(it); Persist.save(); toast(`${its.length} pendiente${its.length === 1 ? '' : 's'} agregado${its.length === 1 ? '' : 's'}`); formPend(); pendBadge(); return false;
+    },
+  });
+  $('#modal').oninput = () => { const n = Pend.leer(Modal.val('pp-t')).length; const el = $('#pp-prev'); if (el) el.textContent = n ? `Se van a agregar ${n} pendiente${n === 1 ? '' : 's'}.` : ''; };
+}
+
+function pendBadge() {
+  const n = Pend.cuantos();
+  for (const b of $$('[data-act="pend"]')) { const s = b.querySelector('.pend-n'); if (s) { s.textContent = n > 9 ? '9+' : String(n); s.hidden = !n; } b.setAttribute('aria-label', n ? `Pendientes: ${n} para hacer` : 'Pendientes'); }
+}
+
 
 /* ===================== FLUJO — demo data ===================== */
 function cargarDemo() {
@@ -6812,11 +6949,13 @@ function renderNav() {
   $('#tabbar').innerHTML = VIEWS.filter(v => v.id !== 'config').slice(0, 5).map(v => btn(v, '')).join('') + btn(VIEWS.find(v => v.id === 'config'), '');
 }
 
+const PEND_ICON = '<svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9.5 3h5v3h-5z"/><path d="M9 13.2l2 2 4-4.2"/></svg>';
 function renderTopbar() {
   const [t, sub] = VIEW_TITLES[ui.view]; const withMonth = ['resumen', 'movimientos', 'tarjetas', 'plan', 'tendencias'].includes(ui.view);
   return `<div class="topbar"><div class="title"><h1>${t}</h1><small>${sub}${state.settings.nombre && ui.view === 'resumen' ? ` · ${esc(state.settings.nombre)}` : ''}</small></div><div class="tools">
     ${ui.view === 'movimientos' && ui.gAnio ? `<div class="month-nav"><button data-anio="-1" aria-label="A\u00f1o anterior">\u2039</button><span class="label" data-anio="0">${ui.gAnio}</span><button data-anio="1" aria-label="A\u00f1o siguiente" ${Number(ui.gAnio) >= Number(D.thisMonth().slice(0, 4)) ? 'disabled' : ''}>\u203a</button></div>` : withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
     <div class="seg" id="cur-seg">${['ARS', 'USD'].map(c => `<button class="${ui.cur === c ? 'on' : ''}" data-cur="${c}">${c === 'ARS' ? '$ ARS' : 'US$'}</button>`).join('')}</div>
+    <button class="icon-btn pend-btn desk-only" data-act="pend" aria-label="Pendientes">${PEND_ICON}<span class="pend-n" hidden></span></button>
     <button class="btn primary" data-act="new" style="display:none" id="btn-new-desktop">${ICONS.plus} Gasto</button>
   </div></div>`;
 }
@@ -6836,7 +6975,7 @@ function render() {
   ChartQ.mount(); aplicarInfo($('.main'));
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
-  headLine();
+  headLine(); pendBadge();
 }
 /** Cromo que reacciona al scroll: la hairline del encabezado existe solo cuando hay algo arriba,
  *  y el FAB se va mientras bajas (flotaba sobre el contenido todo el recorrido y tapaba cifras).
@@ -6950,6 +7089,13 @@ const Actions = {
   'fab-gasto'() { fabMenu(false); formMov(); },
   'fab-op'() { fabMenu(false); formOp(); },
   'fab-calc'() { fabMenu(false); formCalc(); },
+  pend() { formPend(); },
+  'pend-nuevo'() { formPendEditar(null); },
+  'pend-editar'(id) { formPendEditar(id); },
+  'pend-pegar'() { formPendPegar(); },
+  'pend-hecho'(id) { const p = Pend.de(id); if (!p) return; p.hecho = !p.hecho; if (p.hecho) { p.hechoEl = D.today(); p.hechoT = Date.now(); } else { delete p.hechoEl; delete p.hechoT; } Persist.save(); pendBadge(); formPend(); },
+  'pend-borrar'(id) { confirmar('¿Borrar este pendiente?', () => { state.pendientes = Pend.lista().filter(p => p.id !== id); Persist.save(); pendBadge(); setTimeout(formPend, 0); }); },
+  'pend-limpiar'() { confirmar('¿Borrar todas las hechas?', () => { state.pendientes = Pend.lista().filter(p => !p.hecho); Persist.save(); pendBadge(); setTimeout(formPend, 0); }); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
   'pz-orden'(id) { const o = state.settings.pzOrden || { k: 'valor', dir: -1 }; state.settings.pzOrden = o.k === id ? { k: id, dir: -o.dir } : { k: id, dir: id === 'az' ? 1 : -1 }; Persist.save(); render(); },

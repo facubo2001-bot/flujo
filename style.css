@@ -91,6 +91,7 @@ p{margin:0}
     margin:0 -14px 12px;padding:calc(14px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid transparent}
   .mobile-head.scrolled{border-bottom-color:var(--line)}
   .mobile-head .brand{padding:0}
+  .desk-only{display:none!important}
   .tabbar{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:25}
   .tabbar button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:var(--ink-3);padding:4px 0;font-weight:700}
   .tabbar button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
@@ -1196,3 +1197,22 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .proy-sel .ps-r{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;font-size:13.5px}
 .proy-sel .ps-r i{width:10px;height:3px;border-radius:2px;display:block}.proy-sel .ps-r b{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .proy-sel .ps-f{font-size:12px;color:var(--ink-3);margin-top:6px;line-height:1.35}
+
+/* pendientes */
+.pend-btn{position:relative;width:34px;height:34px;border:0;background:transparent}
+.pend-btn svg{width:20px;height:20px}
+.pend-n{position:absolute;top:1px;right:0;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--amber,#f5a524);color:#000;font-size:10px;font-weight:800;line-height:16px;text-align:center}
+.pend-n[hidden]{display:none}
+.pend-top{gap:6px;flex-wrap:wrap}
+.pend-sec{margin-top:16px}
+.pend-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.pend-borrar{margin-left:auto;border:0;background:transparent;color:var(--ink-3);font-size:11px;text-transform:none;letter-spacing:0;padding:2px 0;text-decoration:underline}
+.pend-it{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.pend-chk{flex:none;width:22px;height:22px;margin-top:1px;border-radius:6px;border:1.5px solid var(--ink-3);background:transparent;display:grid;place-items:center;padding:0;color:var(--ink)}
+.pend-chk svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.4}
+.pend-it.ok .pend-chk{background:var(--ink-3);border-color:var(--ink-3);color:var(--bg,#000)}
+.pend-txt{flex:1;min-width:0;border:0;background:transparent;text-align:left;padding:0;color:var(--ink);display:flex;flex-direction:column;gap:3px;font:inherit}
+.pend-t{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.pend-it.ok .pend-t{color:var(--ink-3);text-decoration:line-through}
+.pend-chip{align-self:flex-start;font-size:11px;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.pend-d{font-size:12px;color:var(--ink-3);line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}

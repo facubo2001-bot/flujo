@@ -983,6 +983,7 @@ function exportCompacto() {
   if (hs.length) L.push('HISTORIA ANUAL DE LA CARTERA (USD millones, EPS diluido)', ...hs, '');
   // operaciones
   L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
+  { const ps = (Array.isArray(state.pendientes) ? state.pendientes : []).filter(p => !p.hecho); if (ps.length) { L.push('', 'MIS PENDIENTES (lista que Facu edita en la app; no esta hecho)'); for (const p of ps) L.push(`- [${p.desde ? (p.desde <= D.today() ? 'para hacer' : 'desde ' + p.desde) : (p.cuando || 'para hacer')}] ${p.texto}${p.detalle ? ' -- ' + p.detalle : ''}`); } }
   L.push('', 'Notas: P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
   return L.join('\n');
 }
@@ -1538,4 +1539,118 @@ function formImportar() {
     } catch (e) { $('#import-out').innerHTML = `<div class="callout crit small">${esc(e.message)}</div>`; return false; }
   } });
   $('#modal').onchange = e => { if (e.target.id === 'import-claude-file' && e.target.files[0]) { const fr = new FileReader(); fr.onload = () => { $('#import-txt').value = fr.result; }; fr.readAsText(e.target.files[0]); } };
+}
+
+/* ---------- Pendientes: la lista de cosas para hacer (Facu, 17-oct: "entro a la app, toco esto y digo: ah, tengo que hacer esto") ---------- */
+const Pend = {
+  MESES: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+  lista() { if (!Array.isArray(state.pendientes)) state.pendientes = []; return state.pendientes; },
+  /** en que grupo cae: hoy (para hacer), luego (con fecha futura), si (condicion sin fecha), hecho */
+  grupo(p) { if (p.hecho) return 'hecho'; if (p.desde && p.desde > D.today()) return 'luego'; if (!p.desde && p.cuando) return 'si'; return 'hoy'; },
+  cuantos() { return Pend.lista().filter(p => Pend.grupo(p) === 'hoy').length; },
+  fecha(iso) { if (!iso) return ''; const [, m, d] = iso.split('-').map(Number); return `${d}-${Pend.MESES[m - 1]}`; },
+  /** "22-oct", "22 de octubre", "22/10" -> ISO; si cae mas de 2 meses atras, es del anio que viene */
+  leerFecha(t) {
+    t = String(t || '').toLowerCase(); let d = null, m = null;
+    let x = t.match(/(\d{1,2})\s*(?:-|\/|\s|\sde\s)\s*(ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic)/);
+    if (x) { d = +x[1]; m = x[2] === 'set' ? 9 : Pend.MESES.indexOf(x[2]) + 1; }
+    else if ((x = t.match(/\b(\d{1,2})\/(\d{1,2})\b/))) { d = +x[1]; m = +x[2]; }
+    if (!d || !m || m > 12 || d > 31) return null;
+    const hoy = new Date(); let y = hoy.getFullYear();
+    let iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if ((hoy - new Date(iso + 'T12:00:00')) / 86400000 > 60) iso = `${y + 1}` + iso.slice(4);
+    return iso;
+  },
+  /** texto pegado -> pendientes. Entiende tablas markdown (una fila = un pendiente) y listas comunes */
+  leer(txt) {
+    const out = []; const lines = String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let head = null, headO = [];
+    const celdas = l => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+    for (const l of lines) {
+      if (l.startsWith('|')) {
+        const cs = celdas(l);
+        if (cs.every(c => /^:?-{2,}:?$/.test(c) || c === '')) continue;
+        if (!head) { headO = cs; head = cs.map(c => c.toLowerCase()); continue; }
+        const iCuando = head.findIndex(h => /cargar|cu[aá]ndo|fecha|desde/.test(h));
+        const iPorque = head.findIndex(h => /por qu[eé]|motivo|nota|detalle/.test(h));
+        const partes = []; let cuandoTxt = '';
+        cs.forEach((c, i) => {
+          if (i === iPorque || !c) return; if (i === iCuando) { cuandoTxt = c; return; }
+          if (head[i] === '#' || head[i] === 'n' || head[i] === 'nº') return;
+          // un numero suelto no se entiende sin su columna: "12" -> "Cantidad 12"
+          partes.push(headO[i] && /^[\d$.,\s%-]+$/.test(c) ? `${headO[i]} ${c}` : c);
+        });
+        if (!partes.length) continue;
+        const p = { texto: partes.join(' · '), detalle: iPorque >= 0 ? (cs[iPorque] || '') : '' };
+        Pend.fijarCuando(p, cuandoTxt); out.push(p);
+      } else {
+        head = null; const t = l.replace(/^(?:[-*•]|\d+[.)]|\[\s?[xX ]?\])\s+/, '').trim(); if (!t || t.length < 2) continue;
+        const p = { texto: t, detalle: '' }; const f = Pend.leerFecha(t); if (f) p.desde = f; out.push(p);
+      }
+    }
+    return out;
+  },
+  fijarCuando(p, c) {
+    c = String(c || '').trim(); if (!c) return;
+    if (/^(ya|hoy|ahora)\b/i.test(c)) { p.desde = D.today(); return; }
+    const f = Pend.leerFecha(c); if (f) { p.desde = f; return; }
+    p.cuando = c;
+  },
+  nuevo(p) { const n = { id: uid(), texto: String(p.texto || '').trim(), detalle: String(p.detalle || '').trim(), desde: p.desde || null, cuando: String(p.cuando || '').trim(), hecho: false, t: Date.now() }; Pend.lista().push(n); return n; },
+  de(id) { return Pend.lista().find(p => p.id === id); },
+};
+
+function pendItem(p) {
+  const g = Pend.grupo(p);
+  const chip = g === 'luego' ? `desde el ${Pend.fecha(p.desde)}` : g === 'si' ? esc(p.cuando) : g === 'hecho' ? (p.hechoEl ? `hecho el ${Pend.fecha(p.hechoEl)}` : 'hecho') : (p.desde && p.desde < D.today() ? `desde el ${Pend.fecha(p.desde)}` : (p.cuando ? esc(p.cuando) : ''));
+  return `<div class="pend-it ${g === 'hecho' ? 'ok' : ''}"><button class="pend-chk" data-act="pend-hecho" data-id="${p.id}" aria-label="${g === 'hecho' ? 'Marcar como pendiente' : 'Marcar como hecho'}">${g === 'hecho' ? ICONS.check : ''}</button><button class="pend-txt" data-act="pend-editar" data-id="${p.id}"><span class="pend-t">${esc(p.texto).replace(/(US\$|\$|≈) (?=\d)/g, (m, a) => a + '\u00a0') || '<i class="muted">(sin texto)</i>'}</span>${chip ? `<span class="pend-chip">${chip}</span>` : ''}${p.detalle ? `<span class="pend-d">${esc(p.detalle)}</span>` : ''}</button></div>`;
+}
+
+function formPend() {
+  const L = Pend.lista(); const por = { hoy: [], luego: [], si: [], hecho: [] };
+  for (const p of L) por[Pend.grupo(p)].push(p);
+  por.luego.sort((a, b) => a.desde < b.desde ? -1 : 1);
+  por.hoy.sort((a, b) => (a.desde || '') < (b.desde || '') ? -1 : 1);
+  por.hecho.sort((a, b) => (b.hechoT || 0) - (a.hechoT || 0));
+  const sec = (tit, arr, extra = '') => arr.length ? `<div class="pend-sec"><div class="pend-h">${tit}<span class="muted"> · ${arr.length}</span>${extra}</div>${arr.map(pendItem).join('')}</div>` : '';
+  const body = `<div class="row pend-top"><button class="btn sm" data-act="pend-nuevo">${ICONS.plus} Agregar</button><button class="btn sm" data-act="pend-pegar">${ICONS.copy} Pegar lista</button></div>`
+    + (L.length ? '' : `<p class="muted small" style="margin:14px 0 4px">Todavía no hay nada. Agregá una cosa, o pegá una lista o una tabla (por ejemplo, la de órdenes que te arma Claude): cada renglón queda como un pendiente que podés tocar para editar.</p>`)
+    + sec('Para hacer', por.hoy) + sec('Más adelante', por.luego) + sec('Si se da', por.si)
+    + sec('Hechas', por.hecho.slice(0, 15), `<button class="pend-borrar" data-act="pend-limpiar">Borrar hechas</button>`);
+  Modal.open({ title: 'Pendientes', submit: '', body });
+  $('#modal').classList.add('pend-modal');
+}
+
+function formPendEditar(id) {
+  const p = id ? Pend.de(id) : null; const n = p || { texto: '', detalle: '', desde: null, cuando: '' };
+  Modal.open({
+    title: p ? 'Editar pendiente' : 'Nuevo pendiente', submit: 'Guardar',
+    extra: p ? `<button class="btn danger" data-act="pend-borrar" data-id="${p.id}">Borrar</button>` : '',
+    body: F.field('Qué hay que hacer', `<textarea class="input textarea" id="pe-t" rows="3" placeholder="ej. Cargar orden PEP 12 a $ 11.770">${esc(n.texto)}</textarea>`)
+      + F.field('Detalle (opcional)', `<textarea class="input textarea" id="pe-d" rows="4" placeholder="ej. por qué, o qué mirar antes">${esc(n.detalle)}</textarea>`)
+      + `<div class="grid2">${F.field('Desde cuándo', `<input class="input" type="date" id="pe-f" value="${esc(n.desde || '')}">`, 'Vacío = ya')}${F.field('O si pasa algo', F.input('pe-c', n.cuando, 'placeholder="ej. solo si hay pánico"'), 'Sin fecha: queda en "Si se da"')}</div>`,
+    onSubmit() {
+      const t = Modal.val('pe-t').trim(); if (!t) { toast('Escribí qué hay que hacer'); return false; }
+      const datos = { texto: t, detalle: Modal.val('pe-d').trim(), desde: Modal.val('pe-f') || null, cuando: Modal.val('pe-c').trim() };
+      if (p) Object.assign(p, datos); else Pend.nuevo(datos);
+      Persist.save(); formPend(); pendBadge(); return false;
+    },
+  });
+}
+
+function formPendPegar() {
+  Modal.open({
+    title: 'Pegar lista', submit: 'Agregar',
+    body: `<p class="muted small" style="margin:0 0 10px">Pegá una tabla o una lista. Cada fila o renglón queda como un pendiente aparte, y después tocás cualquiera para editarlo. Si dice "Ya" o "Desde el 22-oct", la app lo pone en la fecha; si dice algo como "Solo si hay pánico", va a "Si se da".</p><textarea class="input textarea" id="pp-t" rows="9" placeholder="Pegá acá"></textarea><div id="pp-prev" class="muted small" style="margin-top:8px"></div>`,
+    onSubmit() {
+      const its = Pend.leer(Modal.val('pp-t')); if (!its.length) { toast('No encontré renglones para agregar'); return false; }
+      for (const it of its) Pend.nuevo(it); Persist.save(); toast(`${its.length} pendiente${its.length === 1 ? '' : 's'} agregado${its.length === 1 ? '' : 's'}`); formPend(); pendBadge(); return false;
+    },
+  });
+  $('#modal').oninput = () => { const n = Pend.leer(Modal.val('pp-t')).length; const el = $('#pp-prev'); if (el) el.textContent = n ? `Se van a agregar ${n} pendiente${n === 1 ? '' : 's'}.` : ''; };
+}
+
+function pendBadge() {
+  const n = Pend.cuantos();
+  for (const b of $$('[data-act="pend"]')) { const s = b.querySelector('.pend-n'); if (s) { s.textContent = n > 9 ? '9+' : String(n); s.hidden = !n; } b.setAttribute('aria-label', n ? `Pendientes: ${n} para hacer` : 'Pendientes'); }
 }

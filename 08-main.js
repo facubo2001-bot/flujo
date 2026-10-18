@@ -8,11 +8,13 @@ function renderNav() {
   $('#tabbar').innerHTML = VIEWS.filter(v => v.id !== 'config').slice(0, 5).map(v => btn(v, '')).join('') + btn(VIEWS.find(v => v.id === 'config'), '');
 }
 
+const PEND_ICON = '<svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9.5 3h5v3h-5z"/><path d="M9 13.2l2 2 4-4.2"/></svg>';
 function renderTopbar() {
   const [t, sub] = VIEW_TITLES[ui.view]; const withMonth = ['resumen', 'movimientos', 'tarjetas', 'plan', 'tendencias'].includes(ui.view);
   return `<div class="topbar"><div class="title"><h1>${t}</h1><small>${sub}${state.settings.nombre && ui.view === 'resumen' ? ` · ${esc(state.settings.nombre)}` : ''}</small></div><div class="tools">
     ${ui.view === 'movimientos' && ui.gAnio ? `<div class="month-nav"><button data-anio="-1" aria-label="A\u00f1o anterior">\u2039</button><span class="label" data-anio="0">${ui.gAnio}</span><button data-anio="1" aria-label="A\u00f1o siguiente" ${Number(ui.gAnio) >= Number(D.thisMonth().slice(0, 4)) ? 'disabled' : ''}>\u203a</button></div>` : withMonth ? `<div class="month-nav"><button data-mes="-1" aria-label="Mes anterior">‹</button><span class="label" data-mes="0" title="Ir al mes actual">${D.monthName(ui.mes)}</span><button data-mes="1" aria-label="Mes siguiente">›</button></div>` : ''}
     <div class="seg" id="cur-seg">${['ARS', 'USD'].map(c => `<button class="${ui.cur === c ? 'on' : ''}" data-cur="${c}">${c === 'ARS' ? '$ ARS' : 'US$'}</button>`).join('')}</div>
+    <button class="icon-btn pend-btn desk-only" data-act="pend" aria-label="Pendientes">${PEND_ICON}<span class="pend-n" hidden></span></button>
     <button class="btn primary" data-act="new" style="display:none" id="btn-new-desktop">${ICONS.plus} Gasto</button>
   </div></div>`;
 }
@@ -32,7 +34,7 @@ function render() {
   ChartQ.mount(); aplicarInfo($('.main'));
   try { sessionStorage.setItem('flujo.ui', JSON.stringify({ view: ui.view, mes: ui.mes, cur: ui.cur })); } catch (e) {}
   if (scroller) scroller.scrollTop = keepY; else window.scrollTo({ top: keepY });
-  headLine();
+  headLine(); pendBadge();
 }
 /** Cromo que reacciona al scroll: la hairline del encabezado existe solo cuando hay algo arriba,
  *  y el FAB se va mientras bajas (flotaba sobre el contenido todo el recorrido y tapaba cifras).
@@ -146,6 +148,13 @@ const Actions = {
   'fab-gasto'() { fabMenu(false); formMov(); },
   'fab-op'() { fabMenu(false); formOp(); },
   'fab-calc'() { fabMenu(false); formCalc(); },
+  pend() { formPend(); },
+  'pend-nuevo'() { formPendEditar(null); },
+  'pend-editar'(id) { formPendEditar(id); },
+  'pend-pegar'() { formPendPegar(); },
+  'pend-hecho'(id) { const p = Pend.de(id); if (!p) return; p.hecho = !p.hecho; if (p.hecho) { p.hechoEl = D.today(); p.hechoT = Date.now(); } else { delete p.hechoEl; delete p.hechoT; } Persist.save(); pendBadge(); formPend(); },
+  'pend-borrar'(id) { confirmar('¿Borrar este pendiente?', () => { state.pendientes = Pend.lista().filter(p => p.id !== id); Persist.save(); pendBadge(); setTimeout(formPend, 0); }); },
+  'pend-limpiar'() { confirmar('¿Borrar todas las hechas?', () => { state.pendientes = Pend.lista().filter(p => !p.hecho); Persist.save(); pendBadge(); setTimeout(formPend, 0); }); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
   'pz-orden'(id) { const o = state.settings.pzOrden || { k: 'valor', dir: -1 }; state.settings.pzOrden = o.k === id ? { k: id, dir: -o.dir } : { k: id, dir: id === 'az' ? 1 : -1 }; Persist.save(); render(); },
