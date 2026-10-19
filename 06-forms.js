@@ -685,6 +685,16 @@ function fundHTML(t, pos) {
       tile('P/CF', num(mu.pcf, 1), '', mu.pcf != null ? 'caja operativa' : ''),
       tile('Div. yield', Fund.yieldDe(t, d) ? pct1(Fund.yieldDe(t, d)) : '\u2014', '', [mu.payout != null ? `payout ${pct1(mu.payout)}` : '', mu.recompras ? `recompra ${pct1(mu.recompras)}` : ''].filter(Boolean).join(' \u00b7 ')),
     ]);
+    // lo que esperan los analistas (Alpha Vantage): P/E forward, PEG, crecimiento esperado y revisiones
+    const em = Est.m(t); const peHoy = (aj => aj ? aj.aj : Fund.pe(t, d))(Fund.peAj(t, d));
+    const fw = em ? grupo('Forward', `Lo que esperan los analistas (Alpha Vantage), como en Finviz. P/E forward: el precio de hoy contra la ganancia por acción esperada para los próximos 12 meses. PEG: el P/E forward dividido el crecimiento esperado de esa ganancia (${em.gEps2 != null ? 'promedio de los próximos 2 ejercicios' : 'próximo ejercicio'}); debajo de 1 es barata para lo que crece, arriba de 2 es cara. Revisiones: cómo cambió la estimación del próximo ejercicio en 90 días; si los analistas la vienen subiendo, el negocio anda mejor de lo esperado. Ojo: los analistas usan ganancia ajustada, no la contable, así que el P/E forward suele dar más bajo que el P/E de hoy.`, [
+      tile('P/E fwd', em.fpe != null ? num(em.fpe, 1) : '—', em.raro ? 'mid' : vsH(em.fpe, peHoy, false), em.otraMoneda ? `balance en ${esc(em.otraMoneda)}` : em.sinBase ? 'sin balance comparable' : em.raro ? '<span class="warn-text">muy distinto al de hoy</span>' : peHoy ? `hoy ${num(peHoy, 1)}` : ''),
+      tile('PEG fwd', em.peg != null ? num(em.peg, 2) : '—', em.peg != null && !em.raro ? abs(em.peg, 1, 2, true) : '', em.gPeg != null ? `crece ${pct1(em.gPeg)}/año` : ''),
+      tile(`EPS FY${em.f1 ? String(em.f1.d).slice(2, 4) : ''}`, pct1(em.gEps), abs(em.gEps, 0.10, 0.04), em.f1 ? `${num(em.f0.eps, 2)} → ${num(em.f1.eps, 2)}` : ''),
+      tile(`Ventas FY${em.f1 ? String(em.f1.d).slice(2, 4) : ''}`, pct1(em.gRev), abs(em.gRev, 0.08, 0.03), em.f1 && em.f1.rev ? `${num(em.f1.rev / 1e9, 1)} mil M` : ''),
+      tile('Revisiones 90d', em.rev90 != null ? `${em.rev90 > 0 ? '+' : ''}${pct1(em.rev90)}` : '—', em.rev90 == null ? '' : em.rev90 >= 0.02 ? 'pos' : em.rev90 <= -0.02 ? 'neg' : 'mid', em.up != null || em.dn != null ? `30d: ${em.up || 0}↑ ${em.dn || 0}↓` : ''),
+      tile('Analistas', em.n != null ? num(em.n, 0) : '—', '', `hace ${em.edad < 1 ? 'menos de 1 día' : Math.round(em.edad) + (Math.round(em.edad) === 1 ? ' día' : ' días')}`),
+    ]) : (state.settings.avKey || '').trim() && !Fund.ETF.has(t) ? `<div class="fs"><div class="fs-t">Forward</div><div class="n muted small" style="padding:4px 0 8px">${(Est.box()[t] || {}).vacio ? 'Alpha Vantage no tiene estimaciones para esta empresa.' : 'Las estimaciones de analistas llegan en los próximos días (24 empresas por día, primero tu cartera).'}</div></div>` : '';
     const bs = grupo('Balance sheet', 'Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana.', [
       tile('Current ratio', num(d.currentRatio, 2), abs(d.currentRatio, 1.2, 0.9), d.currentRatio5 ? `5Y avg ${num(d.currentRatio5, 2)}` : ''),
       tile('Quick ratio', num(d.quickRatio, 2), abs(d.quickRatio, 1, 0.7), d.quickRatio5 ? `5Y avg ${num(d.quickRatio5, 2)}` : ''),
@@ -697,7 +707,7 @@ function fundHTML(t, pos) {
     const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
     const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
     const pie = `<div class="fpie">Finnhub \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} ${infoBtn(`Datos de Finnhub y de los balances presentados a la SEC${d.aniosDatos ? ` (${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta})` : ''}. Si un n\u00famero no coincide con TradingView, copi\u00e1 los datos crudos y pegalos en el chat.`)} <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>`;
-    pane = q + cuenta + g + v + bs + chart + bal + avisos + pie;
+    pane = q + cuenta + g + fw + v + bs + chart + bal + avisos + pie;
   }
   return `<div class="fund hoja" id="fund-box">${cab}${rango}${acciones}${tabs}<div class="fp fp-fund">${pane}</div></div>`;
 }
@@ -804,6 +814,9 @@ const CMP_FILAS = [
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
   { k: 'P/E vs su mediana', v: d => { const aj = Fund.peAj(d.ticker, d); const pe = aj ? aj.aj : Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
+  { k: 'P/E forward', v: d => { const m = Est.m(d.ticker); return m && !m.raro ? m.fpe : null; }, f: cmpNum(1), mejor: -1, valido: v => v > 0 },
+  { k: 'PEG forward', v: d => { const m = Est.m(d.ticker); return m && !m.raro ? m.peg : null; }, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
+  { k: 'EPS esperado pr\u00f3x. a\u00f1o', v: d => { const m = Est.m(d.ticker); return m ? m.gEps : null; }, f: cmpPct, mejor: 1 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
   { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : Tec.distTxt(v, ' '), mejor: -1 },
   { k: 'Dividendo', v: d => d.divAnual && (state.cartera.precios[d.ticker] || {}).c ? d.divAnual / state.cartera.precios[d.ticker].c : ((d.v || 1) >= 5 ? null : d.yieldDiv || null), f: cmpPct, mejor: 0 },
@@ -966,10 +979,12 @@ function exportCompacto() {
     const rango = d.min52 != null && d.max52 > d.min52 && p.precio != null ? (p.precio - d.min52) / (d.max52 - d.min52) : null;
     const zona = [al.urgente ? `urg<=${n2(al.urgente)}` : '', al.mirala ? `mir<=${n2(al.mirala)}` : ''].filter(Boolean).join(' ') || 'sin zona';
     const val = `P/E ${pe ? n1(pe) : '-'}${aj ? `*(limpio ${n1(aj.aj)})` : ''}/med ${n1(d.peMediana)} PEG ${n2(d.peg)} P/FCF ${n1(mu.pfcf)} ROIC ${pc(d.roicAct)} CAGR5 vtas ${pc(d.cagrVentas5 ?? d.crecVentas5)} EPS ${pc(d.cagrEps5)} FCF ${pc(d.cagrFcf5)} mg.neto ${pc(d.margenNeto)} D/E ${n2(d.deudaPat)}`;
+    const em = Est.m(t);
+    const fwd = em ? ` | fwd: P/E ${n1(em.fpe)} PEG ${n2(em.peg)} gEPS ${pc(em.gEps)} gVtas ${pc(em.gRev)} rev90 ${em.rev90 != null ? sg(em.rev90) : '-'} n${em.n ?? '-'}${em.otraMoneda ? ' (balance en ' + em.otraMoneda + ')' : ''}${em.sinBase ? ' (sin P/E: balance no comparable)' : ''}${em.raro ? ' (revisar)' : ''} ${Math.round(em.edad)}d` : '';
     const extra = `52s ${rango != null ? pc(rango) : '-'} EMA200 ${e ? sg(e.dist) : '-'}${b ? ` balance ${b.fecha}` : ''}${al.tier ? ` tier ${al.tier}` : ''}`;
     return tengo
-      ? `${t} | ${n2(p.acciones)} acc PPC ${n2(p.ppc)} | px ${n2(p.precio)} | valor ${n2(p.valor)} (${pc(p.peso)}) | result ${sg(p.rendTotal)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 90)}` : ''}`
-      : `${t} | px ${n2(p.precio)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 60)}` : ''}`;
+      ? `${t} | ${n2(p.acciones)} acc PPC ${n2(p.ppc)} | px ${n2(p.precio)} | valor ${n2(p.valor)} (${pc(p.peso)}) | result ${sg(p.rendTotal)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val}${fwd} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 90)}` : ''}`
+      : `${t} | px ${n2(p.precio)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val}${fwd} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 60)}` : ''}`;
   };
   L.push(`CARTERA (${k.posiciones.length}) - ticker | tenencia | precio USD | valor (peso) | resultado total | zonas | valuacion y calidad | tecnico y balance | que hace`);
   for (const p of k.posiciones.slice().sort((a, b) => (b.valor || 0) - (a.valor || 0))) L.push(fila(p, true));
@@ -984,7 +999,7 @@ function exportCompacto() {
   // operaciones
   L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
   { const ps = (Array.isArray(state.pendientes) ? state.pendientes : []).filter(p => !p.hecho); if (ps.length) { L.push('', 'MIS PENDIENTES (lista que Facu edita en la app; no esta hecho)'); for (const p of ps) L.push(`- [${p.desde ? (p.desde <= D.today() ? 'para hacer' : 'desde ' + p.desde) : (p.cuando || 'para hacer')}] ${p.texto}${p.detalle ? ' -- ' + p.detalle : ''}`); } }
-  L.push('', 'Notas: P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
+  L.push('', 'Notas: fwd = lo que esperan los analistas (Alpha Vantage): P/E con la ganancia esperada de los proximos 12 meses (ajustada, no contable), PEG = ese P/E / crecimiento esperado del EPS, gEPS/gVtas = crecimiento esperado el proximo ejercicio, rev90 = cuanto subio o bajo la estimacion en 90 dias, n = analistas, Nd = dias desde que se bajo. P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
   return L.join('\n');
 }
 

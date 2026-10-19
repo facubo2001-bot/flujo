@@ -558,3 +558,11 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Grupos: Para hacer (sin fecha o fecha <= hoy), Más adelante (fecha futura; pasa sola a Para hacer), Si se da (sin fecha y con condición), Hechas (15 últimas, "Borrar hechas").
 - "Pegar lista": tablas markdown (una fila = un pendiente; columna Cargar/Cuándo/Fecha -> "Ya" = hoy, "Desde el 22-oct" = fecha, otro texto = condición; columna "Por qué" -> detalle; números sueltos llevan el nombre de su columna) y listas comunes (fecha "22-oct" o "5/11" en el renglón).
 - Tocar el texto edita (texto, detalle, fecha, condición, borrar). exportCompacto suma "MIS PENDIENTES".
+
+## Estimaciones de analistas — Alpha Vantage (19-oct-2026, build 202610191726)
+- Clave en Ajustes → Perfil (state.settings.avKey, viaja con el gist). Plan gratis 25/día y 5/min: usamos 24 y una cada 13 s (Est.TOPE/ESPERA). Contador diario en localStorage 'flujo.av.dia'; diag en 'flujo.av.diag'; clave mala en 'flujo.av.mala'.
+- Est.cola(): sin dato > balance nuevo (Fund ttm.hasta cambió) > cartera >4 días > watchlist >7 días; vacías se reintentan a los 30 días; ETFs no. Motor llama Est.paso() después de precios/fichas.
+- EARNINGS_ESTIMATES (CORS ok). Guarda state.cartera.est[T] = {t, h, a:[{d,eps,hi,lo,n,e30,e90,up,dn,rev,rn}], q}.
+- Est.m(t): NTM = parte del FY0 que falta + resto del FY1; P/E fwd = precio/NTM SOLO si Fund.mult da eps (moneda y market cap validados); "raro" si NTM/EPS TTM fuera de 0,33–3. PEG = P/E fwd / crecimiento (2 años si hay FY2, si no FY1/FY0). Crecimientos y revisiones (90d, 30d, ↑↓) no dependen de moneda.
+- Ficha: grupo "Forward" (P/E fwd, PEG fwd, EPS FYxx, Ventas FYxx, Revisiones 90d, Analistas). Comparar: P/E forward, PEG forward, EPS esperado. Export compacto: "fwd: ..." por empresa.
+- Probado: Yahoo (429 desde GitHub) y Finviz (bloqueo) NO sirven; FMP gratis limitado a ~87 símbolos.

@@ -1583,7 +1583,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610180209';
+const BUILD = '202610191726';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2818,6 +2818,91 @@ const Fund = {
   balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
 };
 
+/* ---------- Est: estimaciones de analistas (Alpha Vantage, EARNINGS_ESTIMATES) ----------
+ * Facu, 19-oct: P/E forward, PEG, crecimiento esperado y revisiones, como en Finviz. Plan gratis: 25 consultas por dia y
+ * 5 por minuto; usamos 24 y una cada 13 s. Una consulta por empresa; rota cartera (cada 4 dias) y watchlist (cada 7),
+ * y adelanta la que presento balance nuevo (cambio el ultimo trimestre de la SEC). Se guarda en state.cartera.est
+ * (viaja con el gist). P/E forward y PEG se calculan con el precio de hoy. */
+const Est = {
+  TOPE: 24, ESPERA: 13000, _ult: 0,
+  key() { return (state.settings.avKey || '').trim(); },
+  box() { if (!state.cartera.est) state.cartera.est = {}; return state.cartera.est; },
+  usadas() { try { const x = JSON.parse(localStorage.getItem('flujo.av.dia') || 'null'); return x && x.d === D.today() ? x.n : 0; } catch (e) { return 0; } },
+  _sumar(n) { try { localStorage.setItem('flujo.av.dia', JSON.stringify({ d: D.today(), n })); } catch (e) {} },
+  diag(v) { if (v === undefined) { try { return JSON.parse(localStorage.getItem('flujo.av.diag') || 'null'); } catch (e) { return null; } } try { localStorage.setItem('flujo.av.diag', JSON.stringify({ t: Date.now(), v })); } catch (e) {} },
+  simbolo(t) { return String(t).replace('.', '-'); },
+  _hasta(t) { const d = Fund.de(t); return d && d.ttm && d.ttm.hasta || null; },
+  /** que toca pedir, en orden: sin dato, balance nuevo, cartera vieja (4 d), watchlist vieja (7 d); vacias se reintentan al mes */
+  cola() {
+    if (!Est.key()) return [];
+    const k = E.cartera(); const box = Est.box(); const ahora = Date.now(); const out = [];
+    const ver = (t, dias, prio) => {
+      if (!t || Fund.ETF.has(t)) return; const e = box[t];
+      if (!e) return out.push({ t, p: 0 + prio });
+      const edad = (ahora - e.t) / 86400000;
+      if (e.vacio) { if (edad > 30) out.push({ t, p: 9 }); return; }
+      const h = Est._hasta(t); if (h && e.h && h > e.h && edad > 0.5) return out.push({ t, p: 2 + prio });
+      if (edad > dias) out.push({ t, p: 4 + prio, edad });
+    };
+    for (const p of k.posiciones) ver(p.ticker, 4, 0);
+    for (const w of k.watch) ver(w.ticker, 7, 1);
+    return out.sort((a, b) => a.p - b.p || (b.edad || 0) - (a.edad || 0));
+  },
+  /** una consulta si toca y hay cupo; true si consulto */
+  async paso() {
+    if (!Est.key() || Est.usadas() >= Est.TOPE || navigator.onLine === false) return false;
+    try { if (localStorage.getItem('flujo.av.mala') === Est.key()) return false; } catch (e) {}
+    const c = Est.cola(); if (!c.length) return false;
+    const falta = Est.ESPERA - (Date.now() - Est._ult); if (falta > 0) await new Promise(r => setTimeout(r, falta));
+    return Est.traer(c[0].t);
+  },
+  async traer(t) {
+    Est._ult = Date.now(); Est._sumar(Est.usadas() + 1);
+    let j = null;
+    try { const r = await fetch(`https://www.alphavantage.co/query?function=EARNINGS_ESTIMATES&symbol=${encodeURIComponent(Est.simbolo(t))}&apikey=${encodeURIComponent(Est.key())}`, { cache: 'no-store' }); j = await r.json(); }
+    catch (e) { Est.diag('sin conexión con Alpha Vantage'); return false; }
+    const aviso = j && (j.Information || j.Note || j['Error Message']);
+    if (aviso && !Array.isArray(j.estimates)) {
+      if (/invalid|api key/i.test(aviso) && !/rate|limit|per day|premium/i.test(aviso)) { Est.diag('la clave no es válida'); Est._sumar(Est.usadas() - 1); try { localStorage.setItem('flujo.av.mala', Est.key()); } catch (e) {} return false; }
+      if (/rate|limit|per day|requests/i.test(aviso)) { Est.diag('se usó el cupo del día (25 consultas)'); Est._sumar(Est.TOPE); return false; }
+      Est.box()[t] = { t: Date.now(), vacio: true }; Est.diag('ok'); Persist.save(); return true;
+    }
+    const n = v => v == null || v === '' || v === 'None' ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
+    const fila = x => ({ d: x.date, eps: n(x.eps_estimate_average), hi: n(x.eps_estimate_high), lo: n(x.eps_estimate_low), n: n(x.eps_estimate_analyst_count), e30: n(x.eps_estimate_average_30_days_ago), e90: n(x.eps_estimate_average_90_days_ago), up: n(x.eps_estimate_revision_up_trailing_30_days), dn: n(x.eps_estimate_revision_down_trailing_30_days), rev: n(x.revenue_estimate_average), rn: n(x.revenue_estimate_analyst_count) });
+    const es = Array.isArray(j && j.estimates) ? j.estimates : [];
+    const lim = D.iso(new Date(Date.now() - 400 * 86400000));
+    const a = es.filter(x => /year/i.test(x.horizon || '') && x.date >= lim).map(fila).filter(x => x.eps != null).sort((x, y) => x.d < y.d ? -1 : 1);
+    const q = es.filter(x => /quarter/i.test(x.horizon || '') && x.date >= D.today()).map(fila).filter(x => x.eps != null).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 2);
+    Est.box()[t] = a.length ? { t: Date.now(), h: Est._hasta(t), a, q } : { t: Date.now(), vacio: true };
+    Est.diag('ok'); Persist.save(); return true;
+  },
+  /** metricas con el precio de hoy. P/E forward = precio / ganancia esperada de los proximos 12 meses
+   *  (lo que falta del ejercicio actual + el resto del siguiente). PEG = P/E forward / crecimiento esperado
+   *  (2 anios si hay, si no el proximo). Solo en dolares: con balance en otra moneda, nada de P/E ni PEG */
+  m(t) {
+    const e = Est.box()[t]; if (!e || !e.a || !e.a.length) return null;
+    const hoy = D.today(); const fy = e.a.filter(x => x.d >= hoy); if (!fy.length) return null;
+    const [f0, f1, f2] = fy; const o = { edad: (Date.now() - e.t) / 86400000, f0, f1, n: (f1 || f0).n, at: e.t };
+    if (f1 && f0.eps > 0 && f1.eps != null) o.gEps = f1.eps / f0.eps - 1;
+    if (f2 && f0.eps > 0 && f2.eps > 0) o.gEps2 = Math.sqrt(f2.eps / f0.eps) - 1;
+    if (f1 && f0.rev > 0 && f1.rev > 0) o.gRev = f1.rev / f0.rev - 1;
+    const r = f1 || f0; if (r.e90 > 0 && r.eps != null) o.rev90 = r.eps / r.e90 - 1; if (r.e30 > 0 && r.eps != null) o.rev30 = r.eps / r.e30 - 1; o.up = r.up; o.dn = r.dn;
+    const d = Fund.de(t); const usd = !d || !d.moneda || d.moneda === 'USD';
+    const px = state.cartera.precios[t] && state.cartera.precios[t].c;
+    const w = f1 ? Math.min(1, Math.max(0, D.daysBetween(hoy, f0.d) / 365)) : 1;
+    o.ntm = f1 ? w * f0.eps + (1 - w) * f1.eps : f0.eps;
+    // P/E forward solo si hay balance confirmado en dolares (si no se sabe la moneda, puede ser EUR/TWD contra precio en US$)
+    const mu = d ? Fund.mult(t, d) : {}; const confirmado = mu.eps > 0;  // mult ya valida moneda y valor de mercado contra Finnhub
+    if (usd && confirmado && px && o.ntm > 0) {
+      o.fpe = px / o.ntm;
+      if (mu.eps > 0 && (o.ntm / mu.eps > 3 || o.ntm / mu.eps < 0.33)) o.raro = true;
+      const g = o.gEps2 != null ? o.gEps2 : o.gEps; o.gPeg = g;
+      if (g != null && g > 0.01) o.peg = o.fpe / (g * 100);
+    } else if (!usd) o.otraMoneda = d.moneda; else if (!confirmado) o.sinBase = true;
+    return o;
+  },
+};
+
 /* ---------- Motor: mantiene al dia precios y fichas mientras la app esta abierta ----------
  * No guarda una cola aparte: en cada vuelta mira que esta vencido (por la fecha de lo ultimo que se bajo),
  * asi que si iOS frena la app, al volver sigue donde quedo. Primero precios vencidos, despues el
@@ -2835,6 +2920,7 @@ const Motor = {
         await Fund.calendario();
         const pend = Fund.pendientes();
         if (pend.length) { try { await Fund.traer(pend[0]); } catch (e) {} Motor.pintar(); continue; }
+        try { if (await Est.paso()) { Motor.pintar(); continue; } } catch (e) {}
         await new Promise(r => setTimeout(r, 60000));
       }
     })().finally(() => { Motor._run = null; });
@@ -4763,6 +4849,7 @@ function viewConfig() {
       ${inp('diaCobro', 'Día de cobro', s.diaCobro, 'inputmode="numeric"', '31 = último día del mes. Ese día la app te pregunta cuánto cobraste y recalcula todo.')}
       ${inp('ccl', 'Dólar CCL (ARS por USD)', s.ccl || '', 'inputmode="numeric"', 'Para valuar los CEDEARs en pesos. Se actualiza junto con el MEP.')}
       ${inp('finnhubKey', 'Clave de Finnhub (precios de acciones)', s.finnhubKey || '', 'placeholder="pegá tu API key" autocomplete="off"', 'Gratis en finnhub.io, botón Get free API key. Con esto la Cartera trae los precios al abrir la app. <a href="#" data-act="precios-update">Actualizar precios ahora</a>')}
+      <div class="field"><label>Clave de Alpha Vantage (estimaciones de analistas)</label><input class="input" data-setting="avKey" value="${esc(s.avKey || '')}" placeholder="pegá tu API key" autocomplete="off"><span class="help">Gratis en alphavantage.co. Trae lo que esperan los analistas (P/E forward, PEG, crecimiento esperado y revisiones): hasta 24 empresas por día, primero tu cartera.</span>${(() => { if (!(s.avKey || '').trim()) return ''; const dg = Est.diag(); const tot = Est.cola().length; const con = Object.values(state.cartera.est || {}).filter(e => e && e.a).length; return `<span class="small muted" style="display:block;margin-top:6px"><b>${dg && dg.v !== 'ok' ? 'Ojo: ' + esc(dg.v) + '. ' : ''}Hoy van ${Est.usadas()} de ${Est.TOPE} \u00b7 ${con} empresa${con === 1 ? '' : 's'} con datos${tot ? ` \u00b7 faltan ${tot}` : ' \u00b7 todo al d\u00eda'}.</b></span>`; })()}</div>
       ${inp('tc', 'Dólar MEP (ARS por USD)', s.tc, 'inputmode="numeric"', `${s.tcFecha ? `Actualizado ${D.fmt(s.tcFecha, { year: true })}${s.tcFuente ? ' · ' + esc(s.tcFuente) : ''}. ` : ''}Se usa para la vista en USD y para gastos en dólares. <a href="#" data-act="tc-update">Actualizar desde dolarapi.com</a>`)}
       ${inp('presupuesto', 'Presupuesto mensual de gasto (ARS)', s.presupuesto ? fmtARS.format(s.presupuesto) : '', 'inputmode="numeric"', `Lo que decidís gastar por mes (fijos + cuotas + compras). El resto del sueldo${s.ingreso && s.presupuesto ? ` (${M.f(s.ingreso - s.presupuesto)})` : ''} es para invertir.`)}
       ${inp('alertaCuotasPct', 'Alerta de cuotas (% del presupuesto)', s.alertaCuotasPct, 'inputmode="numeric"', 'Te aviso cuando fijos + cuotas superan esto')}
@@ -5906,6 +5993,16 @@ function fundHTML(t, pos) {
       tile('P/CF', num(mu.pcf, 1), '', mu.pcf != null ? 'caja operativa' : ''),
       tile('Div. yield', Fund.yieldDe(t, d) ? pct1(Fund.yieldDe(t, d)) : '\u2014', '', [mu.payout != null ? `payout ${pct1(mu.payout)}` : '', mu.recompras ? `recompra ${pct1(mu.recompras)}` : ''].filter(Boolean).join(' \u00b7 ')),
     ]);
+    // lo que esperan los analistas (Alpha Vantage): P/E forward, PEG, crecimiento esperado y revisiones
+    const em = Est.m(t); const peHoy = (aj => aj ? aj.aj : Fund.pe(t, d))(Fund.peAj(t, d));
+    const fw = em ? grupo('Forward', `Lo que esperan los analistas (Alpha Vantage), como en Finviz. P/E forward: el precio de hoy contra la ganancia por acción esperada para los próximos 12 meses. PEG: el P/E forward dividido el crecimiento esperado de esa ganancia (${em.gEps2 != null ? 'promedio de los próximos 2 ejercicios' : 'próximo ejercicio'}); debajo de 1 es barata para lo que crece, arriba de 2 es cara. Revisiones: cómo cambió la estimación del próximo ejercicio en 90 días; si los analistas la vienen subiendo, el negocio anda mejor de lo esperado. Ojo: los analistas usan ganancia ajustada, no la contable, así que el P/E forward suele dar más bajo que el P/E de hoy.`, [
+      tile('P/E fwd', em.fpe != null ? num(em.fpe, 1) : '—', em.raro ? 'mid' : vsH(em.fpe, peHoy, false), em.otraMoneda ? `balance en ${esc(em.otraMoneda)}` : em.sinBase ? 'sin balance comparable' : em.raro ? '<span class="warn-text">muy distinto al de hoy</span>' : peHoy ? `hoy ${num(peHoy, 1)}` : ''),
+      tile('PEG fwd', em.peg != null ? num(em.peg, 2) : '—', em.peg != null && !em.raro ? abs(em.peg, 1, 2, true) : '', em.gPeg != null ? `crece ${pct1(em.gPeg)}/año` : ''),
+      tile(`EPS FY${em.f1 ? String(em.f1.d).slice(2, 4) : ''}`, pct1(em.gEps), abs(em.gEps, 0.10, 0.04), em.f1 ? `${num(em.f0.eps, 2)} → ${num(em.f1.eps, 2)}` : ''),
+      tile(`Ventas FY${em.f1 ? String(em.f1.d).slice(2, 4) : ''}`, pct1(em.gRev), abs(em.gRev, 0.08, 0.03), em.f1 && em.f1.rev ? `${num(em.f1.rev / 1e9, 1)} mil M` : ''),
+      tile('Revisiones 90d', em.rev90 != null ? `${em.rev90 > 0 ? '+' : ''}${pct1(em.rev90)}` : '—', em.rev90 == null ? '' : em.rev90 >= 0.02 ? 'pos' : em.rev90 <= -0.02 ? 'neg' : 'mid', em.up != null || em.dn != null ? `30d: ${em.up || 0}↑ ${em.dn || 0}↓` : ''),
+      tile('Analistas', em.n != null ? num(em.n, 0) : '—', '', `hace ${em.edad < 1 ? 'menos de 1 día' : Math.round(em.edad) + (Math.round(em.edad) === 1 ? ' día' : ' días')}`),
+    ]) : (state.settings.avKey || '').trim() && !Fund.ETF.has(t) ? `<div class="fs"><div class="fs-t">Forward</div><div class="n muted small" style="padding:4px 0 8px">${(Est.box()[t] || {}).vacio ? 'Alpha Vantage no tiene estimaciones para esta empresa.' : 'Las estimaciones de analistas llegan en los próximos días (24 empresas por día, primero tu cartera).'}</div></div>` : '';
     const bs = grupo('Balance sheet', 'Current y Quick ratio: activos corrientes contra deudas de corto plazo (arriba de 1 est\u00e1 c\u00f3moda). Interest coverage: cu\u00e1ntas veces cubre los intereses con lo que gana.', [
       tile('Current ratio', num(d.currentRatio, 2), abs(d.currentRatio, 1.2, 0.9), d.currentRatio5 ? `5Y avg ${num(d.currentRatio5, 2)}` : ''),
       tile('Quick ratio', num(d.quickRatio, 2), abs(d.quickRatio, 1, 0.7), d.quickRatio5 ? `5Y avg ${num(d.quickRatio5, 2)}` : ''),
@@ -5918,7 +6015,7 @@ function fundHTML(t, pos) {
     const bal = b ? `<div class="fbal"><i class="pz-dot bal"></i>Next earnings <b>${D.fmt(b.fecha)}</b> \u00b7 ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'ma\u00f1ana' : `en ${b.dias} d\u00edas`}${b.hora === 'amc' ? ' \u00b7 after close' : b.hora === 'bmo' ? ' \u00b7 before open' : ''}</div>` : '';
     const avisos = d.avisos && d.avisos.length ? `<div class="f-avisos">${d.avisos.map(a => `<div><span class="dot warn"></span><span>${esc(a)}</span></div>`).join('')}</div>` : '';
     const pie = `<div class="fpie">Finnhub \u00b7 ${new Date(d.at).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} ${infoBtn(`Datos de Finnhub y de los balances presentados a la SEC${d.aniosDatos ? ` (${d.aniosDatos.desde}\u2013${d.aniosDatos.hasta})` : ''}. Si un n\u00famero no coincide con TradingView, copi\u00e1 los datos crudos y pegalos en el chat.`)} <button type="button" class="link-btn" data-act="fund-crudo" data-id="${esc(t)}">copiar datos crudos</button></div>`;
-    pane = q + cuenta + g + v + bs + chart + bal + avisos + pie;
+    pane = q + cuenta + g + fw + v + bs + chart + bal + avisos + pie;
   }
   return `<div class="fund hoja" id="fund-box">${cab}${rango}${acciones}${tabs}<div class="fp fp-fund">${pane}</div></div>`;
 }
@@ -6025,6 +6122,9 @@ const CMP_FILAS = [
   // el P/E crudo entre industrias distintas compara poco; contra su propia historia compara mejor
   { k: 'P/E vs su mediana', v: d => { const aj = Fund.peAj(d.ticker, d); const pe = aj ? aj.aj : Fund.pe(d.ticker, d); return pe && d.peMediana ? pe / d.peMediana - 1 : null; }, f: v => v == null ? '\u2014' : (v > 0 ? '+' : '') + cmpPct(v), mejor: -1 },
   { k: 'PEG', v: d => d.peg, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
+  { k: 'P/E forward', v: d => { const m = Est.m(d.ticker); return m && !m.raro ? m.fpe : null; }, f: cmpNum(1), mejor: -1, valido: v => v > 0 },
+  { k: 'PEG forward', v: d => { const m = Est.m(d.ticker); return m && !m.raro ? m.peg : null; }, f: cmpNum(2), mejor: -1, valido: v => v > 0 },
+  { k: 'EPS esperado pr\u00f3x. a\u00f1o', v: d => { const m = Est.m(d.ticker); return m ? m.gEps : null; }, f: cmpPct, mejor: 1 },
   { k: 'Rango 52 semanas', v: (d, px) => d.min52 != null && d.max52 > d.min52 && px != null ? clamp((px - d.min52) / (d.max52 - d.min52), 0, 1) : null, f: v => v == null ? '\u2014' : `${Math.round(v * 100)} %`, mejor: -1 },
   { k: 'vs EMA 200', v: d => { const e = Tec.de(d.ticker); return e ? e.dist : null; }, f: v => v == null ? '\u2014' : Tec.distTxt(v, ' '), mejor: -1 },
   { k: 'Dividendo', v: d => d.divAnual && (state.cartera.precios[d.ticker] || {}).c ? d.divAnual / state.cartera.precios[d.ticker].c : ((d.v || 1) >= 5 ? null : d.yieldDiv || null), f: cmpPct, mejor: 0 },
@@ -6187,10 +6287,12 @@ function exportCompacto() {
     const rango = d.min52 != null && d.max52 > d.min52 && p.precio != null ? (p.precio - d.min52) / (d.max52 - d.min52) : null;
     const zona = [al.urgente ? `urg<=${n2(al.urgente)}` : '', al.mirala ? `mir<=${n2(al.mirala)}` : ''].filter(Boolean).join(' ') || 'sin zona';
     const val = `P/E ${pe ? n1(pe) : '-'}${aj ? `*(limpio ${n1(aj.aj)})` : ''}/med ${n1(d.peMediana)} PEG ${n2(d.peg)} P/FCF ${n1(mu.pfcf)} ROIC ${pc(d.roicAct)} CAGR5 vtas ${pc(d.cagrVentas5 ?? d.crecVentas5)} EPS ${pc(d.cagrEps5)} FCF ${pc(d.cagrFcf5)} mg.neto ${pc(d.margenNeto)} D/E ${n2(d.deudaPat)}`;
+    const em = Est.m(t);
+    const fwd = em ? ` | fwd: P/E ${n1(em.fpe)} PEG ${n2(em.peg)} gEPS ${pc(em.gEps)} gVtas ${pc(em.gRev)} rev90 ${em.rev90 != null ? sg(em.rev90) : '-'} n${em.n ?? '-'}${em.otraMoneda ? ' (balance en ' + em.otraMoneda + ')' : ''}${em.sinBase ? ' (sin P/E: balance no comparable)' : ''}${em.raro ? ' (revisar)' : ''} ${Math.round(em.edad)}d` : '';
     const extra = `52s ${rango != null ? pc(rango) : '-'} EMA200 ${e ? sg(e.dist) : '-'}${b ? ` balance ${b.fecha}` : ''}${al.tier ? ` tier ${al.tier}` : ''}`;
     return tengo
-      ? `${t} | ${n2(p.acciones)} acc PPC ${n2(p.ppc)} | px ${n2(p.precio)} | valor ${n2(p.valor)} (${pc(p.peso)}) | result ${sg(p.rendTotal)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 90)}` : ''}`
-      : `${t} | px ${n2(p.precio)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 60)}` : ''}`;
+      ? `${t} | ${n2(p.acciones)} acc PPC ${n2(p.ppc)} | px ${n2(p.precio)} | valor ${n2(p.valor)} (${pc(p.peso)}) | result ${sg(p.rendTotal)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val}${fwd} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 90)}` : ''}`
+      : `${t} | px ${n2(p.precio)} | ${zona}${p.estado ? ' EN ZONA ' + p.estado : ''} | ${val}${fwd} | ${extra}${al.desc ? ` | ${String(al.desc).slice(0, 60)}` : ''}`;
   };
   L.push(`CARTERA (${k.posiciones.length}) - ticker | tenencia | precio USD | valor (peso) | resultado total | zonas | valuacion y calidad | tecnico y balance | que hace`);
   for (const p of k.posiciones.slice().sort((a, b) => (b.valor || 0) - (a.valor || 0))) L.push(fila(p, true));
@@ -6205,7 +6307,7 @@ function exportCompacto() {
   // operaciones
   L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
   { const ps = (Array.isArray(state.pendientes) ? state.pendientes : []).filter(p => !p.hecho); if (ps.length) { L.push('', 'MIS PENDIENTES (lista que Facu edita en la app; no esta hecho)'); for (const p of ps) L.push(`- [${p.desde ? (p.desde <= D.today() ? 'para hacer' : 'desde ' + p.desde) : (p.cuando || 'para hacer')}] ${p.texto}${p.detalle ? ' -- ' + p.detalle : ''}`); } }
-  L.push('', 'Notas: P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
+  L.push('', 'Notas: fwd = lo que esperan los analistas (Alpha Vantage): P/E con la ganancia esperada de los proximos 12 meses (ajustada, no contable), PEG = ese P/E / crecimiento esperado del EPS, gEPS/gVtas = crecimiento esperado el proximo ejercicio, rev90 = cuanto subio o bajo la estimacion en 90 dias, n = analistas, Nd = dias desde que se bajo. P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
   return L.join('\n');
 }
 
@@ -7237,7 +7339,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.filter) { ui.filtros[t.dataset.filter] = t.value; render(); const again = $(`[data-filter="${t.dataset.filter}"]`); if (again && t.dataset.filter === 'q') { again.focus(); again.setSelectionRange(again.value.length, again.value.length); } return; }
-  if (t.dataset.setting) { const k = t.dataset.setting; const v = ['ingreso', 'tc', 'presupuesto', 'ccl'].includes(k) ? M.parse(t.value) : ['diaCobro', 'alertaCuotasPct'].includes(k) ? Number(t.value) || 0 : t.value.trim(); state.settings[k] = v; Persist.save(); if (k !== 'nombre') render(); return; }
+  if (t.dataset.setting) { const k = t.dataset.setting; const v = ['ingreso', 'tc', 'presupuesto', 'ccl'].includes(k) ? M.parse(t.value) : ['diaCobro', 'alertaCuotasPct'].includes(k) ? Number(t.value) || 0 : t.value.trim(); state.settings[k] = v; Persist.save(); if (k === 'avKey' && v) { try { localStorage.removeItem('flujo.av.diag'); } catch (e) {} Motor.arrancar(); } if (k !== 'nombre') render(); return; }
   if (t.dataset.budget) { const c = state.categorias.find(c => c.id === t.dataset.budget); if (c) { c.presupuesto = M.parse(t.value); Persist.save(); render(); } return; }
   if (t.dataset.pago) { const [tarjetaId, mes] = t.dataset.pago.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.cuentaId = t.value; Persist.save(); render(); return; }
   if (t.dataset.pagado) { const [tarjetaId, mes] = t.dataset.pagado.split('|'); let p = state.pagos.find(p => p.tarjetaId === tarjetaId && p.mes === mes); if (!p) { p = { tarjetaId, mes }; state.pagos.push(p); } p.pagado = t.checked; Persist.save(); render(); return; }

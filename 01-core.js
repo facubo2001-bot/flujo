@@ -1534,6 +1534,91 @@ const Fund = {
   balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
 };
 
+/* ---------- Est: estimaciones de analistas (Alpha Vantage, EARNINGS_ESTIMATES) ----------
+ * Facu, 19-oct: P/E forward, PEG, crecimiento esperado y revisiones, como en Finviz. Plan gratis: 25 consultas por dia y
+ * 5 por minuto; usamos 24 y una cada 13 s. Una consulta por empresa; rota cartera (cada 4 dias) y watchlist (cada 7),
+ * y adelanta la que presento balance nuevo (cambio el ultimo trimestre de la SEC). Se guarda en state.cartera.est
+ * (viaja con el gist). P/E forward y PEG se calculan con el precio de hoy. */
+const Est = {
+  TOPE: 24, ESPERA: 13000, _ult: 0,
+  key() { return (state.settings.avKey || '').trim(); },
+  box() { if (!state.cartera.est) state.cartera.est = {}; return state.cartera.est; },
+  usadas() { try { const x = JSON.parse(localStorage.getItem('flujo.av.dia') || 'null'); return x && x.d === D.today() ? x.n : 0; } catch (e) { return 0; } },
+  _sumar(n) { try { localStorage.setItem('flujo.av.dia', JSON.stringify({ d: D.today(), n })); } catch (e) {} },
+  diag(v) { if (v === undefined) { try { return JSON.parse(localStorage.getItem('flujo.av.diag') || 'null'); } catch (e) { return null; } } try { localStorage.setItem('flujo.av.diag', JSON.stringify({ t: Date.now(), v })); } catch (e) {} },
+  simbolo(t) { return String(t).replace('.', '-'); },
+  _hasta(t) { const d = Fund.de(t); return d && d.ttm && d.ttm.hasta || null; },
+  /** que toca pedir, en orden: sin dato, balance nuevo, cartera vieja (4 d), watchlist vieja (7 d); vacias se reintentan al mes */
+  cola() {
+    if (!Est.key()) return [];
+    const k = E.cartera(); const box = Est.box(); const ahora = Date.now(); const out = [];
+    const ver = (t, dias, prio) => {
+      if (!t || Fund.ETF.has(t)) return; const e = box[t];
+      if (!e) return out.push({ t, p: 0 + prio });
+      const edad = (ahora - e.t) / 86400000;
+      if (e.vacio) { if (edad > 30) out.push({ t, p: 9 }); return; }
+      const h = Est._hasta(t); if (h && e.h && h > e.h && edad > 0.5) return out.push({ t, p: 2 + prio });
+      if (edad > dias) out.push({ t, p: 4 + prio, edad });
+    };
+    for (const p of k.posiciones) ver(p.ticker, 4, 0);
+    for (const w of k.watch) ver(w.ticker, 7, 1);
+    return out.sort((a, b) => a.p - b.p || (b.edad || 0) - (a.edad || 0));
+  },
+  /** una consulta si toca y hay cupo; true si consulto */
+  async paso() {
+    if (!Est.key() || Est.usadas() >= Est.TOPE || navigator.onLine === false) return false;
+    try { if (localStorage.getItem('flujo.av.mala') === Est.key()) return false; } catch (e) {}
+    const c = Est.cola(); if (!c.length) return false;
+    const falta = Est.ESPERA - (Date.now() - Est._ult); if (falta > 0) await new Promise(r => setTimeout(r, falta));
+    return Est.traer(c[0].t);
+  },
+  async traer(t) {
+    Est._ult = Date.now(); Est._sumar(Est.usadas() + 1);
+    let j = null;
+    try { const r = await fetch(`https://www.alphavantage.co/query?function=EARNINGS_ESTIMATES&symbol=${encodeURIComponent(Est.simbolo(t))}&apikey=${encodeURIComponent(Est.key())}`, { cache: 'no-store' }); j = await r.json(); }
+    catch (e) { Est.diag('sin conexión con Alpha Vantage'); return false; }
+    const aviso = j && (j.Information || j.Note || j['Error Message']);
+    if (aviso && !Array.isArray(j.estimates)) {
+      if (/invalid|api key/i.test(aviso) && !/rate|limit|per day|premium/i.test(aviso)) { Est.diag('la clave no es válida'); Est._sumar(Est.usadas() - 1); try { localStorage.setItem('flujo.av.mala', Est.key()); } catch (e) {} return false; }
+      if (/rate|limit|per day|requests/i.test(aviso)) { Est.diag('se usó el cupo del día (25 consultas)'); Est._sumar(Est.TOPE); return false; }
+      Est.box()[t] = { t: Date.now(), vacio: true }; Est.diag('ok'); Persist.save(); return true;
+    }
+    const n = v => v == null || v === '' || v === 'None' ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
+    const fila = x => ({ d: x.date, eps: n(x.eps_estimate_average), hi: n(x.eps_estimate_high), lo: n(x.eps_estimate_low), n: n(x.eps_estimate_analyst_count), e30: n(x.eps_estimate_average_30_days_ago), e90: n(x.eps_estimate_average_90_days_ago), up: n(x.eps_estimate_revision_up_trailing_30_days), dn: n(x.eps_estimate_revision_down_trailing_30_days), rev: n(x.revenue_estimate_average), rn: n(x.revenue_estimate_analyst_count) });
+    const es = Array.isArray(j && j.estimates) ? j.estimates : [];
+    const lim = D.iso(new Date(Date.now() - 400 * 86400000));
+    const a = es.filter(x => /year/i.test(x.horizon || '') && x.date >= lim).map(fila).filter(x => x.eps != null).sort((x, y) => x.d < y.d ? -1 : 1);
+    const q = es.filter(x => /quarter/i.test(x.horizon || '') && x.date >= D.today()).map(fila).filter(x => x.eps != null).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 2);
+    Est.box()[t] = a.length ? { t: Date.now(), h: Est._hasta(t), a, q } : { t: Date.now(), vacio: true };
+    Est.diag('ok'); Persist.save(); return true;
+  },
+  /** metricas con el precio de hoy. P/E forward = precio / ganancia esperada de los proximos 12 meses
+   *  (lo que falta del ejercicio actual + el resto del siguiente). PEG = P/E forward / crecimiento esperado
+   *  (2 anios si hay, si no el proximo). Solo en dolares: con balance en otra moneda, nada de P/E ni PEG */
+  m(t) {
+    const e = Est.box()[t]; if (!e || !e.a || !e.a.length) return null;
+    const hoy = D.today(); const fy = e.a.filter(x => x.d >= hoy); if (!fy.length) return null;
+    const [f0, f1, f2] = fy; const o = { edad: (Date.now() - e.t) / 86400000, f0, f1, n: (f1 || f0).n, at: e.t };
+    if (f1 && f0.eps > 0 && f1.eps != null) o.gEps = f1.eps / f0.eps - 1;
+    if (f2 && f0.eps > 0 && f2.eps > 0) o.gEps2 = Math.sqrt(f2.eps / f0.eps) - 1;
+    if (f1 && f0.rev > 0 && f1.rev > 0) o.gRev = f1.rev / f0.rev - 1;
+    const r = f1 || f0; if (r.e90 > 0 && r.eps != null) o.rev90 = r.eps / r.e90 - 1; if (r.e30 > 0 && r.eps != null) o.rev30 = r.eps / r.e30 - 1; o.up = r.up; o.dn = r.dn;
+    const d = Fund.de(t); const usd = !d || !d.moneda || d.moneda === 'USD';
+    const px = state.cartera.precios[t] && state.cartera.precios[t].c;
+    const w = f1 ? Math.min(1, Math.max(0, D.daysBetween(hoy, f0.d) / 365)) : 1;
+    o.ntm = f1 ? w * f0.eps + (1 - w) * f1.eps : f0.eps;
+    // P/E forward solo si hay balance confirmado en dolares (si no se sabe la moneda, puede ser EUR/TWD contra precio en US$)
+    const mu = d ? Fund.mult(t, d) : {}; const confirmado = mu.eps > 0;  // mult ya valida moneda y valor de mercado contra Finnhub
+    if (usd && confirmado && px && o.ntm > 0) {
+      o.fpe = px / o.ntm;
+      if (mu.eps > 0 && (o.ntm / mu.eps > 3 || o.ntm / mu.eps < 0.33)) o.raro = true;
+      const g = o.gEps2 != null ? o.gEps2 : o.gEps; o.gPeg = g;
+      if (g != null && g > 0.01) o.peg = o.fpe / (g * 100);
+    } else if (!usd) o.otraMoneda = d.moneda; else if (!confirmado) o.sinBase = true;
+    return o;
+  },
+};
+
 /* ---------- Motor: mantiene al dia precios y fichas mientras la app esta abierta ----------
  * No guarda una cola aparte: en cada vuelta mira que esta vencido (por la fecha de lo ultimo que se bajo),
  * asi que si iOS frena la app, al volver sigue donde quedo. Primero precios vencidos, despues el
@@ -1551,6 +1636,7 @@ const Motor = {
         await Fund.calendario();
         const pend = Fund.pendientes();
         if (pend.length) { try { await Fund.traer(pend[0]); } catch (e) {} Motor.pintar(); continue; }
+        try { if (await Est.paso()) { Motor.pintar(); continue; } } catch (e) {}
         await new Promise(r => setTimeout(r, 60000));
       }
     })().finally(() => { Motor._run = null; });
