@@ -1,0 +1,9 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          h=$(curl -s -D - -o b.json -H "Origin: https://facubo2001-bot.github.io" "https://www.alphavantage.co/query?function=EARNINGS_ESTIMATES&symbol=IBM&apikey=demo" | grep -i "access-control" | tr '\r\n' '  ')
+          echo "::notice title=CORS::[$h] $(head -c 80 b.json)"
