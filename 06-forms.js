@@ -752,7 +752,9 @@ async function fundRefrescar(t, pos) {
   box.replaceWith(tmp.firstElementChild); aplicarInfo($('#modal'));
 }
 function formPosicion(ticker) {
-  const k = E.cartera(); const p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker); if (!p) return;
+  const k = E.cartera(); let p = k.posiciones.find(x => x.ticker === ticker) || k.watch.find(x => x.ticker === ticker);
+  // una que no seguis (buscada): misma ficha; si le pones zonas y guardas, entra a la watchlist
+  const noSigue = !p; if (!p) { if (!Cedears.de(ticker) && !state.cartera.precios[ticker]) return; p = k.una(ticker); }
   const ops = k.ops.filter(o => o.ticker === ticker).slice().reverse();
   const al = p.alerta || {};
   const tile = (kk, v, cls, sub) => `<div class="ft"><span class="k">${kk}</span><b class="${cls || ''}">${v}</b><span class="s">${sub || '&nbsp;'}</span></div>`;
@@ -764,7 +766,7 @@ function formPosicion(ticker) {
       ${tile('PPC', fmtU(p.ppc), '', p.precio != null && p.ppc ? `${pctS(p.precio / p.ppc - 1)} vs hoy` : '')}
       ${tile('Peso', p.peso != null ? M.pct(p.peso, 1) : '\u2014', '', 'de la cartera')}
       ${tile('Dividendos', p.dividendos ? `+${fmtU(p.dividendos, 2)}` : '\u2014', p.dividendos ? 'pos' : '', 'cobrados')}
-    </div></div>` : `<div class="callout" style="margin-top:14px">Watchlist: no ten\u00e9s ${esc(ticker)}, solo lo vigil\u00e1s.</div>`;
+    </div></div>` : noSigue ? `<div class="callout" style="margin-top:14px">No segu\u00eds ${esc(ticker)}. Para sumarla a la watchlist, poné una zona en Alertas y guardá.</div>` : `<div class="callout" style="margin-top:14px">Watchlist: no ten\u00e9s ${esc(ticker)}, solo lo vigil\u00e1s.</div>`;
   const opsHtml = ops.length ? `<div class="fs"><div class="fs-t">Operaciones</div>${ops.map(o => `<div class="mv" data-act="edit-op" data-id="${o.id}"><div style="min-width:0"><div class="m1"><b>${o.tipo === 'compra' ? 'Compra' : o.tipo === 'venta' ? 'Venta' : 'Dividendo'}</b></div><div class="m2">${D.fmt(o.fecha, { year: true })}${o.tipo !== 'dividendo' ? ` \u00b7 ${fmtAcc(o.acciones)} \u00d7 ${fmtU(o.precio)}` : ''}${o.legado ? ' \u00b7 fecha estimada' : ''}</div></div><div class="mm">${fmtU(o.tipo === 'dividendo' ? Number(o.monto) || 0 : (Number(o.acciones) || 0) * (Number(o.precio) || 0), 2)}</div></div>`).join('')}</div>` : '';
   const alPane = `<div class="fs"><div class="al3">
       ${F.field('<span class="dot warn"></span>Mirala ' + G.le, F.input('a-mirala', al.mirala || '', 'inputmode="decimal" placeholder="\u2014"'))}
@@ -781,6 +783,7 @@ function formPosicion(ticker) {
     Persist.save(); toast('Guardado'); render();
   } });
   $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
+  if (noSigue) { const q = state.cartera.precios[ticker]; if (!(q && q.c) || Date.now() - (q.t || 0) > 3600000) { (async () => { try { await Precios.quote(ticker); } catch (e) {} fundRefrescar(ticker, E.cartera().una(ticker)); })(); return; } }
   fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atras
 }
 /* ---------- COMPARAR EMPRESAS ----------
@@ -837,10 +840,10 @@ function cmpBody() {
   const q = (ui.cmpQ || '').toUpperCase();
   const orden = [...tickers.filter(t => !watch.includes(t)), ...watch.slice().sort(), ...sel.filter(t => !tickers.includes(t))];
   if (!ui.cmpVer || sel.length < 2) return `<div class="hoja cmp-pick">
-    <label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Buscar ticker" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
-    <div class="cmp-hint" id="cmp-hint"></div>
+    <label class="cmp-q"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cmp-q" class="input" type="search" placeholder="Ticker o nombre (ej. JPM o jp morgan)" autocomplete="off" autocapitalize="characters" value="${esc(ui.cmpQ || '')}"></label>
+    <div class="cmp-hint" id="cmp-hint"></div><div class="cmp-sug" id="cmp-sug"></div>
     <div class="cmp-grid">${orden.map(t => `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="${sel.includes(t) ? 'on' : ''}"${q && !t.startsWith(q) ? ' data-dim="1"' : ''}>${esc(t)}${watch.includes(t) ? '<span class="cmp-w">w</span>' : ''}</button>`).join('')}</div>
-    <div class="cmp-ir"><span id="cmp-n">${cmpCuenta(sel.length)}</span><button type="button" class="btn primary" data-act="cmp-ver" ${sel.length < 2 ? 'disabled' : ''}>Comparar</button></div>
+    <div class="cmp-ir"><span id="cmp-n">${cmpCuenta(sel.length)}</span><button type="button" class="btn primary" data-act="cmp-ver" ${sel.length < 1 ? 'disabled' : ''}>${cmpBoton(sel.length)}</button></div>
   </div>`;
   const chips = `<div class="cmp-top"><span>${sel.map(esc).join(' \u00b7 ')}</span><button type="button" class="btn sm ghost" data-act="cmp-pick">Cambiar</button></div>`;
   // una empresa que no seguis (UBER buscada en la lupa) no esta en la cartera: su precio lo trae cmpTraer
@@ -888,15 +891,28 @@ async function cmpTraer() {
   }
   Persist.save();
 }
-function cmpFiltrar() {
-  const q = (ui.cmpQ || '').trim().toUpperCase(); let n = 0;
-  $$('#modal .cmp-grid button').forEach(b => { const ok = !q || b.dataset.id.startsWith(q); if (ok) { delete b.dataset.dim; n++; } else b.dataset.dim = '1'; });
-  const h = $('#cmp-hint'); if (!h) return;
-  if (!q) { h.innerHTML = ''; return; }
-  const c = Cedears.de(q); const t = c ? Cedears.ticker(c) : null;
-  h.innerHTML = n ? `${n} coincide${n > 1 ? 'n' : ''}` : t ? `<button type="button" class="link-btn" data-act="cmp-toggle" data-id="${esc(t)}">${(ui.cmp || []).includes(t) ? `${esc(t)} elegida \u2713` : `+ Comparar ${esc(t)} (no est\u00e1 en tu lista)`}</button>` : 'No hay un CEDEAR con ese ticker';
+/** busca en todos los CEDEARs: ticker que empieza igual primero, despues nombre (sin puntos ni espacios: "jp morgan" encuentra "J.P. Morgan") */
+const cmpAlnum = x => norm(x).replace(/[^a-z0-9]/g, '');
+function cmpBuscar(q, lim = 8) {
+  const qa = cmpAlnum(q); if (!qa) return [];
+  const a = [], b = [];
+  for (const c of Cedears.lista()) { const t = cmpAlnum(Cedears.ticker(c)), code = cmpAlnum(c.code); if (t.startsWith(qa) || code.startsWith(qa)) a.push(c); else if (qa.length >= 3 && cmpAlnum(c.nombre).includes(qa)) b.push(c); }
+  return a.concat(b).slice(0, lim);
 }
-function cmpCuenta(n) { return n ? `${n} elegida${n > 1 ? 's' : ''} (m\u00e1x. ${CMP_MAX})` : `Eleg\u00ed de 2 a ${CMP_MAX} (w = watchlist)`; }
+function cmpFiltrar() {
+  const q = (ui.cmpQ || '').trim(); const qu = q.toUpperCase(); const qn = cmpAlnum(q); let n = 0;
+  // en la grilla: ticker que empieza igual o nombre que contiene lo escrito (las que no, se atenuan en su lugar: nada se mueve)
+  $$('#modal .cmp-grid button').forEach(b => { const t = b.dataset.id; const c = Cedears.de(t); const ok = !q || t.startsWith(qu) || (qn.length >= 3 && c && cmpAlnum(c.nombre).includes(qn)); if (ok) { delete b.dataset.dim; n++; } else b.dataset.dim = '1'; });
+  const h = $('#cmp-hint'), sg = $('#cmp-sug'); if (!h) return;
+  if (!q) { h.innerHTML = ''; if (sg) sg.innerHTML = ''; return; }
+  // y todas las de BYMA que coincidan y no estan en tu lista (JPM, "jp morgan")
+  const enGrilla = new Set($$('#modal .cmp-grid button').map(b => b.dataset.id));
+  const otras = cmpBuscar(q, 12).map(c => ({ t: Cedears.ticker(c), c })).filter(x => !enGrilla.has(x.t)).filter((x, i, a) => a.findIndex(y => y.t === x.t) === i).slice(0, 6);
+  h.textContent = n ? `${n} de tu lista coincide${n > 1 ? 'n' : ''}${otras.length ? ' · otras de BYMA abajo' : ''}` : otras.length ? 'No está en tu lista; de BYMA:' : 'No hay un CEDEAR con ese ticker o nombre';
+  if (sg) sg.innerHTML = otras.map(x => `<button type="button" data-act="cmp-toggle" data-id="${esc(x.t)}" class="${(ui.cmp || []).includes(x.t) ? 'on' : ''}"><b>${esc(x.t)}</b><span>${esc(x.c.nombre)}</span></button>`).join('');
+}
+function cmpCuenta(n) { return n === 1 ? '1 elegida: ficha, o sum\u00e1 otra para comparar' : n ? `${n} elegidas (m\u00e1x. ${CMP_MAX})` : `Toc\u00e1 una para ver su ficha, o de 2 a ${CMP_MAX} para comparar`; }
+function cmpBoton(n) { return n >= 2 ? `Comparar ${n}` : n === 1 ? 'Ver ficha' : 'Eleg\u00ed'; }
 function cmpToggle(t) {
   const sel = ui.cmp || (ui.cmp = []);
   const i = sel.indexOf(t);
@@ -904,20 +920,24 @@ function cmpToggle(t) {
   else if (sel.length >= CMP_MAX) { toast(`Hasta ${CMP_MAX} a la vez: sac\u00e1 una primero`); return; }
   else sel.push(t);
   // elegir no redibuja: solo prende o apaga el boton y actualiza la cuenta (nada se mueve)
-  const btn = $(`#modal .cmp-grid button[data-id="${CSS.escape(t)}"]`); if (btn) btn.classList.toggle('on', sel.includes(t));
+  let btn = $(`#modal .cmp-grid button[data-id="${CSS.escape(t)}"]`);
+  // elegida desde las de BYMA: entra a la grilla al final, asi se ve aunque borres la busqueda
+  if (!btn && sel.includes(t)) { const g = $('#modal .cmp-grid'); if (g) { g.insertAdjacentHTML('beforeend', `<button type="button" data-act="cmp-toggle" data-id="${esc(t)}" class="on">${esc(t)}</button>`); btn = g.lastElementChild; } }
+  if (btn) btn.classList.toggle('on', sel.includes(t));
+  $$(`#modal .cmp-sug button[data-id="${CSS.escape(t)}"]`).forEach(b => b.classList.toggle('on', sel.includes(t)));
   const n = $('#cmp-n'); if (n) n.textContent = cmpCuenta(sel.length);
-  if ($('#cmp-hint') && !btn) cmpFiltrar();
-  const ir = $('#modal [data-act="cmp-ver"]'); if (ir) ir.disabled = sel.length < 2;
+  const ir = $('#modal [data-act="cmp-ver"]'); if (ir) { ir.disabled = sel.length < 1; ir.textContent = cmpBoton(sel.length); }
   cmpTraer();
 }
-function formComparar(t) {
-  ui.cmp = t ? [t] : (ui.cmp || []).slice(0, CMP_MAX); ui.cmpVer = false; ui.cmpQ = '';
-  Modal.open({ title: 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: '' });
+function formComparar(t, buscar) {
+  ui.cmp = t ? [t] : buscar ? [] : (ui.cmp || []).slice(0, CMP_MAX); ui.cmpVer = false; ui.cmpQ = '';
+  Modal.open({ title: buscar ? 'Buscar acci\u00f3n' : 'Comparar empresas', body: `<div class="cmp-host">${cmpBody()}</div>`, submit: '' });
   $('#modal').classList.add('cmp-modal');
+  { const h = $('#modal .m-head'); if (h) $('#modal').style.setProperty('--mh', h.offsetHeight + 'px'); }  // la fila de tickers queda pegada debajo del titulo
   // la lupa filtra la grilla sin redibujar (no se cierra el teclado); Enter elige la primera que quede
   // tipear no mueve nada: las que no coinciden se atenuan en su lugar (Facu: "escribo y explota todo")
   $('#modal').oninput = e => { if (e.target.id !== 'cmp-q') return; ui.cmpQ = e.target.value; cmpFiltrar(); };
-  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.dataset.dim); if (b) cmpToggle(b.dataset.id); else { const q = e.target.value.trim().toUpperCase(); if (q && Cedears.de(q)) cmpToggle(Cedears.ticker(Cedears.de(q))); } };
+  $('#modal').onkeydown = e => { if (e.target.id !== 'cmp-q' || e.key !== 'Enter') return; e.preventDefault(); e.stopPropagation(); const b = $$('#modal .cmp-grid button').find(x => !x.dataset.dim) || $('#modal .cmp-sug button'); if (b) cmpToggle(b.dataset.id); else { const q = e.target.value.trim().toUpperCase(); if (q && Cedears.de(q)) cmpToggle(Cedears.ticker(Cedears.de(q))); } };
   cmpTraer();
 }
 /** Agregar a la watchlist: buscar el CEDEAR, zonas opcionales. Al guardar trae la ficha (fundamentales, balance, EMA) y la abre */

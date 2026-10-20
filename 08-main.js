@@ -62,7 +62,7 @@ function go(view) { ui.view = view; render(); }
 function fabMenu(abrir) {
   const m = $('#fab-menu'), f = $('#fab'); if (!m || !f) return;
   const on = abrir == null ? m.hidden : abrir; if (on === !m.hidden) return;
-  if (on) { const G_ = ['fab-gasto', 'Cargar gasto'], O_ = ['fab-op', 'Compra / venta / dividendo'], C_ = ['fab-calc', 'Calculadora de CEDEAR']; const it = ui.view === 'cartera' ? [G_, C_, O_] : [C_, O_, G_];
+  if (on) { const G_ = ['fab-gasto', 'Cargar gasto'], O_ = ['fab-op', 'Compra / venta / dividendo'], C_ = ['fab-calc', 'Calculadora de CEDEAR'], B_ = ['fab-buscar', 'Buscar acci\u00f3n'], K_ = ['fab-cal', 'Calendario de balances']; const it = ui.view === 'cartera' ? [G_, K_, B_, C_, O_] : [K_, B_, C_, O_, G_];
     m.innerHTML = it.map(([a, l]) => `<button type="button" data-act="${a}">${l}</button>`).join(''); }
   m.hidden = !on; f.classList.toggle('open', on);
 }
@@ -148,6 +148,8 @@ const Actions = {
   'fab-gasto'() { fabMenu(false); formMov(); },
   'fab-op'() { fabMenu(false); formOp(); },
   'fab-calc'() { fabMenu(false); formCalc(); },
+  'fab-buscar'() { fabMenu(false); formComparar(null, true); },
+  'fab-cal'() { fabMenu(false); formBalances(); },
   pend() { formPend(); },
   'pend-nuevo'() { formPendEditar(null); },
   'pend-editar'(id) { formPendEditar(id); },
@@ -203,8 +205,8 @@ const Actions = {
   pos(t) { formPosicion(t); },
   comparar(t) { formComparar(t); },
   'cmp-toggle'(t) { cmpToggle(t); },
-  'cmp-pick'() { ui.cmpVer = false; const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody(); },
-  'cmp-ver'() { if ((ui.cmp || []).length < 2) return; ui.cmpVer = true; const b = $('#modal .m-body .cmp-host'); if (b) { b.innerHTML = cmpBody(); b.scrollIntoView({ block: 'start' }); } cmpTraer(); },
+  'cmp-pick'() { ui.cmpVer = false; { const mm = $('#modal'); if (mm) mm.scrollTop = 0; } const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody(); },
+  'cmp-ver'() { const n = (ui.cmp || []).length; if (n === 1) { const t = ui.cmp[0]; ui.fichaTab = 'fund'; formPosicion(t); return; } if (n < 2) return; const mm = $('#modal'); if (mm) mm.scrollTop = 0; ui.cmpVer = true; const b = $('#modal .m-body .cmp-host'); if (b) b.innerHTML = cmpBody(); cmpTraer(); },
   'new-watch'() { formWatch(); },
   'del-alerta'(t) { delete state.cartera.alertas[t]; Persist.save(); Modal.close(); render(); toast(`Alerta de ${t} quitada`); },
   'precios-update'() { const b = $('[data-act="precios-update"]'); if (b) b.classList.add('girando'); Precios.actualizar(false).finally(() => { const x = $('[data-act="precios-update"]'); if (x) x.classList.remove('girando'); }); },

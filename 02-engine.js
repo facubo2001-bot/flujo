@@ -399,6 +399,8 @@ const E = {
       if (igual) { dupl.push([a, b]); dupIds.add(b.id); } }
     k.duplicadas = dupl; k.dupIds = dupIds;
     k.ventanas = {}; for (const [m] of E.VENTANAS) k.ventanas[m] = E.ventana(k, m);
+    // ficha de cualquier ticker, aunque no se siga (buscar accion): mismo enriquecido, sin tocar las posiciones
+    k.una = t => enrich(pos[t] || { ticker: t, acciones: 0, costo: 0, dividendos: 0, realizado: 0, nOps: 0, lotes: [], spyShares: 0, flujoNeto: 0 });
     return k;
   },
   /** TIR (XIRR): tasa anual r tal que Σ cf_i / (1+r)^(t_i/365) = 0. cfs: [{t: días desde el inicio, v: flujo (negativo = plata que ponés)}]. Newton + bisección. */

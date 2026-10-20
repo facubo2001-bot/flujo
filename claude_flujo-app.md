@@ -566,3 +566,9 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - Est.m(t): NTM = parte del FY0 que falta + resto del FY1; P/E fwd = precio/NTM SOLO si Fund.mult da eps (moneda y market cap validados); "raro" si NTM/EPS TTM fuera de 0,33–3. PEG = P/E fwd / crecimiento (2 años si hay FY2, si no FY1/FY0). Crecimientos y revisiones (90d, 30d, ↑↓) no dependen de moneda.
 - Ficha: grupo "Forward" (P/E fwd, PEG fwd, EPS FYxx, Ventas FYxx, Revisiones 90d, Analistas). Comparar: P/E forward, PEG forward, EPS esperado. Export compacto: "fwd: ..." por empresa.
 - Probado: Yahoo (429 desde GitHub) y Finviz (bloqueo) NO sirven; FMP gratis limitado a ~87 símbolos.
+
+## Buscar acción + calendario en el + y arreglos del comparador (19-oct-2026, build 202610200135)
+- Menú del +: suma "Calendario de balances" (formBalances) y "Buscar acción" (formComparar(null, true)).
+- Buscador (mismo picker que Comparar): la lupa busca por ticker o nombre en TODOS los CEDEARs (cmpBuscar: sin puntos ni espacios, "jp morgan" → JPM); las que no seguís aparecen abajo (.cmp-sug) y al elegirlas entran a la grilla. 1 elegida → botón "Ver ficha" (formPosicion); 2–4 → "Comparar N".
+- formPosicion abre la ficha de cualquier CEDEAR aunque no se siga (E.cartera().una(t)); trae precio y fundamentales; si le ponés zona y guardás, entra a la watchlist.
+- Comparador: se quitó el scrollIntoView que tapaba "Cambiar" bajo el título; scroll a 0 al cambiar de pantalla; la fila de tickers queda pegada arriba al bajar (m-body overflow visible + thead sticky en --mh).
