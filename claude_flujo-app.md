@@ -1,5 +1,32 @@
 # Gestor de gastos — app de finanzas personales de Facu
 
+## ▶ LEER PRIMERO (actualizado 21-oct-2026, build 202610212129)
+
+**Qué es:** PWA en vanilla JS (gastos + cartera de CEDEARs) publicada en GitHub Pages desde este repo **público** `facubo2001-bot/flujo`. Facu la usa en el iPhone y en la compu; sus datos viven en el teléfono y se sincronizan con un gist privado (Ajustes → Sincronización). Facu habla en castellano rioplatense, informal; respuestas cortas y directas. Vara de calidad: "lo que no se pueda corregir no lo ponemos" (datos confiables antes que lindos).
+
+**Un solo chat editando la app a la vez.** El 21-oct dos chats tocaron la app en paralelo y uno pisó al otro (la pestaña Tesis se implementó dos veces). Antes de editar: `git pull` y rearmar la copia de trabajo DESDE el repo (abajo). Nunca subir archivos de una copia local más vieja que el repo.
+
+**Armar la copia de trabajo y buildear** (el repo es plano; `build.js` espera `src/` y `data/`):
+```
+git clone https://github.com/facubo2001-bot/flujo.git flujo-gh      # o git pull si ya está
+mkdir -p w/src w/data w/pwa
+cp flujo-gh/0*.js flujo-gh/style.css flujo-gh/shell.html flujo-gh/fonts.css w/src/
+cp flujo-gh/cedears.json flujo-gh/spy-hist.json flujo-gh/spy-divs.json w/data/
+cp flujo-gh/sw.js w/pwa/ && cp flujo-gh/build.js w/
+cd w && node build.js            # genera w/flujo.html (tests) y w/pwa/index.html + w/pwa/sw.js (VERSION = fecha UTC)
+```
+**Subir:** copiar `w/src/*` a la raíz del repo, `w/pwa/index.html` y `w/pwa/sw.js` a la raíz; verificar `grep -c 'id="flujo-preset">null' index.html` = 1 (la PWA pública NO lleva datos personales; nunca commitear preset.json); commit con las líneas de atribución; push. Pages tarda ~2-3 min. Facu actualiza cerrando y abriendo la app dos veces.
+
+**Probar:** Playwright con Chromium (viewport 390×844, `is_mobile`) sirviendo `w/` con `python3 -m http.server`; cortar las llamadas externas (`page.route(/^https:/, abort)`). Revisar 0 errores de página y mirar capturas. Para probar con datos reales hace falta un respaldo de Facu (Ajustes → Exportar respaldo); no está en el repo (es personal).
+
+**Reglas fijas:** repo público (ni claves ni datos personales en el código); la clave de Finnhub y la de Alpha Vantage las carga Facu en Ajustes (viajan en su gist, no en el repo); el link del gist da acceso a sus datos: no repetirlo.
+
+**Mapa rápido del código:** `01-core.js` (estado, Persist/migrate, Gist, Precios/Finnhub, Fund = fundamentales SEC+Finnhub, Est = estimaciones Alpha Vantage, Motor, Hist, Tec/EMA), `02-engine.js` (cálculos: E.cartera, reserva, TWR), `05-views-b.js` (Cartera, Ajustes), `06-forms.js` (formularios, ficha `formPosicion`, comparador/buscador, Tesis, Pendientes, Intercambio = JSON con Claude, exportCompacto), `08-main.js` (acciones `Actions`, render, FAB). Cada cambio está documentado abajo con fecha y build.
+
+**Pendiente / ideas de Facu sin hacer:** precio de premarket/after (no se puede gratis: hace falta fuente paga); NVDA FCF con capexPropio sin verificar con datos reales; revisar el Forward con la clave real de Alpha Vantage contra Finviz (MSFT).
+
+## Histórico (lo de abajo es el registro de cada tanda; lo más nuevo está al final)
+
 ## ▶ PRÓXIMA TAREA
 **Cola (23-sep, en este orden):**
 1. **Reserva en pesos, tanda 2** (ver sección): esperar la prueba real de Facu con la API de ArgentinaDatos y ajustar; luego histórico en la ficha.
@@ -17,7 +44,7 @@
 
 Después, el backlog de datos del final del documento.
 
-### Pestaña Tesis en la ficha (21-oct, build 202610212040)
+### Pestaña Tesis en la ficha (21-oct, build 202610212040) — REEMPLAZADA por la versión de las 21:02 (ver 'Alertas compactas + Tesis por ticker'); la tesis vive en `cartera.tesis[T]` y `Persist.migrate` mueve cualquier `alertas[T].tesis` vieja ahí
 - Facu: "toda esta tesis la armaría en un bloque y la quiero en la app: qué hace, de quién depende, competidores, matriz FODA". La nota de 300 caracteres no alcanzaba.
 - `alertas[t].tesis` = `{act, hace, gana, depende[], competidores[], foda:{f,o,d,a}, valuacion, mirar[], vender[]}`; `Intercambio.normTesis()` valida y recorta (8 ítems, 400 caracteres); `diff()` la compara por JSON y la muestra en la vista previa ("tesis al 21-oct"); `null` la borra.
 - Ficha: cuarta pestaña **Tesis** (`tesisHTML(t)`, `.fp-tes`, `.seg3.c4`): Qué hace (+ cómo gana plata en gris), De quién depende, Competidores, FODA en grilla 2×2 con punto good/info/warn/crit, Valuación, Qué mirar en cada balance, Cuándo vendo y pie con la fecha. Sin tesis: mensaje "pedísela a Claude".
@@ -588,3 +615,6 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 ## Orden por upside, sin descripción en alertas y reserva más corta (21-oct-2026, build 202610212119)
 - Alertas: orden "Más cerca de comprar" (el de antes) o "Mayor upside" (objetivo / precio; muestra las 10 primeras, el resto en "Ver todas"); settings.alOrden. Se sacó la línea de descripción de cada fila.
 - Reserva: fuera las frases roja (pierde contra…) y amarilla (estacionada rindió…); queda inflación. Lo ganado ($) va al lado del valor grande, no en un renglón aparte.
+
+## Tesis: migración (21-oct-2026, build 202610212129)
+- Dos implementaciones de Tesis chocaron (otro chat la guardaba en `alertas[T].tesis`). Quedó la de `cartera.tesis[T]`; `Persist.migrate` mueve cualquier `alertas[T].tesis` a `cartera.tesis[T]`, así no se pierde lo que Facu haya cargado con la otra.
