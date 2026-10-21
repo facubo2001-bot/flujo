@@ -397,17 +397,21 @@ function viewCartera() {
     } else barra = `<div class="al-sin">${pr != null ? `hoy ${fmtU(pr)} · ` : ''}sin zona de compra</div>`;
     return `<div class="al-row" data-alerta="${esc(t)}">
       <div class="al-top"><div class="l"><b>${esc(t)}</b>${tier ? `<span class="al-tier">${esc(String(tier).slice(0, 4))}</span>` : ''}${bal}</div>${chip}</div>
-      ${al.desc ? `<div class="al-desc">${esc(al.desc)}</div>` : ''}
       ${pr == null && piso ? `<div class="al-sin">${Precios.sinFuente(t) ? 'sin fuente de precio' : 'sin precio'}</div>` : ''}${barra}
     </div>`;
   };
-  const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));
+  // orden: por zona (lo mas critico primero) o por upside al objetivo (Facu, 21-oct: otra mirada de inversion)
+  const alOrd = state.settings.alOrden === 'upside' ? 'upside' : 'zona';
+  const porZona = (a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9));
+  const ordenAl = conAlerta.slice().sort(alOrd === 'upside' ? (a, b) => (b.upside ?? -9) - (a.upside ?? -9) || porZona(a, b) : porZona);
+  const alOrdHtml = `<div class="pz-ord" role="group" aria-label="Ordenar alertas">${[['zona', 'M\u00e1s cerca de comprar'], ['upside', 'Mayor upside']].map(([id, l]) => `<button type="button" data-act="al-orden" data-id="${id}" class="${alOrd === id ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><button class="icon-btn" data-act="balances" aria-label="Calendario de balances" title="Calendario de balances">${ICONS.cuotas}</button><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
     ${ordenAl.length ? (() => {
       // vivas: en zona (roja o amarilla) o a menos de 5 % de mirala. El resto, detras de un boton (Facu)
       const viva = p => p.estado || (p.precio && p.alerta && p.alerta.mirala && (p.precio - p.alerta.mirala) / p.precio <= 0.05);
-      const vivas = ordenAl.filter(viva), resto = ordenAl.filter(p => !viva(p));
-      return (vivas.length ? vivas.map(alRow).join('') : '<p class="small muted" style="margin:4px 0 8px">Nada en zona ni a menos de 5 % de mirala.</p>')
+      // por upside: las 10 con mas recorrido hasta su objetivo; el resto detras del boton
+      const vivas = alOrd === 'upside' ? ordenAl.slice(0, 10) : ordenAl.filter(viva), resto = alOrd === 'upside' ? ordenAl.slice(10) : ordenAl.filter(p => !viva(p));
+      return alOrdHtml + (vivas.length ? vivas.map(alRow).join('') : '<p class="small muted" style="margin:4px 0 8px">Nada en zona ni a menos de 5 % de mirala.</p>')
         + (resto.length ? (ui.alTodas ? resto.map(alRow).join('') : '') + `<button class="btn ghost al-mas" data-act="al-todas">${ui.alTodas ? 'Ver menos' : `Ver todas (${resto.length} m\u00e1s)`}</button>` : '');
     })() : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
   </div>`;
@@ -702,11 +706,10 @@ function renderReservaCard(pt) {
   const ced = (pt.grupos.find(g => g.id === 'cedears') || {}).valor || 0; const pesoPct = ced ? a.valorUSD / ced : null;  // contra los CEDEARs
   return `<div class="card kpi rsv tap" data-act="activo" data-id="${a.id}">
     <div class="label">Reserva en pesos <span class="soft">\u00b7 ${esc(a.nombre)}</span></div>
-    <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}</div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de tus CEDEARs (objetivo ${M.pct(pt.reservaObjetivo, 0)})</span>` : ''}</div></div>
-    <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span><span class="soft">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div>
+    <div class="rsv-top"><div class="value">$ ${fmtARS.format(Math.round(r.valor))}<span class="rsv-gan ${r.ganado >= 0 ? 'up' : 'down'}">${r.ganado >= 0 ? '+' : '\u2212'}$ ${fmtARS.format(Math.round(Math.abs(r.ganado)))}</span></div><div class="rsv-usd">${r.usdHoy != null ? fmtU(r.usdHoy, 0) : '\u2014'}${pesoPct != null ? ` <span class="soft">\u00b7 ${M.pct(pesoPct, 1)} de tus CEDEARs (objetivo ${M.pct(pt.reservaObjetivo, 0)})</span>` : ''}</div></div>
+    <div class="rsv-tasa"><span>TEM <b>${r.tem != null ? (r.tem * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' %' : '\u2014'}</b></span><span>TNA <b>${r.tna != null ? (r.tna * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '\u2014'}</b></span><span>${Math.round(r.dias)} d\u00edas \u00b7 vc al ${D.fmt(r.corte)}</span></div>
     <div class="rsv-sem">${chips}</div>
-    ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : alerta}
-    ${cart ? `<div class="rsv-cart ${r.cartera.difPesos >= 0 ? 'pos' : 'neg'}">${cart}</div>` : ''}
+    ${r.dias < 7 ? `<div class="rsv-sucio">Primeros ${Math.max(1, Math.round(r.dias))} d\u00edas: los n\u00fameros todav\u00eda tienen ruido.</div>` : ''}
     ${infl}
     ${r.faltan.length ? `<div class="small warn-text">Sin valor cuota para ${r.faltan.map(D.fmt).join(', ')}: ese lote no se cuenta.</div>` : ''}
   </div>`;

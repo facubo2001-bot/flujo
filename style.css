@@ -1267,3 +1267,7 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .tes-foda .pos b{color:var(--good)} .tes-foda .acc b{color:var(--accent)} .tes-foda .warn b{color:var(--warn)} .tes-foda .neg b{color:var(--crit)}
 .tes-acts{gap:8px;margin:18px 0 6px}
 @media (max-width:360px){.tes-foda{grid-template-columns:1fr}}
+
+/* reserva: lo ganado al lado del valor (no en un renglon aparte) */
+.rsv-gan{font-size:14px;font-weight:800;margin-left:10px;letter-spacing:0;vertical-align:middle;font-variant-numeric:tabular-nums}
+.rsv-gan.up{color:var(--good)} .rsv-gan.down{color:var(--crit)}
