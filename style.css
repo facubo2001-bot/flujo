@@ -1271,3 +1271,16 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 /* reserva: lo ganado al lado del valor (no en un renglon aparte) */
 .rsv-gan{font-size:14px;font-weight:800;margin-left:10px;letter-spacing:0;vertical-align:middle;font-variant-numeric:tabular-nums}
 .rsv-gan.up{color:var(--good)} .rsv-gan.down{color:var(--crit)}
+
+/* Mejor relacion (21-oct): numero reward/risk junto a la zona */
+.al-top .r{display:flex;align-items:center;gap:8px;flex:none}
+.al-rr{font-size:15px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--ink-2);letter-spacing:-.01em}
+.al-rr.hi{color:var(--accent)}
+.pz-ord .i-btn{align-self:center;margin-left:-6px;border:1px solid var(--line-2);min-height:0;padding:0;width:18px;height:18px;font-size:11px}
+.nov-ag{display:flex;flex-direction:column;margin:2px 0 4px}
+.nov-d{display:flex;gap:12px;align-items:baseline;padding:5px 0}
+.nov-d.sem{border-top:1px solid var(--line);margin-top:4px;padding-top:9px}
+.nov-d .d{flex:none;width:60px;white-space:nowrap;font-size:12.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.nov-d .tk{display:flex;flex-wrap:wrap;gap:2px 14px;min-width:0}
+.nov-d .tk b{font-size:15.5px;font-weight:800;color:var(--ink-2);cursor:pointer;letter-spacing:.01em}
+.nov-d .tk b.mio{color:var(--accent);font-weight:900}

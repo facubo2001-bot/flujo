@@ -1532,7 +1532,11 @@ const Fund = {
   calentar() { return Motor.arrancar(); },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
   /** balance "cerca": 2 semanas antes, para todas (Facu, 12-oct: un mes era un monton) */
-  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= 14 ? b : null; },
+  /** ventana de balances (Facu, 21-oct): esta semana y la que viene, de lunes a viernes. Sabado y domingo cuentan como
+   *  previa de la semana que arranca. FIN_VENTANA = dia de la semana que viene donde corta (5 = viernes, 3 = miercoles). */
+  FIN_VENTANA: 5,
+  finVentana(hoy = D.today()) { const w = D.dow(hoy); const lunes = D.addDays(hoy, w === 0 ? 1 : w === 6 ? 2 : 1 - w); return D.addDays(lunes, 7 + Fund.FIN_VENTANA - 1); },
+  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.fecha <= Fund.finVentana() ? b : null; },
   balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
 };
 

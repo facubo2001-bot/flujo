@@ -1,6 +1,6 @@
 # Gestor de gastos — app de finanzas personales de Facu
 
-## ▶ LEER PRIMERO (actualizado 21-oct-2026, build 202610212129)
+## ▶ LEER PRIMERO (actualizado 21-oct-2026, build 202610212145)
 
 **Qué es:** PWA en vanilla JS (gastos + cartera de CEDEARs) publicada en GitHub Pages desde este repo **público** `facubo2001-bot/flujo`. Facu la usa en el iPhone y en la compu; sus datos viven en el teléfono y se sincronizan con un gist privado (Ajustes → Sincronización). Facu habla en castellano rioplatense, informal; respuestas cortas y directas. Vara de calidad: "lo que no se pueda corregir no lo ponemos" (datos confiables antes que lindos).
 
@@ -618,3 +618,8 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 
 ## Tesis: migración (21-oct-2026, build 202610212129)
 - Dos implementaciones de Tesis chocaron (otro chat la guardaba en `alertas[T].tesis`). Quedó la de `cartera.tesis[T]`; `Persist.migrate` mueve cualquier `alertas[T].tesis` a `cartera.tesis[T]`, así no se pierde lo que Facu haya cargado con la otra.
+
+## Novedades en agenda + Alertas "Mejor relación" (21-oct-2026, build 202610212145)
+- **Ventana de balances**: Facu: "eran millones" (14 días corridos daban ~33). Ahora `Fund.finVentana()` = esta semana y la que viene, de lunes a viernes (`Fund.FIN_VENTANA = 5` → corta el viernes de la semana que viene; sábado y domingo cuentan como previa de la semana que arranca). `Fund.balanceCerca` usa esa ventana: aplica a Novedades, al puntito celeste de Posiciones/ficha y al resaltado "balance …" de Alertas. Se probó 1,5 semanas (`FIN_VENTANA = 3`, miércoles): Facu eligió las dos semanas.
+- **Novedades, balances en agenda** (`.nov-ag/.nov-d`): un renglón por día ("MIÉ 28  META MSFT GEV NOW"), lo que tenés en celeste 900, la watchlist en gris; raya entre esta semana y la que viene. Sin am/pm (está en la ficha). Tocar un ticker abre la ficha. Reemplaza los chips `.nov-chip.bal` (23 chips = 12 renglones; la agenda, 8). Zona, P/E y EMA siguen como chips.
+- **Alertas → "Mejor relación"** (tercer orden, `settings.alOrden = 'rel'`): `rel = upside / caída hasta el piso`, piso = urgente (o mirala si no hay urgente). **Facu: sin colchón ni ajustes, las zonas ya tienen todo calculado.** En el piso o abajo no hay división: "en zona", arriba de todo y entre ellas por upside. Pegadas al piso el número explota (NFLX a 0,1 % del piso = 460×): se muestra ">20×" (el orden usa el valor real). Número junto al chip de zona (`.al-rr`, celeste desde 3×), top 10 + "Ver todas", explicación en la "i" del título (solo en ese modo). Sin objetivo: sin número, al final.

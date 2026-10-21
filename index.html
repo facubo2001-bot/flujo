@@ -1296,6 +1296,19 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .rsv-gan{font-size:14px;font-weight:800;margin-left:10px;letter-spacing:0;vertical-align:middle;font-variant-numeric:tabular-nums}
 .rsv-gan.up{color:var(--good)} .rsv-gan.down{color:var(--crit)}
 
+/* Mejor relacion (21-oct): numero reward/risk junto a la zona */
+.al-top .r{display:flex;align-items:center;gap:8px;flex:none}
+.al-rr{font-size:15px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--ink-2);letter-spacing:-.01em}
+.al-rr.hi{color:var(--accent)}
+.pz-ord .i-btn{align-self:center;margin-left:-6px;border:1px solid var(--line-2);min-height:0;padding:0;width:18px;height:18px;font-size:11px}
+.nov-ag{display:flex;flex-direction:column;margin:2px 0 4px}
+.nov-d{display:flex;gap:12px;align-items:baseline;padding:5px 0}
+.nov-d.sem{border-top:1px solid var(--line);margin-top:4px;padding-top:9px}
+.nov-d .d{flex:none;width:60px;white-space:nowrap;font-size:12.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.nov-d .tk{display:flex;flex-wrap:wrap;gap:2px 14px;min-width:0}
+.nov-d .tk b{font-size:15.5px;font-weight:800;color:var(--ink-2);cursor:pointer;letter-spacing:.01em}
+.nov-d .tk b.mio{color:var(--accent);font-weight:900}
+
 </style>
 <script type="application/json" id="flujo-data">null</script>
 <script type="application/json" id="flujo-preset">null</script>
@@ -1638,7 +1651,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610212129';
+const BUILD = '202610212145';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2871,7 +2884,11 @@ const Fund = {
   calentar() { return Motor.arrancar(); },
   /** próximo balance de un ticker, si está guardado: {fecha, dias} */
   /** balance "cerca": 2 semanas antes, para todas (Facu, 12-oct: un mes era un monton) */
-  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.dias <= 14 ? b : null; },
+  /** ventana de balances (Facu, 21-oct): esta semana y la que viene, de lunes a viernes. Sabado y domingo cuentan como
+   *  previa de la semana que arranca. FIN_VENTANA = dia de la semana que viene donde corta (5 = viernes, 3 = miercoles). */
+  FIN_VENTANA: 5,
+  finVentana(hoy = D.today()) { const w = D.dow(hoy); const lunes = D.addDays(hoy, w === 0 ? 1 : w === 6 ? 2 : 1 - w); return D.addDays(lunes, 7 + Fund.FIN_VENTANA - 1); },
+  balanceCerca(t, tengo) { const b = Fund.balance(t); return b && b.fecha <= Fund.finVentana() ? b : null; },
   balance(t) { const d = Fund.de(t); const b = Fund.calDe(t) || (d && d.balance); if (!b || !b.fecha) return null; const dias = D.daysBetween(D.today(), b.fecha); return dias >= 0 ? { ...b, dias } : null; },
 };
 
@@ -4971,12 +4988,14 @@ function viewCartera() {
   const pt = E.patrimonio(k); const hayActivos = pt.activos.length > 0;
   const rendStr = v => v && v.disponible && v.rend.realDiv != null ? { v: pctS(v.rend.realDiv), cls: v.rend.realDiv >= 0 ? 'pos' : 'neg' } : { v: '—', cls: '' };
   const reparto = pt.grupos.filter(g => g.valor > 0).map(g => `${g.id === 'cedears' ? 'CEDEARs' : g.id === 'reserva' ? 'fondo' : g.nombre.toLowerCase()} ${M.pct(g.valor / pt.total, 0)}`).join(' · ');
-  // balances cerca: 2 semanas antes, cartera y watchlist; primero los mas proximos, entre iguales lo que tenes
+  // balances cerca: esta semana y la que viene (Fund.finVentana), cartera y watchlist; primero los mas proximos, entre iguales lo que tenes
   const balSemana = [...k.posiciones.map(x => ({ t: x.ticker, tengo: true, peso: x.peso })), ...k.watch.filter(w => !k.posiciones.some(p => p.ticker === w.ticker)).map(x => ({ t: x.ticker, tengo: false, peso: 0 }))]
     .map(x => ({ ...x, b: Fund.balanceCerca(x.t, x.tengo) })).filter(x => x.b).sort((x, y) => x.b.dias - y.b.dias || (y.tengo - x.tengo) || (y.peso - x.peso));
-  // chips: "MELI 25/09 pm" (pm = tras el cierre, am = antes de abrir)
-  const ddmm = f => `${f.slice(8, 10)}/${f.slice(5, 7)}`;
-  const balLineas = balSemana.length ? `<div class="nov-l nov-z"><span class="nov-chips">${balSemana.map(x => `<span class="nov-chip bal" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)} ${ddmm(x.b.fecha)}${x.b.hora === 'bmo' ? '<i>am</i>' : x.b.hora === 'amc' ? '<i>pm</i>' : ''}</span>`).join('')}</span></div>` : '';
+  // agenda (Facu, 21-oct: con chips eran demasiados): un renglon por dia, lo que tenes en celeste, la watchlist en gris
+  const DIAS = ['Dom', 'Lun', 'Mar', 'Mi\u00e9', 'Jue', 'Vie', 'S\u00e1b'];
+  const porDia = {}; balSemana.forEach(x => (porDia[x.b.fecha] = porDia[x.b.fecha] || []).push(x));
+  const lunesProx = D.addDays(Fund.finVentana(), 1 - Fund.FIN_VENTANA);
+  const balLineas = !balSemana.length ? '' : `<div class="nov-ag">${Object.keys(porDia).sort().map((f, i, arr) => `<div class="nov-d${i && f >= lunesProx && arr[i - 1] < lunesProx ? ' sem' : ''}"><span class="d">${DIAS[D.dow(f)]} ${Number(f.slice(8, 10))}</span><span class="tk">${porDia[f].map(x => `<b class="${x.tengo ? 'mio' : ''}" data-act="pos" data-id="${esc(x.t)}">${esc(x.t)}</b>`).join('')}</span></div>`).join('')}</div>`;
   const zona = [...k.posiciones, ...k.watch].filter(x => x.estado).sort((x, y) => (x.estado === 'urgente' ? 0 : 1) - (y.estado === 'urgente' ? 0 : 1) || ((k.posiciones.some(p => p.ticker === y.ticker) ? 1 : 0) - (k.posiciones.some(p => p.ticker === x.ticker) ? 1 : 0)));
   const zonaLinea = zona.length ? `<div class="nov-l nov-z"><span class="nov-chips">${zona.map(x => `<span class="nov-chip ${x.estado}" data-act="pos" data-id="${esc(x.ticker)}">${esc(x.ticker)}</span>`).join('')}</span></div>` : '';
   const baratas = Fund.baratas([...k.posiciones, ...k.watch].map(p => p.ticker)).slice(0, 4);  // Facu: menos ruido, las 4 mas baratas
@@ -5002,7 +5021,7 @@ function viewCartera() {
       ] })}
     ${renderReservaCard(pt)}
     <div class="card kpi nov ${balLineas || zonaLinea ? 'tap' : ''}" ${balLineas || zonaLinea ? 'data-act="ir-alertas"' : ''}><div class="label">Novedades</div>
-      ${balLineas || zonaLinea || barLinea || emaLinea ? balLineas + zonaLinea + barLinea + emaLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana.</span></div>'}
+      ${balLineas || zonaLinea || barLinea || emaLinea ? balLineas + zonaLinea + barLinea + emaLinea : '<div class="nov-l"><span class="muted">Sin novedades: nada en zona ni balances esta semana ni la que viene.</span></div>'}
     </div>
   </div>`;
   const conc = state.cartera.conciliacion || null;
@@ -5046,7 +5065,7 @@ function viewCartera() {
     const al = p.alerta; const pr = p.precio; const t = p.ticker;
     const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : '';
     const tier = Tier.de(t); const b = Fund.balance(t);
-    const bal = b ? `<span class="al-bal${b.dias <= 14 ? ' ojo' : ''}">balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : D.fmt(b.fecha)}</span>` : '';
+    const bal = b ? `<span class="al-bal${Fund.balanceCerca(t) ? ' ojo' : ''}">balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : D.fmt(b.fecha)}</span>` : '';
     const num = v => fmtUSD2.format(v).replace(',00', '');
     const pcA = v => `${Math.abs(v * 100).toLocaleString('es-AR', { maximumFractionDigits: Math.abs(v) < 0.1 ? 1 : 0 })} %`;
     const urg = al.urgente || null, mir = al.mirala || null, obj = p.objetivo || null;
@@ -5072,21 +5091,27 @@ function viewCartera() {
       <div class="al-tk">${vis.map(l => `<span class="${l.cls}" style="left:${l.c.toFixed(1)}%">${l.txt}</span>`).join('')}</div>`;
     } else barra = `<div class="al-sin">${pr != null ? `hoy ${fmtU(pr)} · ` : ''}sin zona de compra</div>`;
     return `<div class="al-row" data-alerta="${esc(t)}">
-      <div class="al-top"><div class="l"><b>${esc(t)}</b>${tier ? `<span class="al-tier">${esc(String(tier).slice(0, 4))}</span>` : ''}${bal}</div>${chip}</div>
+      <div class="al-top"><div class="l"><b>${esc(t)}</b>${tier ? `<span class="al-tier">${esc(String(tier).slice(0, 4))}</span>` : ''}${bal}</div><div class="r">${alOrd === 'rel' && p.rel != null ? `<span class="al-rr${p.rel >= 3 ? ' hi' : ''}">${p.caida <= 0 ? 'en zona' : p.rel > 20 ? '&gt;20\u00d7' : `${p.rel.toLocaleString('es-AR', { maximumFractionDigits: p.rel < 10 ? 1 : 0 })}\u00d7`}</span>` : ''}${chip}</div></div>
       ${pr == null && piso ? `<div class="al-sin">${Precios.sinFuente(t) ? 'sin fuente de precio' : 'sin precio'}</div>` : ''}${barra}
     </div>`;
   };
-  // orden: por zona (lo mas critico primero) o por upside al objetivo (Facu, 21-oct: otra mirada de inversion)
-  const alOrd = state.settings.alOrden === 'upside' ? 'upside' : 'zona';
+  // orden: por zona (lo mas critico primero), por upside al objetivo (Facu, 21-oct: otra mirada de inversion)
+  // o por relacion upside / caida hasta la zona roja (reward/risk): junta las dos miradas en un numero.
+  // rel = upside / lo que le falta caer hasta el piso (urgente, o mirala si no hay urgente). Facu (21-oct): sin colchon,
+  // las zonas ya tienen todo calculado. Ya en el piso o abajo: no hay division posible -> "en zona", arriba de todo, por upside.
+  // Sin objetivo: sin dato.
+  const alOrd = ['upside', 'rel'].includes(state.settings.alOrden) ? state.settings.alOrden : 'zona';
+  for (const p of conAlerta) { const piso = p.alerta && (p.alerta.urgente || p.alerta.mirala); p.caida = piso && p.precio ? (p.precio - piso) / p.precio : null; p.rel = p.upside == null || p.caida == null ? null : p.caida <= 0 ? 1e6 + p.upside : p.upside / p.caida; }
   const porZona = (a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9));
-  const ordenAl = conAlerta.slice().sort(alOrd === 'upside' ? (a, b) => (b.upside ?? -9) - (a.upside ?? -9) || porZona(a, b) : porZona);
-  const alOrdHtml = `<div class="pz-ord" role="group" aria-label="Ordenar alertas">${[['zona', 'M\u00e1s cerca de comprar'], ['upside', 'Mayor upside']].map(([id, l]) => `<button type="button" data-act="al-orden" data-id="${id}" class="${alOrd === id ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  html += `<div class="card section"><div class="card-head"><h2>Alertas de precio</h2><div class="row" style="gap:8px"><button class="icon-btn" data-act="balances" aria-label="Calendario de balances" title="Calendario de balances">${ICONS.cuotas}</button><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
+  const ordenAl = conAlerta.slice().sort(alOrd === 'upside' ? (a, b) => (b.upside ?? -9) - (a.upside ?? -9) || porZona(a, b) : alOrd === 'rel' ? (a, b) => (b.rel ?? -1e9) - (a.rel ?? -1e9) || porZona(a, b) : porZona);
+  const alOrdHtml = `<div class="pz-ord" role="group" aria-label="Ordenar alertas">${[['zona', 'M\u00e1s cerca de comprar'], ['upside', 'Mayor upside'], ['rel', 'Mejor relaci\u00f3n']].map(([id, l]) => `<button type="button" data-act="al-orden" data-id="${id}" class="${alOrd === id ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  html += `<div class="card section"><div class="card-head"><h2>Alertas de precio${alOrd === 'rel' ? infoBtn('Mejor relaci\u00f3n (reward/risk) = upside hasta tu objetivo \u00f7 lo que le falta caer hasta tu zona roja. 3\u00d7 = por cada 1 % que le falta caer, 3 % de upside. Las que ya est\u00e1n en zona roja van primero, por upside. Pegadas al piso el n\u00famero se dispara: se muestra &gt;20\u00d7. En celeste desde 3\u00d7. Sin objetivo cargado no hay relaci\u00f3n.') : ''}</h2><div class="row" style="gap:8px"><button class="icon-btn" data-act="balances" aria-label="Calendario de balances" title="Calendario de balances">${ICONS.cuotas}</button><button class="btn sm ghost" data-act="comparar">Comparar</button><button class="btn sm" data-act="new-watch">${ICONS.plus} Ticker</button></div></div>
     ${ordenAl.length ? (() => {
       // vivas: en zona (roja o amarilla) o a menos de 5 % de mirala. El resto, detras de un boton (Facu)
       const viva = p => p.estado || (p.precio && p.alerta && p.alerta.mirala && (p.precio - p.alerta.mirala) / p.precio <= 0.05);
       // por upside: las 10 con mas recorrido hasta su objetivo; el resto detras del boton
-      const vivas = alOrd === 'upside' ? ordenAl.slice(0, 10) : ordenAl.filter(viva), resto = alOrd === 'upside' ? ordenAl.slice(10) : ordenAl.filter(p => !viva(p));
+      const top10 = alOrd === 'upside' || alOrd === 'rel';
+      const vivas = top10 ? ordenAl.slice(0, 10) : ordenAl.filter(viva), resto = top10 ? ordenAl.slice(10) : ordenAl.filter(p => !viva(p));
       return alOrdHtml + (vivas.length ? vivas.map(alRow).join('') : '<p class="small muted" style="margin:4px 0 8px">Nada en zona ni a menos de 5 % de mirala.</p>')
         + (resto.length ? (ui.alTodas ? resto.map(alRow).join('') : '') + `<button class="btn ghost al-mas" data-act="al-todas">${ui.alTodas ? 'Ver menos' : `Ver todas (${resto.length} m\u00e1s)`}</button>` : '');
     })() : emptyInline('Sin alertas cargadas', 'Agregar', 'new-watch')}
