@@ -27,3 +27,13 @@ Reglas del formato: solo los tickers que cambian; `null` quita el ticker de aler
 
 ## Después de importar
 Si cambiaron niveles, el bot de alertas (tarea programada `trig_01D6aMNws9KzBkpE5FmNv6jt`, corre cada hora en horario de mercado) sigue con los niveles viejos hasta que se actualice su prompt: Facu tiene que pedir en un chat con acceso a tareas programadas "actualizá la tarea de alertas con estos niveles". Mantener también `claude/alertas-cedears.md` al día (47 tickers + PFE desde el 21-sep).
+
+## Tesis completa por empresa (21-oct-2026, build 202610212040)
+Facu pidió tener la tesis entera en la app ("qué hace, de quién depende, competidores, FODA"). Va en `alertas.TICKER.tesis` dentro del mismo JSON de "Cargar actualizaciones" y se ve en la pestaña **Tesis** de la ficha (Fundamentals · Tesis · Mi posición · Alertas). Es solo lectura en la app: la escribe Claude.
+```json
+"AVGO": { "tesis": { "act": "2026-10-21", "hace": "…", "gana": "cómo gana plata", "depende": ["…"], "competidores": ["…"],
+  "foda": { "f": ["…"], "o": ["…"], "d": ["…"], "a": ["…"] }, "valuacion": "…", "mirar": ["qué mirar en cada balance"], "vender": ["cuándo vendo"] } }
+```
+- Listas de hasta 8 textos de hasta 400 caracteres (se recorta). Si se manda, **reemplaza la tesis anterior entera**; `"tesis": null` la borra; si no se manda, no se toca. Mandarla solo cuando cambia (post-balance o cambio de tesis) y actualizar `act`.
+- Puede ir sola (sin niveles) o junto con mirala/urgente/nota. El form de Alertas de la ficha conserva la tesis al guardar.
+- Export: el JSON del export ya NO repite la tesis dentro de `alerta`; va legible en la sección "Tesis completas" (posiciones y watchlist con tesis) más la lista de posiciones "Sin tesis todavía".

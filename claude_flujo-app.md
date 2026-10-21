@@ -17,6 +17,13 @@
 
 Después, el backlog de datos del final del documento.
 
+### Pestaña Tesis en la ficha (21-oct, build 202610212040)
+- Facu: "toda esta tesis la armaría en un bloque y la quiero en la app: qué hace, de quién depende, competidores, matriz FODA". La nota de 300 caracteres no alcanzaba.
+- `alertas[t].tesis` = `{act, hace, gana, depende[], competidores[], foda:{f,o,d,a}, valuacion, mirar[], vender[]}`; `Intercambio.normTesis()` valida y recorta (8 ítems, 400 caracteres); `diff()` la compara por JSON y la muestra en la vista previa ("tesis al 21-oct"); `null` la borra.
+- Ficha: cuarta pestaña **Tesis** (`tesisHTML(t)`, `.fp-tes`, `.seg3.c4`): Qué hace (+ cómo gana plata en gris), De quién depende, Competidores, FODA en grilla 2×2 con punto good/info/warn/crit, Valuación, Qué mirar en cada balance, Cuándo vendo y pie con la fecha. Sin tesis: mensaje "pedísela a Claude".
+- El form de Alertas conserva `tesis` al guardar (antes rearmaba el objeto y la hubiera borrado). Export: `Intercambio.sinTesis()` la saca del JSON y `tesisTexto()` la pone legible en "Tesis completas".
+- Probado con Playwright a 390×844 (datos de ejemplo + JSON de AVGO): carga, idempotencia (segundo diff = 0 cambios), Guardar en Alertas la conserva, `null` la borra, sin errores de página.
+
 ## Sistema visual (rediseño 19-sep-2026, secciones 1–6 de `REDISENO-COMPLETO.md`)
 - **Tipografía**: una sola familia, **Public Sans variable** (eje wght 100–900, SIL OFL), subset latino en woff2 **embebido en base64 dentro del CSS** (`src/fonts.css`, 26 KB → 35 KB en base64). Sin CDN y sin archivos sueltos: el deploy sigue siendo un solo `index.html` y la app anda offline. Se sacaron los `<link>` a Google Fonts de `shell.html`.
   - **El woff2 embebido es el de upstream, sin tocar (26.832 bytes, 226 glifos).** Hubo un intento de injertar el glifo `≤` con fontTools: Chromium lo dibujaba bien y **CoreText (iOS) lo dibujaba vacío**, dejando un espacio huérfano donde iba el símbolo. Revertido. **No injertar glifos en la fuente**: lo que la fuente no trae se dibuja como SVG.

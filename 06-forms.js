@@ -609,6 +609,25 @@ function formOpCalc() {
  * Cabecera (ticker, precio, que hace en una linea, 52W), botones de accion y tres pestañas:
  * Fundamentals (bloques con su historico) · Mi posicion · Alertas. Las tres se dibujan siempre (los campos de
  * Alertas tienen que existir para Guardar) y la pestaña se cambia sin re-dibujar (#modal[data-ftab]). */
+/** Pestaña Tesis de la ficha: lo que escribe Claude (alertas[t].tesis). Solo lectura: se cambia por "Cargar actualizaciones". */
+function tesisHTML(t) {
+  const al = state.cartera.alertas[t] || {}; const z = al.tesis;
+  if (!z) return `<div class="fs"><div class="n" style="padding:6px 0 2px">Todavía no hay tesis para ${esc(t)}. Pedísela a Claude: llega en el mismo JSON de "Cargar actualizaciones" y queda acá.</div></div>`;
+  const ul = a => `<ul class="tz-l">${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  const sec = (tit, html) => html ? `<div class="fs"><div class="fs-t">${tit}</div>${html}</div>` : '';
+  const p = x => x ? `<p class="tz-p">${esc(x)}</p>` : '';
+  const cel = (tit, dot, a) => `<div class="tz-c"><div class="tz-h"><span class="dot ${dot}"></span>${tit}</div>${a.length ? ul(a) : '<div class="n">\u2014</div>'}</div>`;
+  const f = z.foda || {};
+  const foda = (f.f || []).length + (f.o || []).length + (f.d || []).length + (f.a || []).length ? `<div class="tz-foda">${cel('Fortalezas', 'good', f.f || [])}${cel('Oportunidades', 'info', f.o || [])}${cel('Debilidades', 'warn', f.d || [])}${cel('Amenazas', 'crit', f.a || [])}</div>` : '';
+  return sec('Qu\u00e9 hace', p(z.hace) + (z.gana ? `<p class="tz-p soft">${esc(z.gana)}</p>` : ''))
+    + sec('De qui\u00e9n depende', (z.depende || []).length ? ul(z.depende) : '')
+    + sec('Competidores', (z.competidores || []).length ? ul(z.competidores) : '')
+    + sec('FODA', foda)
+    + sec('Valuaci\u00f3n', p(z.valuacion))
+    + sec('Qu\u00e9 mirar en cada balance', (z.mirar || []).length ? ul(z.mirar) : '')
+    + sec('Cu\u00e1ndo vendo', (z.vender || []).length ? ul(z.vender) : '')
+    + `<div class="n" style="margin-top:16px">Tesis al ${D.fmt(z.act, { year: true })} \u00b7 la escribe Claude y se actualiza con "Cargar actualizaciones".</div>`;
+}
 function fundHTML(t, pos) {
   const precio = pos && pos.precio != null ? pos.precio : null;
   const d = Fund.de(t);
@@ -641,7 +660,7 @@ function fundHTML(t, pos) {
   const tieneAcc = pos && pos.acciones;
   const acciones = `<div class="acts"><button type="button" class="a p" data-act="op-para" data-id="${esc(t)}|compra">+ Comprar</button>${tieneAcc ? `<button type="button" class="a" data-act="op-para" data-id="${esc(t)}|venta">Vender</button><button type="button" class="a" data-act="op-para" data-id="${esc(t)}|dividendo">Dividendo</button>` : ''}<button type="button" class="a" data-act="comparar" data-id="${esc(t)}">Comparar</button></div>`;
   const tab = ui.fichaTab || 'fund';
-  const tabs = `<div class="seg3">${[['fund', 'Fundamentals'], ['pos', 'Mi posici\u00f3n'], ['al', 'Alertas']].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg3 c4">${[['fund', 'Fundamentals'], ['tes', 'Tesis'], ['pos', 'Mi posici\u00f3n'], ['al', 'Alertas']].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
 
   let pane;
   if (!d) pane = `<div class="n" style="padding:14px 0">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes para ver los fundamentales.'}</div>`;
@@ -776,10 +795,12 @@ function formPosicion(ticker) {
     ${F.field('Qu\u00e9 hace', F.input('a-desc', al.desc || '', 'maxlength="120" placeholder="una l\u00ednea, fija"'))}
     ${F.field('Tesis / nota', `<textarea class="input" id="a-nota" rows="3" placeholder="tier \u00b7 por qu\u00e9 la ten\u00e9s, qu\u00e9 mirar">${esc(al.nota || '')}</textarea>`)}
     ${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>`;
-  const body = `${fundHTML(ticker, p)}<div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
+  const body = `${fundHTML(ticker, p)}<div class="fp fp-tes">${tesisHTML(ticker)}</div><div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
-    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else { const prev = state.cartera.alertas[ticker] || {}; state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}) }; }
+    const prev = state.cartera.alertas[ticker] || {};
+    // la tesis no se edita en este form (la escribe Claude): se conserva siempre
+    if (!mirala && !urgente && !objetivo && !nota && !desc && !prev.tesis) { delete state.cartera.alertas[ticker]; } else { state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}), ...(prev.tesis ? { tesis: prev.tesis } : {}) }; }
     Persist.save(); toast('Guardado'); render();
   } });
   $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
@@ -1029,6 +1050,30 @@ const Intercambio = {
   /** v3 (28-sep): `tier` (A, B, C, Cíclica, Especulativa, F) y `tipo` (sector, p. ej. Tecnología) como campos propios. Tier F saca el ticker. */
   /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
   DESC_MAX: 120, NOTA_MAX: 300,
+  /** tesis completa por empresa (21-oct, Facu: "qué hace, de quién depende, competidores, FODA"). La escribe Claude y llega por
+   *  "Cargar actualizaciones" en `alertas.TICKER.tesis`; se ve en la pestaña Tesis de la ficha. Listas de hasta 8 textos de hasta 400. */
+  TESIS_LISTA: 8, TESIS_TXT: 400,
+  normTesis(x) {
+    if (x == null || typeof x !== 'object' || Array.isArray(x)) return null;
+    const s = v => v == null ? null : (String(v).trim().slice(0, Intercambio.TESIS_TXT) || null);
+    const l = v => (Array.isArray(v) ? v : v == null ? [] : [v]).map(s).filter(Boolean).slice(0, Intercambio.TESIS_LISTA);
+    const f = x.foda && typeof x.foda === 'object' ? x.foda : {};
+    const t = { act: /^\d{4}-\d{2}-\d{2}$/.test(String(x.act || '')) ? String(x.act) : D.today(), hace: s(x.hace), gana: s(x.gana), depende: l(x.depende), competidores: l(x.competidores),
+      foda: { f: l(f.f), o: l(f.o), d: l(f.d), a: l(f.a) }, mirar: l(x.mirar), vender: l(x.vender), valuacion: s(x.valuacion) };
+    const vacia = !t.hace && !t.gana && !t.valuacion && !t.depende.length && !t.competidores.length && !t.mirar.length && !t.vender.length && !Object.values(t.foda).some(a => a.length);
+    return vacia ? null : t;
+  },
+  /** la tesis en texto plano, para el export (Claude la lee y la mantiene) */
+  tesisTexto(tk, t) {
+    const L = [`### ${tk} (tesis al ${t.act})`]; const li = (k, a) => { if (a && a.length) L.push(`- **${k}:** ${a.join(' · ')}`); };
+    if (t.hace) L.push(`- **Qué hace:** ${t.hace}`); if (t.gana) L.push(`- **Cómo gana plata:** ${t.gana}`);
+    li('Depende de', t.depende); li('Competidores', t.competidores);
+    li('Fortalezas', t.foda.f); li('Oportunidades', t.foda.o); li('Debilidades', t.foda.d); li('Amenazas', t.foda.a);
+    if (t.valuacion) L.push(`- **Valuación:** ${t.valuacion}`); li('Qué mirar en cada balance', t.mirar); li('Cuándo vendo', t.vender);
+    return L.join('\n');
+  },
+  /** la alerta sin la tesis (el JSON del export no la repite: va legible en su seccion) */
+  sinTesis(a) { if (!a || !a.tesis) return a || null; const { tesis, ...r } = a; return r; },
   partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
   nombreArchivo() { const d = new Date(); return `cartera-${D.today()}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`; },
   /** Markdown legible (tablas) + bloque JSON exacto + instrucciones y esquema de respuesta */
@@ -1050,12 +1095,14 @@ const Intercambio = {
       resumen: { valorUSD: k.valor, valorTotalUSD: valorTot != null ? +valorTot.toFixed(2) : null, realizadoCerradasUSD: +realCerr.toFixed(2), realizadoVentasParcialesUSD: +realParc.toFixed(2), twrDiario: twrR, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
       riesgo: Object.fromEntries([['anio', 'YTD'], ['inicio', 'Todo']].map(([m]) => [m, k.ventanas[m] && k.ventanas[m].disponible ? Hist.riesgo(k, k.ventanas[m].desde) : null])),
       rendimiento: Object.fromEntries(E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
-      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
-      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
+      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: Intercambio.sinTesis(p.alerta) })),
+      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: Intercambio.sinTesis(p.alerta) })),
       ventasParciales: parciales.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), ventas: ventasDe(p.ticker) })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
     const c = ctxPartes(pendientes);
+    const conTz = [...k.posiciones, ...k.watch].filter(p => p.alerta && p.alerta.tesis);
+    const tesisFull = conTz.length ? `## Tesis completas (pestaña Tesis de la ficha)\n${conTz.map(p => Intercambio.tesisTexto(p.ticker + (p.acciones ? '' : ' (watchlist)'), p.alerta.tesis)).join('\n\n')}\n\nSin tesis todavía: ${k.posiciones.filter(p => !(p.alerta && p.alerta.tesis)).map(p => p.ticker).join(', ') || 'ninguna posición'}.` : '';
     const tesis = [...k.posiciones, ...k.watch].filter(p => p.alerta && (p.alerta.desc || p.alerta.nota)).map(p => `- **${p.ticker}**${p.acciones ? '' : ' (watchlist)'} \u2014 ${p.alerta.desc ? esc(p.alerta.desc) + ' ' : ''}${p.alerta.nota ? `_${esc(p.alerta.nota)}_` : ''}`).join('\n');
     const md = `# Cartera y mercado de ${esc(s.nombre || 'mi cartera')} \u2014 ${c.cuando}
 
@@ -1080,7 +1127,7 @@ ${c.tablaPx}
 
 ## Qu\u00e9 hace cada una y mi tesis
 ${tesis || '\u2014'}
-
+${tesisFull ? '\n' + tesisFull + '\n' : ''}
 ${c.tablaF}
 
 ${c.tablaF2}
@@ -1136,7 +1183,7 @@ Sos mi asesor de inversiones (perfil: largo plazo, calidad a buen precio, Buffet
   },
   "comentario": "resumen en una línea de lo que cambiaste y por qué" }
 \`\`\`
-Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); opcional \`tesis\` = tesis completa para la pestaña Tesis de la ficha: \`{ "act": "AAAA-MM-DD", "hace": "…", "gana": "cómo gana plata", "depende": ["…"], "competidores": ["…"], "foda": { "f": ["…"], "o": ["…"], "d": ["…"], "a": ["…"] }, "valuacion": "…", "mirar": ["qué mirar en cada balance"], "vender": ["cuándo vendo"] }\` (listas de hasta 8 textos de hasta 400 caracteres; si la mandás, reemplaza la anterior entera; \`null\` la borra; no la mandes si no cambia); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
 `;
     return md;
   },
@@ -1167,12 +1214,13 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
       if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
       const num = x => x == null || x === '' ? null : (Number(x) || null);
       const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) , tier: 'tier' in v ? (Tier.norm(v.tier) || null) : (antes ? antes.tier || null : null), tipo: 'tipo' in v ? (v.tipo ? String(v.tipo).slice(0, 40) : null) : (antes ? antes.tipo || null : null) };
+      { const tz = 'tesis' in v ? Intercambio.normTesis(v.tesis) : (antes ? antes.tesis || null : null); if (tz) despues.tesis = tz; }
       // nota vieja con " | " (qué hace | tesis): se parte; el desc explícito manda
       if ('nota' in v && despues.nota && despues.nota.includes(' | ')) { const pt = Intercambio.partirNota(despues.nota); despues.nota = pt.nota; if (!('desc' in v)) despues.desc = pt.desc || despues.desc; }
       if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
       // tier F = no invertible: chau de la watchlist (Facu). Si la tenes en cartera, solo se avisa
       if (despues.tier === 'F') { if (tengo.has(ticker)) avisos.push(`${ticker}: tier F pero est\u00e1 en tu cartera; queda.`); else { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; } }
-      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null));
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null)) && JSON.stringify(antes.tesis || null) === JSON.stringify(despues.tesis || null);
       if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
     }
     return { cambios, avisos, comentario: obj.comentario || '' };
@@ -1563,7 +1611,7 @@ function formImportar() {
       const out = $('#import-out');
       if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
       Intercambio._pendiente = d;
-      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
+      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.tesis ? ` · tesis al ${Pend.fecha(a.tesis.act)}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
       out.innerHTML = `<div class="stack">${d.comentario ? `<div class="callout" style="font-size:13px"><b>Claude:</b> ${esc(d.comentario)}</div>` : ''}
         ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
         ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
