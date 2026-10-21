@@ -609,25 +609,6 @@ function formOpCalc() {
  * Cabecera (ticker, precio, que hace en una linea, 52W), botones de accion y tres pestañas:
  * Fundamentals (bloques con su historico) · Mi posicion · Alertas. Las tres se dibujan siempre (los campos de
  * Alertas tienen que existir para Guardar) y la pestaña se cambia sin re-dibujar (#modal[data-ftab]). */
-/** Pestaña Tesis de la ficha: lo que escribe Claude (alertas[t].tesis). Solo lectura: se cambia por "Cargar actualizaciones". */
-function tesisHTML(t) {
-  const al = state.cartera.alertas[t] || {}; const z = al.tesis;
-  if (!z) return `<div class="fs"><div class="n" style="padding:6px 0 2px">Todavía no hay tesis para ${esc(t)}. Pedísela a Claude: llega en el mismo JSON de "Cargar actualizaciones" y queda acá.</div></div>`;
-  const ul = a => `<ul class="tz-l">${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
-  const sec = (tit, html) => html ? `<div class="fs"><div class="fs-t">${tit}</div>${html}</div>` : '';
-  const p = x => x ? `<p class="tz-p">${esc(x)}</p>` : '';
-  const cel = (tit, dot, a) => `<div class="tz-c"><div class="tz-h"><span class="dot ${dot}"></span>${tit}</div>${a.length ? ul(a) : '<div class="n">\u2014</div>'}</div>`;
-  const f = z.foda || {};
-  const foda = (f.f || []).length + (f.o || []).length + (f.d || []).length + (f.a || []).length ? `<div class="tz-foda">${cel('Fortalezas', 'good', f.f || [])}${cel('Oportunidades', 'info', f.o || [])}${cel('Debilidades', 'warn', f.d || [])}${cel('Amenazas', 'crit', f.a || [])}</div>` : '';
-  return sec('Qu\u00e9 hace', p(z.hace) + (z.gana ? `<p class="tz-p soft">${esc(z.gana)}</p>` : ''))
-    + sec('De qui\u00e9n depende', (z.depende || []).length ? ul(z.depende) : '')
-    + sec('Competidores', (z.competidores || []).length ? ul(z.competidores) : '')
-    + sec('FODA', foda)
-    + sec('Valuaci\u00f3n', p(z.valuacion))
-    + sec('Qu\u00e9 mirar en cada balance', (z.mirar || []).length ? ul(z.mirar) : '')
-    + sec('Cu\u00e1ndo vendo', (z.vender || []).length ? ul(z.vender) : '')
-    + `<div class="n" style="margin-top:16px">Tesis al ${D.fmt(z.act, { year: true })} \u00b7 la escribe Claude y se actualiza con "Cargar actualizaciones".</div>`;
-}
 function fundHTML(t, pos) {
   const precio = pos && pos.precio != null ? pos.precio : null;
   const d = Fund.de(t);
@@ -660,7 +641,7 @@ function fundHTML(t, pos) {
   const tieneAcc = pos && pos.acciones;
   const acciones = `<div class="acts"><button type="button" class="a p" data-act="op-para" data-id="${esc(t)}|compra">+ Comprar</button>${tieneAcc ? `<button type="button" class="a" data-act="op-para" data-id="${esc(t)}|venta">Vender</button><button type="button" class="a" data-act="op-para" data-id="${esc(t)}|dividendo">Dividendo</button>` : ''}<button type="button" class="a" data-act="comparar" data-id="${esc(t)}">Comparar</button></div>`;
   const tab = ui.fichaTab || 'fund';
-  const tabs = `<div class="seg3 c4">${[['fund', 'Fundamentals'], ['tes', 'Tesis'], ['pos', 'Mi posici\u00f3n'], ['al', 'Alertas']].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg3 n4">${[['fund', 'Datos'], ['pos', 'Posici\u00f3n'], ['al', 'Alertas'], ['tes', `Tesis${Tesis.de(t) ? '' : ' +'}`]].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
 
   let pane;
   if (!d) pane = `<div class="n" style="padding:14px 0">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes para ver los fundamentales.'}</div>`;
@@ -795,17 +776,19 @@ function formPosicion(ticker) {
     ${F.field('Qu\u00e9 hace', F.input('a-desc', al.desc || '', 'maxlength="120" placeholder="una l\u00ednea, fija"'))}
     ${F.field('Tesis / nota', `<textarea class="input" id="a-nota" rows="3" placeholder="tier \u00b7 por qu\u00e9 la ten\u00e9s, qu\u00e9 mirar">${esc(al.nota || '')}</textarea>`)}
     ${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>`;
-  const body = `${fundHTML(ticker, p)}<div class="fp fp-tes">${tesisHTML(ticker)}</div><div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
+  const body = `${fundHTML(ticker, p)}<div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div><div class="fp fp-tes" id="tes-box">${Tesis.html(ticker)}</div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
-    const prev = state.cartera.alertas[ticker] || {};
-    // la tesis no se edita en este form (la escribe Claude): se conserva siempre
-    if (!mirala && !urgente && !objetivo && !nota && !desc && !prev.tesis) { delete state.cartera.alertas[ticker]; } else { state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}), ...(prev.tesis ? { tesis: prev.tesis } : {}) }; }
+    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else { const prev = state.cartera.alertas[ticker] || {}; state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}) }; }
     Persist.save(); toast('Guardado'); render();
   } });
   $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
   if (noSigue) { const q = state.cartera.precios[ticker]; if (!(q && q.c) || Date.now() - (q.t || 0) > 3600000) { (async () => { try { await Precios.quote(ticker); } catch (e) {} fundRefrescar(ticker, E.cartera().una(ticker)); })(); return; } }
   fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atras
+}
+function formTesisPegar(t) {
+  Modal.open({ title: `Tesis de ${t}`, submit: 'Guardar tesis', body: `<p class="muted small" style="margin:0 0 10px">Pegá la respuesta del chat de Inversiones (el bloque JSON con "tesis"). Si ya había una, la reemplaza.</p><textarea class="input textarea" id="tes-txt" rows="10" placeholder="Pegá acá"></textarea>`,
+    onSubmit() { const x = Tesis.leer(Modal.val('tes-txt'), t); if (!x) { toast('No encontré una tesis en lo que pegaste'); return false; } Tesis.box()[t] = x; Persist.save(); toast('Tesis guardada'); ui.fichaTab = 'tes'; formPosicion(t); return false; } });
 }
 /* ---------- COMPARAR EMPRESAS ----------
  * Hasta tres tickers de la cartera o la watchlist, las mismas metricas que la ficha, una al lado de la otra.
@@ -1039,41 +1022,60 @@ function exportCompacto() {
   if (hs.length) L.push('HISTORIA ANUAL DE LA CARTERA (USD millones, EPS diluido)', ...hs, '');
   // operaciones
   L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
+  { const ts = Object.keys(state.cartera.tesis || {}).sort(); if (ts.length) { L.push('', 'MIS TESIS (cuando vender y que mirar; la tesis completa esta en la app)'); for (const t of ts) L.push('- ' + Tesis.resumen(t)); } }
   { const ps = (Array.isArray(state.pendientes) ? state.pendientes : []).filter(p => !p.hecho); if (ps.length) { L.push('', 'MIS PENDIENTES (lista que Facu edita en la app; no esta hecho)'); for (const p of ps) L.push(`- [${p.desde ? (p.desde <= D.today() ? 'para hacer' : 'desde ' + p.desde) : (p.cuando || 'para hacer')}] ${p.texto}${p.detalle ? ' -- ' + p.detalle : ''}`); } }
   L.push('', 'Notas: fwd = lo que esperan los analistas (Alpha Vantage): P/E con la ganancia esperada de los proximos 12 meses (ajustada, no contable), PEG = ese P/E / crecimiento esperado del EPS, gEPS/gVtas = crecimiento esperado el proximo ejercicio, rev90 = cuanto subio o bajo la estimacion en 90 dias, n = analistas, Nd = dias desde que se bajo. P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
   return L.join('\n');
 }
 
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
+/* ---------- Tesis por ticker (Facu, 21-oct): la arma el chat de Inversiones y se carga como JSON.
+ * Va en state.cartera.tesis[T], aparte de las alertas, asi guardar zonas o quitar una alerta no la borra. */
+const Tesis = {
+  SECC: [['hace', 'Qué hace'], ['gana', 'Cómo gana plata'], ['depende', 'De quién depende'], ['competidores', 'Competidores'], ['foda', 'FODA'], ['valuacion', 'Valuación'], ['mirar', 'Qué mirar en cada balance'], ['vender', 'Cuándo vender']],
+  box() { if (!state.cartera.tesis) state.cartera.tesis = {}; return state.cartera.tesis; },
+  de(t) { return Tesis.box()[t] || null; },
+  /** limpia lo que llega: textos y listas cortas; claves desconocidas se guardan igual (si son texto o lista) */
+  limpiar(x) {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+    const txt = v => v == null ? null : String(v).trim().slice(0, 2500) || null;
+    const lista = v => (Array.isArray(v) ? v : v == null ? [] : [v]).map(e => String(e).trim().slice(0, 500)).filter(Boolean).slice(0, 20);
+    const o = { act: /^\d{4}-\d{2}-\d{2}$/.test(String(x.act || '')) ? x.act : D.today() };
+    for (const [k, v] of Object.entries(x)) {
+      if (k === 'act') continue;
+      if (k === 'foda') { if (v && typeof v === 'object') { const f = {}; for (const q of ['f', 'o', 'd', 'a']) { const l = lista(v[q]); if (l.length) f[q] = l; } if (Object.keys(f).length) o.foda = f; } continue; }
+      if (Array.isArray(v)) { const l = lista(v); if (l.length) o[k.slice(0, 40)] = l; } else if (typeof v === 'string' || typeof v === 'number') { const t = txt(v); if (t) o[k.slice(0, 40)] = t; }
+    }
+    return Object.keys(o).length > 1 ? o : null;
+  },
+  /** de un texto pegado: el JSON de cambios (toma la tesis del ticker) o la tesis sola */
+  leer(texto, t) {
+    let obj = null;
+    try { obj = Intercambio.parsear(texto); } catch (e) {}
+    if (obj && obj.alertas) { const k = Object.keys(obj.alertas).find(x => x.toUpperCase() === t.toUpperCase()) || (Object.keys(obj.alertas).length === 1 ? Object.keys(obj.alertas)[0] : null); const v = k && obj.alertas[k]; return v && v.tesis ? Tesis.limpiar(v.tesis) : null; }
+    const i = String(texto || '').indexOf('{'); if (i < 0) return null;
+    let d = 0; for (let j = i; j < texto.length; j++) { if (texto[j] === '{') d++; else if (texto[j] === '}') { d--; if (d === 0) { try { const o = JSON.parse(texto.slice(i, j + 1)); return Tesis.limpiar(o.tesis || o); } catch (e) { return null; } } } }
+    return null;
+  },
+  html(t) {
+    const x = Tesis.de(t);
+    const btns = `<div class="row tes-acts"><button type="button" class="btn sm" data-act="tesis-pegar" data-id="${esc(t)}">${ICONS.copy} ${x ? 'Reemplazar' : 'Pegar tesis'}</button>${x ? `<button type="button" class="btn sm ghost danger" data-act="tesis-borrar" data-id="${esc(t)}">Borrar</button>` : ''}</div>`;
+    if (!x) return `<div class="fs tes"><p class="muted small" style="margin:12px 0">Todavía no hay tesis de ${esc(t)}. Pedile a Claude en el chat de Inversiones "armame la tesis de ${esc(t)}" y pegá acá lo que te devuelva (el bloque JSON).</p>${btns}</div>`;
+    const lst = l => `<ul>${l.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
+    const sec = (k, tit) => { const v = x[k]; if (v == null) return ''; if (k === 'foda') { const q = [['f', 'Fortalezas', 'pos'], ['o', 'Oportunidades', 'acc'], ['d', 'Debilidades', 'warn'], ['a', 'Amenazas', 'neg']]; return `<div class="tes-s"><div class="tes-t">${tit}</div><div class="tes-foda">${q.filter(([c]) => v[c]).map(([c, n, cls]) => `<div class="${cls}"><b>${n}</b>${lst(v[c])}</div>`).join('')}</div></div>`; } return `<div class="tes-s"><div class="tes-t">${tit}</div>${Array.isArray(v) ? lst(v) : `<p>${esc(v)}</p>`}</div>`; };
+    const conocidas = new Set(Tesis.SECC.map(([k]) => k).concat('act'));
+    const extra = Object.keys(x).filter(k => !conocidas.has(k)).map(k => sec(k, esc(k)));
+    return `<div class="fs tes"><div class="tes-act">Actualizada el ${D.fmt(x.act, { year: true })}${(Date.now() - D.parse(x.act)) / 86400000 > 120 ? ' · <span class="warn-text">tiene más de 4 meses: revisala</span>' : ''}</div>${Tesis.SECC.map(([k, n]) => sec(k, n)).join('')}${extra.join('')}${btns}</div>`;
+  },
+  /** para el archivo de Claude: lo que decide (vender y mirar), en una linea */
+  resumen(t) { const x = Tesis.de(t); if (!x) return ''; const c = l => (l || []).join('; '); return `${t} (tesis ${x.act}): vender si: ${c(x.vender) || '-'} | mirar: ${c(x.mirar) || '-'}`; },
+};
+
 const Intercambio = {
   FORMATO: 'gestor-gastos-cambios', VERSION: 3,
   /** v3 (28-sep): `tier` (A, B, C, Cíclica, Especulativa, F) y `tipo` (sector, p. ej. Tecnología) como campos propios. Tier F saca el ticker. */
   /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
   DESC_MAX: 120, NOTA_MAX: 300,
-  /** tesis completa por empresa (21-oct, Facu: "qué hace, de quién depende, competidores, FODA"). La escribe Claude y llega por
-   *  "Cargar actualizaciones" en `alertas.TICKER.tesis`; se ve en la pestaña Tesis de la ficha. Listas de hasta 8 textos de hasta 400. */
-  TESIS_LISTA: 8, TESIS_TXT: 400,
-  normTesis(x) {
-    if (x == null || typeof x !== 'object' || Array.isArray(x)) return null;
-    const s = v => v == null ? null : (String(v).trim().slice(0, Intercambio.TESIS_TXT) || null);
-    const l = v => (Array.isArray(v) ? v : v == null ? [] : [v]).map(s).filter(Boolean).slice(0, Intercambio.TESIS_LISTA);
-    const f = x.foda && typeof x.foda === 'object' ? x.foda : {};
-    const t = { act: /^\d{4}-\d{2}-\d{2}$/.test(String(x.act || '')) ? String(x.act) : D.today(), hace: s(x.hace), gana: s(x.gana), depende: l(x.depende), competidores: l(x.competidores),
-      foda: { f: l(f.f), o: l(f.o), d: l(f.d), a: l(f.a) }, mirar: l(x.mirar), vender: l(x.vender), valuacion: s(x.valuacion) };
-    const vacia = !t.hace && !t.gana && !t.valuacion && !t.depende.length && !t.competidores.length && !t.mirar.length && !t.vender.length && !Object.values(t.foda).some(a => a.length);
-    return vacia ? null : t;
-  },
-  /** la tesis en texto plano, para el export (Claude la lee y la mantiene) */
-  tesisTexto(tk, t) {
-    const L = [`### ${tk} (tesis al ${t.act})`]; const li = (k, a) => { if (a && a.length) L.push(`- **${k}:** ${a.join(' · ')}`); };
-    if (t.hace) L.push(`- **Qué hace:** ${t.hace}`); if (t.gana) L.push(`- **Cómo gana plata:** ${t.gana}`);
-    li('Depende de', t.depende); li('Competidores', t.competidores);
-    li('Fortalezas', t.foda.f); li('Oportunidades', t.foda.o); li('Debilidades', t.foda.d); li('Amenazas', t.foda.a);
-    if (t.valuacion) L.push(`- **Valuación:** ${t.valuacion}`); li('Qué mirar en cada balance', t.mirar); li('Cuándo vendo', t.vender);
-    return L.join('\n');
-  },
-  /** la alerta sin la tesis (el JSON del export no la repite: va legible en su seccion) */
-  sinTesis(a) { if (!a || !a.tesis) return a || null; const { tesis, ...r } = a; return r; },
   partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
   nombreArchivo() { const d = new Date(); return `cartera-${D.today()}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`; },
   /** Markdown legible (tablas) + bloque JSON exacto + instrucciones y esquema de respuesta */
@@ -1095,14 +1097,12 @@ const Intercambio = {
       resumen: { valorUSD: k.valor, valorTotalUSD: valorTot != null ? +valorTot.toFixed(2) : null, realizadoCerradasUSD: +realCerr.toFixed(2), realizadoVentasParcialesUSD: +realParc.toFixed(2), twrDiario: twrR, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
       riesgo: Object.fromEntries([['anio', 'YTD'], ['inicio', 'Todo']].map(([m]) => [m, k.ventanas[m] && k.ventanas[m].disponible ? Hist.riesgo(k, k.ventanas[m].desde) : null])),
       rendimiento: Object.fromEntries(E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
-      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: Intercambio.sinTesis(p.alerta) })),
-      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: Intercambio.sinTesis(p.alerta) })),
+      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
+      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
       ventasParciales: parciales.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), ventas: ventasDe(p.ticker) })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
     const c = ctxPartes(pendientes);
-    const conTz = [...k.posiciones, ...k.watch].filter(p => p.alerta && p.alerta.tesis);
-    const tesisFull = conTz.length ? `## Tesis completas (pestaña Tesis de la ficha)\n${conTz.map(p => Intercambio.tesisTexto(p.ticker + (p.acciones ? '' : ' (watchlist)'), p.alerta.tesis)).join('\n\n')}\n\nSin tesis todavía: ${k.posiciones.filter(p => !(p.alerta && p.alerta.tesis)).map(p => p.ticker).join(', ') || 'ninguna posición'}.` : '';
     const tesis = [...k.posiciones, ...k.watch].filter(p => p.alerta && (p.alerta.desc || p.alerta.nota)).map(p => `- **${p.ticker}**${p.acciones ? '' : ' (watchlist)'} \u2014 ${p.alerta.desc ? esc(p.alerta.desc) + ' ' : ''}${p.alerta.nota ? `_${esc(p.alerta.nota)}_` : ''}`).join('\n');
     const md = `# Cartera y mercado de ${esc(s.nombre || 'mi cartera')} \u2014 ${c.cuando}
 
@@ -1127,7 +1127,7 @@ ${c.tablaPx}
 
 ## Qu\u00e9 hace cada una y mi tesis
 ${tesis || '\u2014'}
-${tesisFull ? '\n' + tesisFull + '\n' : ''}
+
 ${c.tablaF}
 
 ${c.tablaF2}
@@ -1183,7 +1183,9 @@ Sos mi asesor de inversiones (perfil: largo plazo, calidad a buen precio, Buffet
   },
   "comentario": "resumen en una línea de lo que cambiaste y por qué" }
 \`\`\`
-Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); opcional \`tesis\` = tesis completa para la pestaña Tesis de la ficha: \`{ "act": "AAAA-MM-DD", "hace": "…", "gana": "cómo gana plata", "depende": ["…"], "competidores": ["…"], "foda": { "f": ["…"], "o": ["…"], "d": ["…"], "a": ["…"] }, "valuacion": "…", "mirar": ["qué mirar en cada balance"], "vender": ["cuándo vendo"] }\` (listas de hasta 8 textos de hasta 400 caracteres; si la mandás, reemplaza la anterior entera; \`null\` la borra; no la mandes si no cambia); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+
+**Tesis completa de una empresa** (si te la pido): dentro del ticker mandá \`"tesis": { "act": "AAAA-MM-DD", "hace": "…", "gana": "…", "depende": ["…"], "competidores": ["…"], "foda": { "f": ["…"], "o": ["…"], "d": ["…"], "a": ["…"] }, "valuacion": "…", "mirar": ["…"], "vender": ["…"] }\`. Un ticker que trae solo \`tesis\` no cambia sus zonas; \`"tesis": null\` la borra. La app la muestra en la pestaña Tesis de la ficha.
 `;
     return md;
   },
@@ -1212,21 +1214,22 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
       const antes = cur[ticker] || null;
       if (v === null) { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; }
       if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
+      if ('tesis' in v) { if (v.tesis === null) { if (Tesis.de(ticker)) cambios.push({ ticker, tipo: 'tesis', tesis: null }); } else { const ts = Tesis.limpiar(v.tesis); if (ts) cambios.push({ ticker, tipo: 'tesis', tesis: ts }); else avisos.push(`${ticker}: la tesis vino vac\u00eda o con otro formato, se ignora.`); } }
+      if (Object.keys(v).every(x => x === 'tesis')) continue;  // solo tesis: las zonas no se tocan
       const num = x => x == null || x === '' ? null : (Number(x) || null);
       const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) , tier: 'tier' in v ? (Tier.norm(v.tier) || null) : (antes ? antes.tier || null : null), tipo: 'tipo' in v ? (v.tipo ? String(v.tipo).slice(0, 40) : null) : (antes ? antes.tipo || null : null) };
-      { const tz = 'tesis' in v ? Intercambio.normTesis(v.tesis) : (antes ? antes.tesis || null : null); if (tz) despues.tesis = tz; }
       // nota vieja con " | " (qué hace | tesis): se parte; el desc explícito manda
       if ('nota' in v && despues.nota && despues.nota.includes(' | ')) { const pt = Intercambio.partirNota(despues.nota); despues.nota = pt.nota; if (!('desc' in v)) despues.desc = pt.desc || despues.desc; }
       if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
       // tier F = no invertible: chau de la watchlist (Facu). Si la tenes en cartera, solo se avisa
       if (despues.tier === 'F') { if (tengo.has(ticker)) avisos.push(`${ticker}: tier F pero est\u00e1 en tu cartera; queda.`); else { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; } }
-      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null)) && JSON.stringify(antes.tesis || null) === JSON.stringify(despues.tesis || null);
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null));
       if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
     }
     return { cambios, avisos, comentario: obj.comentario || '' };
   },
   aplicar(d) {
-    for (const c of d.cambios) { if (c.tipo === 'quitar') delete state.cartera.alertas[c.ticker]; else state.cartera.alertas[c.ticker] = c.despues; }
+    for (const c of d.cambios) { if (c.tipo === 'tesis') { if (c.tesis) Tesis.box()[c.ticker] = c.tesis; else delete Tesis.box()[c.ticker]; } else if (c.tipo === 'quitar') delete state.cartera.alertas[c.ticker]; else state.cartera.alertas[c.ticker] = c.despues; }
     Persist.save();
   },
 };
@@ -1611,9 +1614,9 @@ function formImportar() {
       const out = $('#import-out');
       if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
       Intercambio._pendiente = d;
-      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.tesis ? ` · tesis al ${Pend.fecha(a.tesis.act)}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
+      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
       out.innerHTML = `<div class="stack">${d.comentario ? `<div class="callout" style="font-size:13px"><b>Claude:</b> ${esc(d.comentario)}</div>` : ''}
-        ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
+        ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'tesis' ? (c.tesis ? (Tesis.de(c.ticker) ? 'tesis nueva versi\u00f3n' : 'tesis') : 'borrar tesis') : c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo === 'tesis' ? (c.tesis ? `<span class="sub small">${Tesis.SECC.filter(([k]) => c.tesis[k]).map(([, n]) => n).join(' \u00b7 ')} \u00b7 al ${esc(c.tesis.act)}</span>` : '') : c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes && c.tipo !== 'tesis' ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
         ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
         <button type="button" class="btn primary" data-act="import-apply">Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}</button></div>`;
       const sb = $('#modal [data-act="submit"]'); if (sb) sb.textContent = `Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}`;

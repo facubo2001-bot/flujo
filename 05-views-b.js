@@ -364,17 +364,41 @@ function viewCartera() {
   </div>`;
   // alertas: una vista compacta, sin scroll horizontal
   const conAlerta = [...k.posiciones.filter(p => p.alerta), ...k.watch];
+  // fila compacta (Facu, 21-oct): ticker · tier · balance | zona; que hace en un renglon; barra de precios con zonas,
+  // precio de hoy, distancia a la proxima zona mas baja y al objetivo
   const alRow = p => {
-    const al = p.alerta; const pr = p.precio;
-    const dist = (niv) => pr && niv ? (pr - niv) / pr : null;
-    const dM = dist(al.mirala), dU = dist(al.urgente);
-    const cerca = dM != null ? clamp(1 - Math.max(0, dM) / 0.25, 0, 1) : 0;
-    const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>comprá urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : dM != null ? `<span class="pill neutral">a ${M.pct(dM, 1)}</span>` : '<span class="pill neutral">sin precio</span>';
-    return `<div class="al-row" data-alerta="${esc(p.ticker)}">
-      <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : Precios.sinFuente(p.ticker) ? 'sin fuente de precio' : 'sin precio'}${Tier.de(p.ticker) ? ` \u00b7 tier ${Tier.de(p.ticker)}` : ''}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
+    const al = p.alerta; const pr = p.precio; const t = p.ticker;
+    const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : '';
+    const tier = Tier.de(t); const b = Fund.balance(t);
+    const bal = b ? `<span class="al-bal${b.dias <= 14 ? ' ojo' : ''}">balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : D.fmt(b.fecha)}</span>` : '';
+    const num = v => fmtUSD2.format(v).replace(',00', '');
+    const pcA = v => `${Math.abs(v * 100).toLocaleString('es-AR', { maximumFractionDigits: Math.abs(v) < 0.1 ? 1 : 0 })} %`;
+    const urg = al.urgente || null, mir = al.mirala || null, obj = p.objetivo || null;
+    let barra = '';
+    const piso = urg || mir;
+    if (piso) {
+      const lo = Math.min(piso, pr || piso) * 0.88, hi = Math.max(obj || 0, pr || 0, mir || 0, piso) * 1.08;
+      const X = v => clamp((v - lo) / (hi - lo) * 100, 0, 100);
+      const segs = (urg ? `<i class="z crit" style="width:${X(urg).toFixed(1)}%"></i>` : '') + (mir && (!urg || mir > urg) ? `<i class="z warn" style="left:${(urg ? X(urg) : 0).toFixed(1)}%;width:${(X(mir) - (urg ? X(urg) : 0)).toFixed(1)}%"></i>` : '');
+      // proxima zona mas baja: la que todavia no toco el precio
+      const prox = !pr ? null : p.estado === 'urgente' ? null : p.estado === 'mirala' ? (urg && urg < mir ? 'urg' : null) : (mir ? 'mir' : 'urg');
+      const labs = [];
+      if (urg) labs.push({ x: X(urg), pri: prox === 'urg' ? 3 : 1, cls: prox === 'urg' ? 'nx' : '', txt: num(urg) + (prox === 'urg' ? ` · −${pcA((pr - urg) / pr)}` : '') });
+      if (mir && (!urg || mir > urg)) labs.push({ x: X(mir), pri: prox === 'mir' ? 3 : 1, cls: prox === 'mir' ? 'nx' : '', txt: num(mir) + (prox === 'mir' ? ` · −${pcA((pr - mir) / pr)}` : '') });
+      if (p.estado === 'urgente' && urg) { const l = labs.find(x => x.x === X(urg)); if (l) { l.pri = 3; l.cls = 'nx crit'; l.txt = `${num(urg)} · ${pcA((urg - pr) / urg)} abajo`; } }
+      if (obj && pr) labs.push({ x: X(obj), pri: 2, cls: 'ob', txt: `${num(obj)} · ${obj >= pr ? '+' : '−'}${pcA(obj / pr - 1)}` });
+      // que no se pisen: ancho estimado sobre ~330 px; si choca, queda la de mas prioridad
+      const W = l => l.txt.length * 6.3 / 330 * 100;
+      labs.forEach(l => { const w = W(l); l.c = clamp(l.x, w / 2, 100 - w / 2); });
+      const vis = []; labs.slice().sort((a, b) => b.pri - a.pri).forEach(l => { if (!vis.some(v => Math.abs(v.c - l.c) < (W(v) + W(l)) / 2 + 1.5)) vis.push(l); });
+      const pxL = pr ? `<span class="al-px ${p.estado || ''}" style="left:${X(pr).toFixed(1)}%"><span class="lab" style="transform:translateX(-${clamp(X(pr), 8, 92)}%)">${num(pr)}</span><em></em></span>` : '';
+      barra = `<div class="al-rg"><div class="tr">${segs}</div>${obj ? `<i class="al-obj" style="left:${X(obj).toFixed(1)}%"></i>` : ''}${pxL}</div>
+      <div class="al-tk">${vis.map(l => `<span class="${l.cls}" style="left:${l.c.toFixed(1)}%">${l.txt}</span>`).join('')}</div>`;
+    } else barra = `<div class="al-sin">${pr != null ? `hoy ${fmtU(pr)} · ` : ''}sin zona de compra</div>`;
+    return `<div class="al-row" data-alerta="${esc(t)}">
+      <div class="al-top"><div class="l"><b>${esc(t)}</b>${tier ? `<span class="al-tier">${esc(String(tier).slice(0, 4))}</span>` : ''}${bal}</div>${chip}</div>
       ${al.desc ? `<div class="al-desc">${esc(al.desc)}</div>` : ''}
-      <div class="al-bar"><i class="${p.estado === 'urgente' ? 'glow-fill crit' : p.estado === 'mirala' ? 'glow-fill warn' : ''}" style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
-      <div class="al-lv"><span><span class="dot warn"></span>${G.le} ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>${G.le} ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
+      ${pr == null && piso ? `<div class="al-sin">${Precios.sinFuente(t) ? 'sin fuente de precio' : 'sin precio'}</div>` : ''}${barra}
     </div>`;
   };
   const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));

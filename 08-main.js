@@ -148,6 +148,8 @@ const Actions = {
   'fab-gasto'() { fabMenu(false); formMov(); },
   'fab-op'() { fabMenu(false); formOp(); },
   'fab-calc'() { fabMenu(false); formCalc(); },
+  'tesis-pegar'(t) { formTesisPegar(t); },
+  'tesis-borrar'(t) { confirmar(`\u00bfBorrar la tesis de ${t}?`, () => { delete Tesis.box()[t]; Persist.save(); setTimeout(() => { ui.fichaTab = 'tes'; formPosicion(t); }, 0); }); },
   'fab-buscar'() { fabMenu(false); formComparar(null, true); },
   'fab-cal'() { fabMenu(false); formBalances(); },
   pend() { formPend(); },

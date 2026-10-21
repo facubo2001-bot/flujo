@@ -960,7 +960,7 @@ h2 .i-btn{vertical-align:3px}
 
 /* ===== Ficha de empresa ===== */
 #modal.ficha .fp{display:none}
-#modal.ficha[data-ftab="fund"] .fp-fund,#modal.ficha[data-ftab="tes"] .fp-tes,#modal.ficha[data-ftab="pos"] .fp-pos,#modal.ficha[data-ftab="al"] .fp-al{display:block}
+#modal.ficha[data-ftab="fund"] .fp-fund,#modal.ficha[data-ftab="pos"] .fp-pos,#modal.ficha[data-ftab="al"] .fp-al,#modal.ficha[data-ftab="tes"] .fp-tes{display:block}
 .fh2{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .fh2 .tk{font-family:var(--font-display);font-size:30px;font-weight:900;letter-spacing:-.03em;display:flex;align-items:center;gap:8px;line-height:1.1}
 .fh2 .tk .pz-dot{width:9px;height:9px}
@@ -1253,21 +1253,44 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .cmp-hint{height:auto;min-height:20px}
 #modal.cmp-modal .m-body{overflow:visible}  /* con overflow-x:hidden el m-body se vuelve contenedor de scroll y la cabecera no se pega */
 
-/* ficha: pestaña Tesis (21-oct) */
-.seg3.c4{grid-template-columns:repeat(4,1fr)}
-.seg3.c4 button{font-size:12px;padding:8px 0;letter-spacing:-.01em}
-.tz-p{margin:0;font-size:14px;line-height:1.45;color:var(--ink)}
-.tz-p.soft{margin-top:6px;font-size:13px;color:var(--ink-2)}
-.tz-l{margin:0;padding:0;list-style:none}
-.tz-l li{position:relative;padding:6px 0 6px 14px;font-size:13.5px;line-height:1.4;color:var(--ink);border-top:1px solid var(--line)}
-.tz-l li:first-child{border-top:0}
-.tz-l li::before{content:"";position:absolute;left:2px;top:13px;width:4px;height:4px;border-radius:50%;background:var(--ink-3)}
-.tz-foda{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.tz-c{border:1px solid var(--line);border-radius:12px;padding:10px 10px 4px;min-width:0}
-.tz-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--ink-2);margin-bottom:2px}
-.tz-c .tz-l li{font-size:12.5px;padding:5px 0 5px 12px}
-.tz-c .tz-l li::before{top:12px}
-.fp-tes .n{font-size:11.5px;color:var(--ink-3);font-weight:400;line-height:1.35}
+/* alertas compactas con barra de precios (21-oct) */
+.al-row{padding:10px 0 8px}
+.al-top .l{display:flex;align-items:baseline;gap:7px;min-width:0}
+.al-top .l b{font-size:16.5px;font-weight:900;letter-spacing:-.02em}
+.al-tier{font-size:10.5px;font-weight:800;color:var(--ink-2);border:1px solid var(--line-2);border-radius:5px;padding:0 5px;line-height:15px;align-self:center}
+.al-bal{font-size:11.5px;color:var(--ink-3);font-weight:600;white-space:nowrap}
+.al-bal.ojo{color:var(--warn);font-weight:800}
+.al-row .al-desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;margin-top:1px}
+.al-rg{position:relative;height:34px;margin-top:2px}
+.al-rg .tr{position:absolute;left:0;right:0;top:22px;height:7px;border-radius:4px;background:rgba(255,255,255,.10);overflow:hidden}
+.al-rg .z{position:absolute;top:0;bottom:0;left:0}
+.al-rg .z.crit{background:rgba(255,74,69,.78)} .al-rg .z.warn{background:rgba(255,206,33,.72)}
+.al-obj{position:absolute;top:18px;width:2px;height:15px;margin-left:-1px;background:var(--accent);border-radius:1px}
+.al-px{position:absolute;top:0;width:0}
+.al-px .lab{position:absolute;top:0;left:0;font-size:11px;font-weight:800;white-space:nowrap;background:var(--ink);color:#000;border-radius:5px;padding:0 5px;line-height:17px;font-variant-numeric:tabular-nums}
+.al-px.urgente .lab{background:var(--crit);color:#fff} .al-px.mirala .lab{background:var(--warn);color:#000}
+.al-px em{position:absolute;top:18px;left:-1.5px;width:3px;height:15px;background:var(--ink);border-radius:2px;box-shadow:0 0 0 2px var(--bg)}
+.al-tk{position:relative;height:15px;font-size:10.5px;font-weight:700;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.al-tk span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.al-tk .nx{color:var(--ink);font-weight:800} .al-tk .nx.crit{color:var(--crit)} .al-tk .ob{color:var(--accent)}
+.al-sin{font-size:12px;color:var(--ink-3);margin-top:4px}
+
+/* tesis en la ficha */
+.seg3.n4{grid-template-columns:repeat(4,1fr)}
+.seg3.n4 button{font-size:13px}
+.tes-act{font-size:12px;color:var(--ink-3);margin:12px 0 4px}
+.tes-s{margin-top:14px}
+.tes-t{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+.tes p{margin:0;font-size:14px;line-height:1.5;color:var(--ink)}
+.tes ul{margin:0;padding-left:18px;font-size:14px;line-height:1.45}
+.tes li{margin:3px 0}
+.tes-foda{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tes-foda>div{border:1px solid var(--line-2);border-radius:12px;padding:9px 10px}
+.tes-foda b{display:block;font-size:12px;margin-bottom:3px}
+.tes-foda ul{font-size:12.5px;padding-left:15px}
+.tes-foda .pos b{color:var(--good)} .tes-foda .acc b{color:var(--accent)} .tes-foda .warn b{color:var(--warn)} .tes-foda .neg b{color:var(--crit)}
+.tes-acts{gap:8px;margin:18px 0 6px}
+@media (max-width:360px){.tes-foda{grid-template-columns:1fr}}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1611,7 +1634,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610212041';
+const BUILD = '202610212053';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -5011,17 +5034,41 @@ function viewCartera() {
   </div>`;
   // alertas: una vista compacta, sin scroll horizontal
   const conAlerta = [...k.posiciones.filter(p => p.alerta), ...k.watch];
+  // fila compacta (Facu, 21-oct): ticker · tier · balance | zona; que hace en un renglon; barra de precios con zonas,
+  // precio de hoy, distancia a la proxima zona mas baja y al objetivo
   const alRow = p => {
-    const al = p.alerta; const pr = p.precio;
-    const dist = (niv) => pr && niv ? (pr - niv) / pr : null;
-    const dM = dist(al.mirala), dU = dist(al.urgente);
-    const cerca = dM != null ? clamp(1 - Math.max(0, dM) / 0.25, 0, 1) : 0;
-    const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>comprá urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : dM != null ? `<span class="pill neutral">a ${M.pct(dM, 1)}</span>` : '<span class="pill neutral">sin precio</span>';
-    return `<div class="al-row" data-alerta="${esc(p.ticker)}">
-      <div class="al-top"><div><b>${esc(p.ticker)}</b>${p.acciones ? '' : ' <span class="tag">watchlist</span>'}<span class="sub">${pr != null ? `hoy ${fmtU(pr)}` : Precios.sinFuente(p.ticker) ? 'sin fuente de precio' : 'sin precio'}${Tier.de(p.ticker) ? ` \u00b7 tier ${Tier.de(p.ticker)}` : ''}${p.objetivo ? ` · obj ${fmtUSD.format(p.objetivo)}${p.upside != null ? ` (${pctS(p.upside, 0)})` : ''}` : ''}</span></div>${chip}</div>
+    const al = p.alerta; const pr = p.precio; const t = p.ticker;
+    const chip = p.estado === 'urgente' ? '<span class="pill crit"><span class="dot"></span>urgente</span>' : p.estado === 'mirala' ? '<span class="pill warn"><span class="dot"></span>mirala</span>' : '';
+    const tier = Tier.de(t); const b = Fund.balance(t);
+    const bal = b ? `<span class="al-bal${b.dias <= 14 ? ' ojo' : ''}">balance ${b.dias === 0 ? 'hoy' : b.dias === 1 ? 'mañana' : D.fmt(b.fecha)}</span>` : '';
+    const num = v => fmtUSD2.format(v).replace(',00', '');
+    const pcA = v => `${Math.abs(v * 100).toLocaleString('es-AR', { maximumFractionDigits: Math.abs(v) < 0.1 ? 1 : 0 })} %`;
+    const urg = al.urgente || null, mir = al.mirala || null, obj = p.objetivo || null;
+    let barra = '';
+    const piso = urg || mir;
+    if (piso) {
+      const lo = Math.min(piso, pr || piso) * 0.88, hi = Math.max(obj || 0, pr || 0, mir || 0, piso) * 1.08;
+      const X = v => clamp((v - lo) / (hi - lo) * 100, 0, 100);
+      const segs = (urg ? `<i class="z crit" style="width:${X(urg).toFixed(1)}%"></i>` : '') + (mir && (!urg || mir > urg) ? `<i class="z warn" style="left:${(urg ? X(urg) : 0).toFixed(1)}%;width:${(X(mir) - (urg ? X(urg) : 0)).toFixed(1)}%"></i>` : '');
+      // proxima zona mas baja: la que todavia no toco el precio
+      const prox = !pr ? null : p.estado === 'urgente' ? null : p.estado === 'mirala' ? (urg && urg < mir ? 'urg' : null) : (mir ? 'mir' : 'urg');
+      const labs = [];
+      if (urg) labs.push({ x: X(urg), pri: prox === 'urg' ? 3 : 1, cls: prox === 'urg' ? 'nx' : '', txt: num(urg) + (prox === 'urg' ? ` · −${pcA((pr - urg) / pr)}` : '') });
+      if (mir && (!urg || mir > urg)) labs.push({ x: X(mir), pri: prox === 'mir' ? 3 : 1, cls: prox === 'mir' ? 'nx' : '', txt: num(mir) + (prox === 'mir' ? ` · −${pcA((pr - mir) / pr)}` : '') });
+      if (p.estado === 'urgente' && urg) { const l = labs.find(x => x.x === X(urg)); if (l) { l.pri = 3; l.cls = 'nx crit'; l.txt = `${num(urg)} · ${pcA((urg - pr) / urg)} abajo`; } }
+      if (obj && pr) labs.push({ x: X(obj), pri: 2, cls: 'ob', txt: `${num(obj)} · ${obj >= pr ? '+' : '−'}${pcA(obj / pr - 1)}` });
+      // que no se pisen: ancho estimado sobre ~330 px; si choca, queda la de mas prioridad
+      const W = l => l.txt.length * 6.3 / 330 * 100;
+      labs.forEach(l => { const w = W(l); l.c = clamp(l.x, w / 2, 100 - w / 2); });
+      const vis = []; labs.slice().sort((a, b) => b.pri - a.pri).forEach(l => { if (!vis.some(v => Math.abs(v.c - l.c) < (W(v) + W(l)) / 2 + 1.5)) vis.push(l); });
+      const pxL = pr ? `<span class="al-px ${p.estado || ''}" style="left:${X(pr).toFixed(1)}%"><span class="lab" style="transform:translateX(-${clamp(X(pr), 8, 92)}%)">${num(pr)}</span><em></em></span>` : '';
+      barra = `<div class="al-rg"><div class="tr">${segs}</div>${obj ? `<i class="al-obj" style="left:${X(obj).toFixed(1)}%"></i>` : ''}${pxL}</div>
+      <div class="al-tk">${vis.map(l => `<span class="${l.cls}" style="left:${l.c.toFixed(1)}%">${l.txt}</span>`).join('')}</div>`;
+    } else barra = `<div class="al-sin">${pr != null ? `hoy ${fmtU(pr)} · ` : ''}sin zona de compra</div>`;
+    return `<div class="al-row" data-alerta="${esc(t)}">
+      <div class="al-top"><div class="l"><b>${esc(t)}</b>${tier ? `<span class="al-tier">${esc(String(tier).slice(0, 4))}</span>` : ''}${bal}</div>${chip}</div>
       ${al.desc ? `<div class="al-desc">${esc(al.desc)}</div>` : ''}
-      <div class="al-bar"><i class="${p.estado === 'urgente' ? 'glow-fill crit' : p.estado === 'mirala' ? 'glow-fill warn' : ''}" style="width:${Math.round(cerca * 100)}%;background:${p.estado === 'urgente' ? 'var(--crit)' : p.estado === 'mirala' ? 'var(--warn)' : 'var(--accent)'}"></i></div>
-      <div class="al-lv"><span><span class="dot warn"></span>${G.le} ${al.mirala ? fmtUSD2.format(al.mirala).replace(',00', '') : '—'}${dM != null ? ` <small>${p.estado ? 'en zona' : '−' + M.pct(dM, 1)}</small>` : ''}</span><span><span class="dot crit"></span>${G.le} ${al.urgente ? fmtUSD2.format(al.urgente).replace(',00', '') : '—'}${dU != null ? ` <small>${p.estado === 'urgente' ? 'en zona' : '−' + M.pct(Math.max(0, dU), 1)}</small>` : ''}</span></div>
+      ${pr == null && piso ? `<div class="al-sin">${Precios.sinFuente(t) ? 'sin fuente de precio' : 'sin precio'}</div>` : ''}${barra}
     </div>`;
   };
   const ordenAl = conAlerta.slice().sort((a, b) => (a.estado === 'urgente' ? 0 : a.estado === 'mirala' ? 1 : 2) - (b.estado === 'urgente' ? 0 : b.estado === 'mirala' ? 1 : 2) || ((a.distMirala ?? 9) - (b.distMirala ?? 9)));
@@ -5947,25 +5994,6 @@ function formOpCalc() {
  * Cabecera (ticker, precio, que hace en una linea, 52W), botones de accion y tres pestañas:
  * Fundamentals (bloques con su historico) · Mi posicion · Alertas. Las tres se dibujan siempre (los campos de
  * Alertas tienen que existir para Guardar) y la pestaña se cambia sin re-dibujar (#modal[data-ftab]). */
-/** Pestaña Tesis de la ficha: lo que escribe Claude (alertas[t].tesis). Solo lectura: se cambia por "Cargar actualizaciones". */
-function tesisHTML(t) {
-  const al = state.cartera.alertas[t] || {}; const z = al.tesis;
-  if (!z) return `<div class="fs"><div class="n" style="padding:6px 0 2px">Todavía no hay tesis para ${esc(t)}. Pedísela a Claude: llega en el mismo JSON de "Cargar actualizaciones" y queda acá.</div></div>`;
-  const ul = a => `<ul class="tz-l">${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
-  const sec = (tit, html) => html ? `<div class="fs"><div class="fs-t">${tit}</div>${html}</div>` : '';
-  const p = x => x ? `<p class="tz-p">${esc(x)}</p>` : '';
-  const cel = (tit, dot, a) => `<div class="tz-c"><div class="tz-h"><span class="dot ${dot}"></span>${tit}</div>${a.length ? ul(a) : '<div class="n">\u2014</div>'}</div>`;
-  const f = z.foda || {};
-  const foda = (f.f || []).length + (f.o || []).length + (f.d || []).length + (f.a || []).length ? `<div class="tz-foda">${cel('Fortalezas', 'good', f.f || [])}${cel('Oportunidades', 'info', f.o || [])}${cel('Debilidades', 'warn', f.d || [])}${cel('Amenazas', 'crit', f.a || [])}</div>` : '';
-  return sec('Qu\u00e9 hace', p(z.hace) + (z.gana ? `<p class="tz-p soft">${esc(z.gana)}</p>` : ''))
-    + sec('De qui\u00e9n depende', (z.depende || []).length ? ul(z.depende) : '')
-    + sec('Competidores', (z.competidores || []).length ? ul(z.competidores) : '')
-    + sec('FODA', foda)
-    + sec('Valuaci\u00f3n', p(z.valuacion))
-    + sec('Qu\u00e9 mirar en cada balance', (z.mirar || []).length ? ul(z.mirar) : '')
-    + sec('Cu\u00e1ndo vendo', (z.vender || []).length ? ul(z.vender) : '')
-    + `<div class="n" style="margin-top:16px">Tesis al ${D.fmt(z.act, { year: true })} \u00b7 la escribe Claude y se actualiza con "Cargar actualizaciones".</div>`;
-}
 function fundHTML(t, pos) {
   const precio = pos && pos.precio != null ? pos.precio : null;
   const d = Fund.de(t);
@@ -5998,7 +6026,7 @@ function fundHTML(t, pos) {
   const tieneAcc = pos && pos.acciones;
   const acciones = `<div class="acts"><button type="button" class="a p" data-act="op-para" data-id="${esc(t)}|compra">+ Comprar</button>${tieneAcc ? `<button type="button" class="a" data-act="op-para" data-id="${esc(t)}|venta">Vender</button><button type="button" class="a" data-act="op-para" data-id="${esc(t)}|dividendo">Dividendo</button>` : ''}<button type="button" class="a" data-act="comparar" data-id="${esc(t)}">Comparar</button></div>`;
   const tab = ui.fichaTab || 'fund';
-  const tabs = `<div class="seg3 c4">${[['fund', 'Fundamentals'], ['tes', 'Tesis'], ['pos', 'Mi posici\u00f3n'], ['al', 'Alertas']].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg3 n4">${[['fund', 'Datos'], ['pos', 'Posici\u00f3n'], ['al', 'Alertas'], ['tes', `Tesis${Tesis.de(t) ? '' : ' +'}`]].map(([k, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-act="ficha-tab" data-id="${k}">${l}</button>`).join('')}</div>`;
 
   let pane;
   if (!d) pane = `<div class="n" style="padding:14px 0">${(state.settings.finnhubKey || '').trim() ? 'Buscando datos\u2026' : 'Carg\u00e1 tu clave de Finnhub en Ajustes para ver los fundamentales.'}</div>`;
@@ -6133,17 +6161,19 @@ function formPosicion(ticker) {
     ${F.field('Qu\u00e9 hace', F.input('a-desc', al.desc || '', 'maxlength="120" placeholder="una l\u00ednea, fija"'))}
     ${F.field('Tesis / nota', `<textarea class="input" id="a-nota" rows="3" placeholder="tier \u00b7 por qu\u00e9 la ten\u00e9s, qu\u00e9 mirar">${esc(al.nota || '')}</textarea>`)}
     ${p.alerta ? `<button type="button" class="btn sm danger" data-act="del-alerta" data-id="${esc(ticker)}">Quitar alerta</button>` : ''}</div>`;
-  const body = `${fundHTML(ticker, p)}<div class="fp fp-tes">${tesisHTML(ticker)}</div><div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div>`;
+  const body = `${fundHTML(ticker, p)}<div class="fp fp-pos">${posPane}${opsHtml}</div><div class="fp fp-al">${alPane}</div><div class="fp fp-tes" id="tes-box">${Tesis.html(ticker)}</div>`;
   Modal.open({ title: '', body, submit: 'Guardar', onSubmit: () => {
     const mirala = M.parse(Modal.val('a-mirala')), urgente = M.parse(Modal.val('a-urgente')), objetivo = M.parse(Modal.val('a-objetivo')), desc = Modal.val('a-desc').trim().slice(0, Intercambio.DESC_MAX), nota = Modal.val('a-nota').trim().slice(0, Intercambio.NOTA_MAX);
-    const prev = state.cartera.alertas[ticker] || {};
-    // la tesis no se edita en este form (la escribe Claude): se conserva siempre
-    if (!mirala && !urgente && !objetivo && !nota && !desc && !prev.tesis) { delete state.cartera.alertas[ticker]; } else { state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}), ...(prev.tesis ? { tesis: prev.tesis } : {}) }; }
+    if (!mirala && !urgente && !objetivo && !nota && !desc) { delete state.cartera.alertas[ticker]; } else { const prev = state.cartera.alertas[ticker] || {}; state.cartera.alertas[ticker] = { mirala: mirala || null, urgente: urgente || null, objetivo: objetivo || null, desc: desc || null, nota: nota || null, ...(prev.tier ? { tier: prev.tier } : {}), ...(prev.tipo ? { tipo: prev.tipo } : {}) }; }
     Persist.save(); toast('Guardado'); render();
   } });
   $('#modal').classList.add('ficha'); $('#modal').dataset.ftab = ui.fichaTab || 'fund';
   if (noSigue) { const q = state.cartera.precios[ticker]; if (!(q && q.c) || Date.now() - (q.t || 0) > 3600000) { (async () => { try { await Precios.quote(ticker); } catch (e) {} fundRefrescar(ticker, E.cartera().una(ticker)); })(); return; } }
   fundRefrescar(ticker, p);  // siempre al abrir: se ve lo guardado y se actualiza atras
+}
+function formTesisPegar(t) {
+  Modal.open({ title: `Tesis de ${t}`, submit: 'Guardar tesis', body: `<p class="muted small" style="margin:0 0 10px">Pegá la respuesta del chat de Inversiones (el bloque JSON con "tesis"). Si ya había una, la reemplaza.</p><textarea class="input textarea" id="tes-txt" rows="10" placeholder="Pegá acá"></textarea>`,
+    onSubmit() { const x = Tesis.leer(Modal.val('tes-txt'), t); if (!x) { toast('No encontré una tesis en lo que pegaste'); return false; } Tesis.box()[t] = x; Persist.save(); toast('Tesis guardada'); ui.fichaTab = 'tes'; formPosicion(t); return false; } });
 }
 /* ---------- COMPARAR EMPRESAS ----------
  * Hasta tres tickers de la cartera o la watchlist, las mismas metricas que la ficha, una al lado de la otra.
@@ -6377,41 +6407,60 @@ function exportCompacto() {
   if (hs.length) L.push('HISTORIA ANUAL DE LA CARTERA (USD millones, EPS diluido)', ...hs, '');
   // operaciones
   L.push('ULTIMAS 25 OPERACIONES'); for (const o of k.ops.slice().reverse().slice(0, 25)) L.push(`${o.fecha} ${o.tipo} ${o.ticker} ${o.tipo === 'dividendo' ? n2(o.monto) : `${n2(o.acciones)} a ${n2(o.precio)}`}`);
+  { const ts = Object.keys(state.cartera.tesis || {}).sort(); if (ts.length) { L.push('', 'MIS TESIS (cuando vender y que mirar; la tesis completa esta en la app)'); for (const t of ts) L.push('- ' + Tesis.resumen(t)); } }
   { const ps = (Array.isArray(state.pendientes) ? state.pendientes : []).filter(p => !p.hecho); if (ps.length) { L.push('', 'MIS PENDIENTES (lista que Facu edita en la app; no esta hecho)'); for (const p of ps) L.push(`- [${p.desde ? (p.desde <= D.today() ? 'para hacer' : 'desde ' + p.desde) : (p.cuando || 'para hacer')}] ${p.texto}${p.detalle ? ' -- ' + p.detalle : ''}`); } }
   L.push('', 'Notas: fwd = lo que esperan los analistas (Alpha Vantage): P/E con la ganancia esperada de los proximos 12 meses (ajustada, no contable), PEG = ese P/E / crecimiento esperado del EPS, gEPS/gVtas = crecimiento esperado el proximo ejercicio, rev90 = cuanto subio o bajo la estimacion en 90 dias, n = analistas, Nd = dias desde que se bajo. P/E con * = inflado por ganancias fuera del negocio. "mir/urg" = mis zonas de compra (mirala / urgente). CAGR5 = ultimo ejercicio contra 5 anios antes. 52s = posicion en el rango de 52 semanas. Si cambias zonas o tiers, devolveme el bloque JSON de siempre para "Cargar actualizaciones". El export completo esta en la app (Exportar para Claude).');
   return L.join('\n');
 }
 
 /* ---------- intercambio con Claude: exportar cartera / cargar actualizaciones ---------- */
+/* ---------- Tesis por ticker (Facu, 21-oct): la arma el chat de Inversiones y se carga como JSON.
+ * Va en state.cartera.tesis[T], aparte de las alertas, asi guardar zonas o quitar una alerta no la borra. */
+const Tesis = {
+  SECC: [['hace', 'Qué hace'], ['gana', 'Cómo gana plata'], ['depende', 'De quién depende'], ['competidores', 'Competidores'], ['foda', 'FODA'], ['valuacion', 'Valuación'], ['mirar', 'Qué mirar en cada balance'], ['vender', 'Cuándo vender']],
+  box() { if (!state.cartera.tesis) state.cartera.tesis = {}; return state.cartera.tesis; },
+  de(t) { return Tesis.box()[t] || null; },
+  /** limpia lo que llega: textos y listas cortas; claves desconocidas se guardan igual (si son texto o lista) */
+  limpiar(x) {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+    const txt = v => v == null ? null : String(v).trim().slice(0, 2500) || null;
+    const lista = v => (Array.isArray(v) ? v : v == null ? [] : [v]).map(e => String(e).trim().slice(0, 500)).filter(Boolean).slice(0, 20);
+    const o = { act: /^\d{4}-\d{2}-\d{2}$/.test(String(x.act || '')) ? x.act : D.today() };
+    for (const [k, v] of Object.entries(x)) {
+      if (k === 'act') continue;
+      if (k === 'foda') { if (v && typeof v === 'object') { const f = {}; for (const q of ['f', 'o', 'd', 'a']) { const l = lista(v[q]); if (l.length) f[q] = l; } if (Object.keys(f).length) o.foda = f; } continue; }
+      if (Array.isArray(v)) { const l = lista(v); if (l.length) o[k.slice(0, 40)] = l; } else if (typeof v === 'string' || typeof v === 'number') { const t = txt(v); if (t) o[k.slice(0, 40)] = t; }
+    }
+    return Object.keys(o).length > 1 ? o : null;
+  },
+  /** de un texto pegado: el JSON de cambios (toma la tesis del ticker) o la tesis sola */
+  leer(texto, t) {
+    let obj = null;
+    try { obj = Intercambio.parsear(texto); } catch (e) {}
+    if (obj && obj.alertas) { const k = Object.keys(obj.alertas).find(x => x.toUpperCase() === t.toUpperCase()) || (Object.keys(obj.alertas).length === 1 ? Object.keys(obj.alertas)[0] : null); const v = k && obj.alertas[k]; return v && v.tesis ? Tesis.limpiar(v.tesis) : null; }
+    const i = String(texto || '').indexOf('{'); if (i < 0) return null;
+    let d = 0; for (let j = i; j < texto.length; j++) { if (texto[j] === '{') d++; else if (texto[j] === '}') { d--; if (d === 0) { try { const o = JSON.parse(texto.slice(i, j + 1)); return Tesis.limpiar(o.tesis || o); } catch (e) { return null; } } } }
+    return null;
+  },
+  html(t) {
+    const x = Tesis.de(t);
+    const btns = `<div class="row tes-acts"><button type="button" class="btn sm" data-act="tesis-pegar" data-id="${esc(t)}">${ICONS.copy} ${x ? 'Reemplazar' : 'Pegar tesis'}</button>${x ? `<button type="button" class="btn sm ghost danger" data-act="tesis-borrar" data-id="${esc(t)}">Borrar</button>` : ''}</div>`;
+    if (!x) return `<div class="fs tes"><p class="muted small" style="margin:12px 0">Todavía no hay tesis de ${esc(t)}. Pedile a Claude en el chat de Inversiones "armame la tesis de ${esc(t)}" y pegá acá lo que te devuelva (el bloque JSON).</p>${btns}</div>`;
+    const lst = l => `<ul>${l.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
+    const sec = (k, tit) => { const v = x[k]; if (v == null) return ''; if (k === 'foda') { const q = [['f', 'Fortalezas', 'pos'], ['o', 'Oportunidades', 'acc'], ['d', 'Debilidades', 'warn'], ['a', 'Amenazas', 'neg']]; return `<div class="tes-s"><div class="tes-t">${tit}</div><div class="tes-foda">${q.filter(([c]) => v[c]).map(([c, n, cls]) => `<div class="${cls}"><b>${n}</b>${lst(v[c])}</div>`).join('')}</div></div>`; } return `<div class="tes-s"><div class="tes-t">${tit}</div>${Array.isArray(v) ? lst(v) : `<p>${esc(v)}</p>`}</div>`; };
+    const conocidas = new Set(Tesis.SECC.map(([k]) => k).concat('act'));
+    const extra = Object.keys(x).filter(k => !conocidas.has(k)).map(k => sec(k, esc(k)));
+    return `<div class="fs tes"><div class="tes-act">Actualizada el ${D.fmt(x.act, { year: true })}${(Date.now() - D.parse(x.act)) / 86400000 > 120 ? ' · <span class="warn-text">tiene más de 4 meses: revisala</span>' : ''}</div>${Tesis.SECC.map(([k, n]) => sec(k, n)).join('')}${extra.join('')}${btns}</div>`;
+  },
+  /** para el archivo de Claude: lo que decide (vender y mirar), en una linea */
+  resumen(t) { const x = Tesis.de(t); if (!x) return ''; const c = l => (l || []).join('; '); return `${t} (tesis ${x.act}): vender si: ${c(x.vender) || '-'} | mirar: ${c(x.mirar) || '-'}`; },
+};
+
 const Intercambio = {
   FORMATO: 'gestor-gastos-cambios', VERSION: 3,
   /** v3 (28-sep): `tier` (A, B, C, Cíclica, Especulativa, F) y `tipo` (sector, p. ej. Tecnología) como campos propios. Tier F saca el ticker. */
   /** v2: `desc` (qué hace la empresa, fijo, ≤120) separado de `nota` (tier + tesis, se recalibra). Una nota vieja "qué hace | tesis" se parte. */
   DESC_MAX: 120, NOTA_MAX: 300,
-  /** tesis completa por empresa (21-oct, Facu: "qué hace, de quién depende, competidores, FODA"). La escribe Claude y llega por
-   *  "Cargar actualizaciones" en `alertas.TICKER.tesis`; se ve en la pestaña Tesis de la ficha. Listas de hasta 8 textos de hasta 400. */
-  TESIS_LISTA: 8, TESIS_TXT: 400,
-  normTesis(x) {
-    if (x == null || typeof x !== 'object' || Array.isArray(x)) return null;
-    const s = v => v == null ? null : (String(v).trim().slice(0, Intercambio.TESIS_TXT) || null);
-    const l = v => (Array.isArray(v) ? v : v == null ? [] : [v]).map(s).filter(Boolean).slice(0, Intercambio.TESIS_LISTA);
-    const f = x.foda && typeof x.foda === 'object' ? x.foda : {};
-    const t = { act: /^\d{4}-\d{2}-\d{2}$/.test(String(x.act || '')) ? String(x.act) : D.today(), hace: s(x.hace), gana: s(x.gana), depende: l(x.depende), competidores: l(x.competidores),
-      foda: { f: l(f.f), o: l(f.o), d: l(f.d), a: l(f.a) }, mirar: l(x.mirar), vender: l(x.vender), valuacion: s(x.valuacion) };
-    const vacia = !t.hace && !t.gana && !t.valuacion && !t.depende.length && !t.competidores.length && !t.mirar.length && !t.vender.length && !Object.values(t.foda).some(a => a.length);
-    return vacia ? null : t;
-  },
-  /** la tesis en texto plano, para el export (Claude la lee y la mantiene) */
-  tesisTexto(tk, t) {
-    const L = [`### ${tk} (tesis al ${t.act})`]; const li = (k, a) => { if (a && a.length) L.push(`- **${k}:** ${a.join(' · ')}`); };
-    if (t.hace) L.push(`- **Qué hace:** ${t.hace}`); if (t.gana) L.push(`- **Cómo gana plata:** ${t.gana}`);
-    li('Depende de', t.depende); li('Competidores', t.competidores);
-    li('Fortalezas', t.foda.f); li('Oportunidades', t.foda.o); li('Debilidades', t.foda.d); li('Amenazas', t.foda.a);
-    if (t.valuacion) L.push(`- **Valuación:** ${t.valuacion}`); li('Qué mirar en cada balance', t.mirar); li('Cuándo vendo', t.vender);
-    return L.join('\n');
-  },
-  /** la alerta sin la tesis (el JSON del export no la repite: va legible en su seccion) */
-  sinTesis(a) { if (!a || !a.tesis) return a || null; const { tesis, ...r } = a; return r; },
   partirNota(nota) { const t = nota == null ? '' : String(nota); const i = t.indexOf(' | '); return i < 0 ? { desc: null, nota: t.trim() || null } : { desc: t.slice(0, i).trim().slice(0, Intercambio.DESC_MAX) || null, nota: t.slice(i + 3).trim().slice(0, Intercambio.NOTA_MAX) || null }; },
   nombreArchivo() { const d = new Date(); return `cartera-${D.today()}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`; },
   /** Markdown legible (tablas) + bloque JSON exacto + instrucciones y esquema de respuesta */
@@ -6433,14 +6482,12 @@ const Intercambio = {
       resumen: { valorUSD: k.valor, valorTotalUSD: valorTot != null ? +valorTot.toFixed(2) : null, realizadoCerradasUSD: +realCerr.toFixed(2), realizadoVentasParcialesUSD: +realParc.toFixed(2), twrDiario: twrR, costoUSD: k.costo, gpUSD: k.gp, gpPct: k.gpPct, dividendosUSD: k.dividendos, realizadoUSD: k.realizado, resultadoTotalUSD: k.gpTotal != null ? +k.gpTotal.toFixed(2) : null, rendTotalSobreCosto: k.rendTotal, posiciones: k.posiciones.length },
       riesgo: Object.fromEntries([['anio', 'YTD'], ['inicio', 'Todo']].map(([m]) => [m, k.ventanas[m] && k.ventanas[m].disponible ? Hist.riesgo(k, k.ventanas[m].desde) : null])),
       rendimiento: Object.fromEntries(E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => [m, Object.assign({ rango: l }, rendJSON(k.ventanas[m]) || { disponible: false })])),
-      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: Intercambio.sinTesis(p.alerta) })),
-      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: Intercambio.sinTesis(p.alerta) })),
+      posiciones: k.posiciones.map(p => ({ ticker: p.ticker, cedear: p.cedear ? p.cedear.code : null, ratio: p.cedear ? Cedears.ratioTxt(p.cedear) : null, acciones: +p.acciones.toFixed(6), ppc: +p.ppc.toFixed(2), precio: p.precio, valor: p.valor != null ? +p.valor.toFixed(2) : null, gpPct: p.gpPct, rendTotal: p.rendTotal, rendPrecio: p.rendPrecio, rendDividendos: p.rendDiv, peso: p.peso, alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null, dividendosUSD: +p.dividendos.toFixed(2), lotes: (p.lotes || []).map(l => ({ fecha: l.fecha, acciones: +l.q.toFixed(6), precio: +l.px.toFixed(2) })), alerta: p.alerta || null })),
+      watchlist: k.watch.map(p => ({ ticker: p.ticker, precio: p.precio, alerta: p.alerta })),
       ventasParciales: parciales.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), ventas: ventasDe(p.ticker) })),
       cerradas: k.cerradas.map(p => ({ ticker: p.ticker, realizadoUSD: +p.realizado.toFixed(2), dividendosUSD: +p.dividendos.toFixed(2), alfaUSD: p.alfaUSD != null ? +p.alfaUSD.toFixed(2) : null })),
     };
     const c = ctxPartes(pendientes);
-    const conTz = [...k.posiciones, ...k.watch].filter(p => p.alerta && p.alerta.tesis);
-    const tesisFull = conTz.length ? `## Tesis completas (pestaña Tesis de la ficha)\n${conTz.map(p => Intercambio.tesisTexto(p.ticker + (p.acciones ? '' : ' (watchlist)'), p.alerta.tesis)).join('\n\n')}\n\nSin tesis todavía: ${k.posiciones.filter(p => !(p.alerta && p.alerta.tesis)).map(p => p.ticker).join(', ') || 'ninguna posición'}.` : '';
     const tesis = [...k.posiciones, ...k.watch].filter(p => p.alerta && (p.alerta.desc || p.alerta.nota)).map(p => `- **${p.ticker}**${p.acciones ? '' : ' (watchlist)'} \u2014 ${p.alerta.desc ? esc(p.alerta.desc) + ' ' : ''}${p.alerta.nota ? `_${esc(p.alerta.nota)}_` : ''}`).join('\n');
     const md = `# Cartera y mercado de ${esc(s.nombre || 'mi cartera')} \u2014 ${c.cuando}
 
@@ -6465,7 +6512,7 @@ ${c.tablaPx}
 
 ## Qu\u00e9 hace cada una y mi tesis
 ${tesis || '\u2014'}
-${tesisFull ? '\n' + tesisFull + '\n' : ''}
+
 ${c.tablaF}
 
 ${c.tablaF2}
@@ -6521,7 +6568,9 @@ Sos mi asesor de inversiones (perfil: largo plazo, calidad a buen precio, Buffet
   },
   "comentario": "resumen en una línea de lo que cambiaste y por qué" }
 \`\`\`
-Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); opcional \`tesis\` = tesis completa para la pestaña Tesis de la ficha: \`{ "act": "AAAA-MM-DD", "hace": "…", "gana": "cómo gana plata", "depende": ["…"], "competidores": ["…"], "foda": { "f": ["…"], "o": ["…"], "d": ["…"], "a": ["…"] }, "valuacion": "…", "mirar": ["qué mirar en cada balance"], "vender": ["cuándo vendo"] }\` (listas de hasta 8 textos de hasta 400 caracteres; si la mandás, reemplaza la anterior entera; \`null\` la borra; no la mandes si no cambia); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en USD por acción del subyacente; \`desc\` es qué hace la empresa (fijo, máx. 120 caracteres, opcional: si no lo mandás no se toca) y \`nota\` es la tesis (máx. 300); \`tier\` es A, B, C, Cíclica, Especulativa o F (F saca el ticker de la watchlist) y \`tipo\` el sector (Tecnología, Financiero, Consumo defensivo…); no inventes precios, si te falta un dato decilo. Si cambiás niveles, recordame pedirte en el chat del proyecto que actualices la tarea programada de alertas con los nuevos valores.
+
+**Tesis completa de una empresa** (si te la pido): dentro del ticker mandá \`"tesis": { "act": "AAAA-MM-DD", "hace": "…", "gana": "…", "depende": ["…"], "competidores": ["…"], "foda": { "f": ["…"], "o": ["…"], "d": ["…"], "a": ["…"] }, "valuacion": "…", "mirar": ["…"], "vender": ["…"] }\`. Un ticker que trae solo \`tesis\` no cambia sus zonas; \`"tesis": null\` la borra. La app la muestra en la pestaña Tesis de la ficha.
 `;
     return md;
   },
@@ -6550,21 +6599,22 @@ Reglas: tickers en formato de EE.UU. (BRK-B, no BRKB); niveles y objetivos en US
       const antes = cur[ticker] || null;
       if (v === null) { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; }
       if (typeof v !== 'object') { avisos.push(`${ticker}: valor inválido, se ignora.`); continue; }
+      if ('tesis' in v) { if (v.tesis === null) { if (Tesis.de(ticker)) cambios.push({ ticker, tipo: 'tesis', tesis: null }); } else { const ts = Tesis.limpiar(v.tesis); if (ts) cambios.push({ ticker, tipo: 'tesis', tesis: ts }); else avisos.push(`${ticker}: la tesis vino vac\u00eda o con otro formato, se ignora.`); } }
+      if (Object.keys(v).every(x => x === 'tesis')) continue;  // solo tesis: las zonas no se tocan
       const num = x => x == null || x === '' ? null : (Number(x) || null);
       const despues = { mirala: 'mirala' in v ? num(v.mirala) : (antes ? antes.mirala : null), urgente: 'urgente' in v ? num(v.urgente) : (antes ? antes.urgente : null), objetivo: 'objetivo' in v ? num(v.objetivo) : (antes ? antes.objetivo : null), desc: 'desc' in v ? (v.desc ? String(v.desc).trim().slice(0, Intercambio.DESC_MAX) : null) : (antes ? antes.desc || null : null), nota: 'nota' in v ? (v.nota ? String(v.nota).slice(0, Intercambio.NOTA_MAX) : null) : (antes ? antes.nota : null) , tier: 'tier' in v ? (Tier.norm(v.tier) || null) : (antes ? antes.tier || null : null), tipo: 'tipo' in v ? (v.tipo ? String(v.tipo).slice(0, 40) : null) : (antes ? antes.tipo || null : null) };
-      { const tz = 'tesis' in v ? Intercambio.normTesis(v.tesis) : (antes ? antes.tesis || null : null); if (tz) despues.tesis = tz; }
       // nota vieja con " | " (qué hace | tesis): se parte; el desc explícito manda
       if ('nota' in v && despues.nota && despues.nota.includes(' | ')) { const pt = Intercambio.partirNota(despues.nota); despues.nota = pt.nota; if (!('desc' in v)) despues.desc = pt.desc || despues.desc; }
       if (despues.mirala && despues.urgente && despues.urgente > despues.mirala) avisos.push(`${ticker}: "urgente" (${despues.urgente}) es mayor que "mirala" (${despues.mirala}); revisalo.`);
       // tier F = no invertible: chau de la watchlist (Facu). Si la tenes en cartera, solo se avisa
       if (despues.tier === 'F') { if (tengo.has(ticker)) avisos.push(`${ticker}: tier F pero est\u00e1 en tu cartera; queda.`); else { if (antes) cambios.push({ ticker, tipo: 'quitar', antes }); continue; } }
-      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null)) && JSON.stringify(antes.tesis || null) === JSON.stringify(despues.tesis || null);
+      const igual = antes && ['mirala', 'urgente', 'objetivo', 'desc', 'nota', 'tier', 'tipo'].every(f => (antes[f] || null) === (despues[f] || null));
       if (!igual) cambios.push({ ticker, tipo: antes ? 'cambiar' : (tengo.has(ticker) ? 'nueva' : 'watchlist'), antes, despues });
     }
     return { cambios, avisos, comentario: obj.comentario || '' };
   },
   aplicar(d) {
-    for (const c of d.cambios) { if (c.tipo === 'quitar') delete state.cartera.alertas[c.ticker]; else state.cartera.alertas[c.ticker] = c.despues; }
+    for (const c of d.cambios) { if (c.tipo === 'tesis') { if (c.tesis) Tesis.box()[c.ticker] = c.tesis; else delete Tesis.box()[c.ticker]; } else if (c.tipo === 'quitar') delete state.cartera.alertas[c.ticker]; else state.cartera.alertas[c.ticker] = c.despues; }
     Persist.save();
   },
 };
@@ -6949,9 +6999,9 @@ function formImportar() {
       const out = $('#import-out');
       if (!d.cambios.length) { out.innerHTML = `<div class="callout">Sin cambios respecto de lo que ya tenés.${d.avisos.length ? '<br>' + d.avisos.map(esc).join('<br>') : ''}</div>`; return false; }
       Intercambio._pendiente = d;
-      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.tesis ? ` · tesis al ${Pend.fecha(a.tesis.act)}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
+      const fmt = a => a ? `🟡 ${a.mirala ?? '—'} · 🔴 ${a.urgente ?? '—'}${a.objetivo ? ` · obj ${a.objetivo}` : ''}${a.nota ? ` · “${esc(a.nota)}”` : ''}${a.desc ? `<span class="sub small muted" style="display:block">${esc(a.desc)}</span>` : ''}` : '—';
       out.innerHTML = `<div class="stack">${d.comentario ? `<div class="callout" style="font-size:13px"><b>Claude:</b> ${esc(d.comentario)}</div>` : ''}
-        ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
+        ${d.cambios.map(c => `<div class="list-item" style="align-items:flex-start"><div><b>${esc(c.ticker)}</b> <span class="tag">${c.tipo === 'tesis' ? (c.tesis ? (Tesis.de(c.ticker) ? 'tesis nueva versi\u00f3n' : 'tesis') : 'borrar tesis') : c.tipo === 'quitar' ? 'quitar' : c.tipo === 'cambiar' ? 'cambia' : c.tipo === 'nueva' ? 'nueva alerta' : 'a watchlist'}</span>${c.tipo === 'tesis' ? (c.tesis ? `<span class="sub small">${Tesis.SECC.filter(([k]) => c.tesis[k]).map(([, n]) => n).join(' \u00b7 ')} \u00b7 al ${esc(c.tesis.act)}</span>` : '') : c.tipo !== 'quitar' ? `<span class="sub small">${fmt(c.despues)}</span>` : ''}${c.antes && c.tipo !== 'tesis' ? `<span class="sub small muted">antes: ${fmt(c.antes)}</span>` : ''}</div></div>`).join('')}
         ${d.avisos.length ? `<div class="callout amber small">${d.avisos.map(esc).join('<br>')}</div>` : ''}
         <button type="button" class="btn primary" data-act="import-apply">Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}</button></div>`;
       const sb = $('#modal [data-act="submit"]'); if (sb) sb.textContent = `Aplicar ${d.cambios.length} cambio${d.cambios.length > 1 ? 's' : ''}`;
@@ -7289,6 +7339,8 @@ const Actions = {
   'fab-gasto'() { fabMenu(false); formMov(); },
   'fab-op'() { fabMenu(false); formOp(); },
   'fab-calc'() { fabMenu(false); formCalc(); },
+  'tesis-pegar'(t) { formTesisPegar(t); },
+  'tesis-borrar'(t) { confirmar(`\u00bfBorrar la tesis de ${t}?`, () => { delete Tesis.box()[t]; Persist.save(); setTimeout(() => { ui.fichaTab = 'tes'; formPosicion(t); }, 0); }); },
   'fab-buscar'() { fabMenu(false); formComparar(null, true); },
   'fab-cal'() { fabMenu(false); formBalances(); },
   pend() { formPend(); },
