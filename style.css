@@ -1284,3 +1284,11 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .nov-d .tk{display:flex;flex-wrap:wrap;gap:2px 14px;min-width:0}
 .nov-d .tk b{font-size:15.5px;font-weight:800;color:var(--ink-2);cursor:pointer;letter-spacing:.01em}
 .nov-d .tk b.mio{color:var(--accent);font-weight:900}
+/* recorrer graficos de lineas con el dedo (23-oct) */
+.chart svg.lc{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.chart svg.lc .sc-l{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:3 3}
+.chart svg.lc .sc-d{stroke:var(--bg);stroke-width:2}
+/* ancho segun contenido: posicionado fixed cerca del borde derecho se achicaba y partia cada fila en dos */
+#tooltip{width:max-content;max-width:300px}
+#tooltip .row{flex-wrap:nowrap}
+#tooltip .row span,#tooltip .row b{white-space:nowrap}

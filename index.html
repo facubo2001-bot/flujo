@@ -1308,6 +1308,14 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .nov-d .tk{display:flex;flex-wrap:wrap;gap:2px 14px;min-width:0}
 .nov-d .tk b{font-size:15.5px;font-weight:800;color:var(--ink-2);cursor:pointer;letter-spacing:.01em}
 .nov-d .tk b.mio{color:var(--accent);font-weight:900}
+/* recorrer graficos de lineas con el dedo (23-oct) */
+.chart svg.lc{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.chart svg.lc .sc-l{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:3 3}
+.chart svg.lc .sc-d{stroke:var(--bg);stroke-width:2}
+/* ancho segun contenido: posicionado fixed cerca del borde derecho se achicaba y partia cada fila en dos */
+#tooltip{width:max-content;max-width:300px}
+#tooltip .row{flex-wrap:nowrap}
+#tooltip .row span,#tooltip .row b{white-space:nowrap}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1651,7 +1659,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610212145';
+const BUILD = '202610230331';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -3935,8 +3943,11 @@ const Charts = {
       const rows = series.filter(s => s.values[i] != null).map(s => tipRow(s.color, s.name, tipFmt(s.values[i], s))).join('');
       hits += `<rect class="hit" x="${x(i) - bw / 2}" y="${padT}" width="${bw}" height="${ih}" data-tip="${esc(`<b>${esc(tipTitle(i))}</b>${rows}`)}"/>`;
     });
-    const guide = `<line class="guide" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" stroke="var(--ink-3)" stroke-width="1" opacity="0"/>`;
-    return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${g}<g class="axis"><line x1="${padL}" x2="${w - padR}" y1="${y(0)}" y2="${y(0)}"/></g>${ref}${paths}${cr}${dots}${xl}${hits}</svg>`;
+    // recorrer con el dedo (Facu, 23-oct: "como en las apps de inversion, pasas el dedo y punto a punto te dice el valor"):
+    // x de cada punto e y de cada serie viajan en data-sc; la guia y los puntos se mueven en el handler de abajo
+    const sc = esc(JSON.stringify({ x: labels.map((_, i) => +x(i).toFixed(1)), s: series.map(s => ({ c: s.color, y: s.values.map(v => v == null ? null : +y(v).toFixed(1)) })) }));
+    const guide = `<g class="sc-g" style="display:none"><line class="sc-l" x1="0" x2="0" y1="${padT}" y2="${padT + ih}"/>${series.map(s => `<circle class="sc-d" r="4.5" fill="${s.color}"/>`).join('')}</g>`;
+    return `<svg class="lc" data-sc="${sc}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${g}<g class="axis"><line x1="${padL}" x2="${w - padR}" y1="${y(0)}" y2="${y(0)}"/></g>${ref}${paths}${cr}${dots}${xl}${guide}${hits}</svg>`;
   },
 
   /** Stacked columns. series: [{name,color,values}] ; optional line overlay {name,values,color} on the SAME axis */
@@ -4030,8 +4041,30 @@ const Charts = {
   document.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('[data-tip]')) tip.classList.remove('show'); });
   let ts = null;
   document.addEventListener('touchstart', e => { const t = e.target.closest && e.target.closest('[data-tip]'); ts = t ? { t, x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
-  document.addEventListener('touchend', e => { if (!ts) return; const c = e.changedTouches[0]; const moved = Math.abs(c.clientX - ts.x) + Math.abs(c.clientY - ts.y); const t = ts.t; ts = null; if (moved > 8) return; tip.innerHTML = t.dataset.tip; tip.classList.add('show'); const r = t.getBoundingClientRect(); tip.style.left = clamp(r.left + r.width / 2, 130, window.innerWidth - 130) + 'px'; tip.style.top = (r.top < 90 ? r.bottom + 90 : r.top) + 'px'; setTimeout(() => tip.classList.remove('show'), 2500); }, { passive: true });
-  document.addEventListener('touchmove', () => { if (tip.classList.contains('show')) tip.classList.remove('show'); }, { passive: true });
+  document.addEventListener('touchend', e => { if (!ts || ts.t.closest('svg.lc')) return; const c = e.changedTouches[0]; const moved = Math.abs(c.clientX - ts.x) + Math.abs(c.clientY - ts.y); const t = ts.t; ts = null; if (moved > 8) return; tip.innerHTML = t.dataset.tip; tip.classList.add('show'); const r = t.getBoundingClientRect(); tip.style.left = clamp(r.left + r.width / 2, 130, window.innerWidth - 130) + 'px'; tip.style.top = (r.top < 90 ? r.bottom + 90 : r.top) + 'px'; setTimeout(() => tip.classList.remove('show'), 2500); }, { passive: true });
+  document.addEventListener('touchmove', () => { if (!sc && tip.classList.contains('show')) tip.classList.remove('show'); }, { passive: true });
+  /* graficos de lineas: apoyar el dedo y deslizarlo recorre punto a punto (guia vertical + puntos + lectura arriba del grafico).
+   * touch-action: pan-y en .lc: lo horizontal es del grafico, lo vertical sigue scrolleando la pagina (eso cancela el recorrido). */
+  let sc = null, scHide = 0;
+  const scPaint = e => {
+    const svg = sc.svg, d = sc.d; const r = svg.getBoundingClientRect(); const k = svg.viewBox.baseVal.width / r.width; const xv = (e.clientX - r.left) * k;
+    let i = 0; for (let j = 1; j < d.x.length; j++) if (Math.abs(d.x[j] - xv) < Math.abs(d.x[i] - xv)) i = j;
+    // salta los dias sin ningun valor (proyeccion que todavia no arranca, meses sin datos)
+    if (!d.s.some(s => s.y[i] != null)) { let b = -1; for (let j = 0; j < d.x.length; j++) if (d.s.some(s => s.y[j] != null) && (b < 0 || Math.abs(d.x[j] - xv) < Math.abs(d.x[b] - xv))) b = j; if (b < 0) return; i = b; }
+    if (sc.i !== i) {
+      sc.i = i; const g = svg.querySelector('.sc-g'); const hit = svg.querySelectorAll('.hit')[i];
+      g.style.display = ''; const l = g.querySelector('.sc-l'); l.setAttribute('x1', d.x[i]); l.setAttribute('x2', d.x[i]);
+      g.querySelectorAll('.sc-d').forEach((c, j) => { const yy = d.s[j] && d.s[j].y[i]; c.style.display = yy == null ? 'none' : ''; if (yy != null) { c.setAttribute('cx', d.x[i]); c.setAttribute('cy', yy); } });
+      if (hit && hit.dataset.tip) tip.innerHTML = hit.dataset.tip;
+    }
+    tip.classList.add('show'); const hw = tip.offsetWidth / 2 + 8; tip.style.left = clamp(r.left + d.x[i] / k, hw, window.innerWidth - hw) + 'px'; tip.style.top = Math.max(r.top + 4, 110) + 'px';
+  };
+  const scEnd = () => { if (!sc) return; const s0 = sc; sc = null; clearTimeout(scHide); scHide = setTimeout(() => { if (sc) return; tip.classList.remove('show'); const g = s0.svg.querySelector('.sc-g'); if (g) g.style.display = 'none'; }, 1800); };
+  document.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; const svg = e.target.closest && e.target.closest('svg.lc'); if (!svg || svg.closest('.proy-chart')) return;  // la proyeccion tiene su propio recorrido (proyMover) clearTimeout(scHide);
+    document.querySelectorAll('svg.lc .sc-g').forEach(g => { if (!svg.contains(g)) g.style.display = 'none'; });
+    sc = { svg, d: svg._sc || (svg._sc = JSON.parse(svg.dataset.sc)), i: -1 }; scPaint(e); });
+  document.addEventListener('pointermove', e => { if (sc) scPaint(e); });
+  document.addEventListener('pointerup', scEnd); document.addEventListener('pointercancel', scEnd);
 })();
 
 /* chart mounting: charts render against the real container width */

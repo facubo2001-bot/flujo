@@ -1,6 +1,6 @@
 # Gestor de gastos — app de finanzas personales de Facu
 
-## ▶ LEER PRIMERO (actualizado 21-oct-2026, build 202610212145)
+## ▶ LEER PRIMERO (actualizado 23-oct-2026, build 202610230331)
 
 **Qué es:** PWA en vanilla JS (gastos + cartera de CEDEARs) publicada en GitHub Pages desde este repo **público** `facubo2001-bot/flujo`. Facu la usa en el iPhone y en la compu; sus datos viven en el teléfono y se sincronizan con un gist privado (Ajustes → Sincronización). Facu habla en castellano rioplatense, informal; respuestas cortas y directas. Vara de calidad: "lo que no se pueda corregir no lo ponemos" (datos confiables antes que lindos).
 
@@ -623,3 +623,9 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - **Ventana de balances**: Facu: "eran millones" (14 días corridos daban ~33). Ahora `Fund.finVentana()` = esta semana y la que viene, de lunes a viernes (`Fund.FIN_VENTANA = 5` → corta el viernes de la semana que viene; sábado y domingo cuentan como previa de la semana que arranca). `Fund.balanceCerca` usa esa ventana: aplica a Novedades, al puntito celeste de Posiciones/ficha y al resaltado "balance …" de Alertas. Se probó 1,5 semanas (`FIN_VENTANA = 3`, miércoles): Facu eligió las dos semanas.
 - **Novedades, balances en agenda** (`.nov-ag/.nov-d`): un renglón por día ("MIÉ 28  META MSFT GEV NOW"), lo que tenés en celeste 900, la watchlist en gris; raya entre esta semana y la que viene. Sin am/pm (está en la ficha). Tocar un ticker abre la ficha. Reemplaza los chips `.nov-chip.bal` (23 chips = 12 renglones; la agenda, 8). Zona, P/E y EMA siguen como chips.
 - **Alertas → "Mejor relación"** (tercer orden, `settings.alOrden = 'rel'`): `rel = upside / caída hasta el piso`, piso = urgente (o mirala si no hay urgente). **Facu: sin colchón ni ajustes, las zonas ya tienen todo calculado.** En el piso o abajo no hay división: "en zona", arriba de todo y entre ellas por upside. Pegadas al piso el número explota (NFLX a 0,1 % del piso = 460×): se muestra ">20×" (el orden usa el valor real). Número junto al chip de zona (`.al-rr`, celeste desde 3×), top 10 + "Ver todas", explicación en la "i" del título (solo en ese modo). Sin objetivo: sin número, al final.
+
+## Gráficos de líneas: recorrer con el dedo (23-oct-2026, build 202610230331)
+- Facu: "como en las apps de inversión, pasás el dedo y punto a punto te dice el valor"; antes había que tocar cada punto y andaba mal.
+- `Charts.line` ahora marca el svg con `class="lc"` y `data-sc` (x de cada punto, y de cada serie) y dibuja una guía `.sc-g` (línea punteada + un punto por serie), oculta. En 03-charts (delegación del tooltip): `pointerdown` táctil sobre `svg.lc` arranca el recorrido, `pointermove` busca el punto más cercano (saltea índices sin valores), mueve guía y puntos y muestra el `data-tip` de ese punto en `#tooltip` **arriba del gráfico** (no bajo el dedo). Al soltar queda 1,8 s y se va (un toque solo también muestra el valor). `touch-action: pan-y`: lo horizontal recorre, lo vertical sigue scrolleando. Mouse: hover de siempre.
+- Aplica a todos los `Charts.line`: Ritmo del mes, Tendencias y Evolución de la cartera. La Proyección queda con su recorrido propio (`proyMover`, excluida). Barras (`Charts.stacked`) sin cambios.
+- `#tooltip` con `width:max-content` y filas sin wrap: cerca del borde derecho se achicaba y partía cada fila en dos.
