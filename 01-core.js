@@ -699,11 +699,13 @@ const Spy = {
   fechas() { Spy.tabla(); return Spy._keys; },
   /** último cierre conocido ≤ fecha */
   /** Dividendos de SPY (ex-fecha → USD por acción), para que la sombra sea S&P 500 *total return*: se reinvierten al cierre de la ex-fecha */
-  divs() { if (!Spy._divs) { const d = typeof SPY_DIVS !== 'undefined' && SPY_DIVS.divs ? SPY_DIVS.divs : {}; Spy._divs = Object.keys(d).sort().map(f => ({ fecha: f, monto: Number(d[f]) || 0 })); } return Spy._divs; },
-  /** factor de reinversión de dividendos de SPY para acciones tenidas desde `desde` (exclusive) hasta `hasta` (inclusive): Π (1 + div / cierre ex-fecha) */
-  /** Decisión de diseño (sep-2026): la comparación contra el S&P 500 es precio contra precio, sin dividendos de ningún lado → TR apagado (los datos quedan por si algún día se quiere total return) */
-  TR: false,
-  factor(desde, hasta) { if (!Spy.TR) return 1; let f = 1; for (const d of Spy.divs()) { if (d.fecha <= desde) continue; if (d.fecha > hasta) break; const c = Spy.at(d.fecha); if (c && d.monto) f *= 1 + d.monto / c; } return f; },
+  /** dividendos de SPY por ex-fecha: los embebidos (data/spy-divs.json) más los que trae sec/hist.json cada día (Hist.datos.spyDivs), así no quedan viejos */
+  divs() { if (!Spy._divs) { const d = { ...(typeof SPY_DIVS !== 'undefined' && SPY_DIVS.divs ? SPY_DIVS.divs : {}), ...((typeof Hist !== 'undefined' && Hist.datos && Hist.datos.spyDivs) || {}) }; Spy._divs = Object.keys(d).sort().map(f => ({ fecha: f, monto: Number(d[f]) || 0 })); } return Spy._divs; },
+  /** factor de reinversión de dividendos de SPY para acciones tenidas desde `desde` (exclusive) hasta `hasta` (inclusive): Π (1 + div·(1−RET) / cierre ex-fecha) */
+  /** Desde el 25-oct-2026 (auditoría): la sombra S&P es total return, con los dividendos de SPY netos de la retención del 30 % que
+   *  le cobran a un tenedor de CEDEAR de SPY. Antes era precio contra precio, que inflaba el alfa ~1 pp por año. */
+  TR: true, RET: 0.30,
+  factor(desde, hasta) { if (!Spy.TR) return 1; let f = 1; for (const d of Spy.divs()) { if (d.fecha <= desde) continue; if (d.fecha > hasta) break; const c = Spy.at(d.fecha); if (c && d.monto) f *= 1 + d.monto * (1 - Spy.RET) / c; } return f; },
   /** fecha del último cierre conocido ≤ fecha (null si no hay) */
   fechaDe(fecha) { const m = Spy.tabla(); if (m[fecha]) return fecha; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best; },
   at(fecha) { const m = Spy.tabla(); if (m[fecha]) return m[fecha]; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best ? m[best] : null; },
@@ -872,8 +874,23 @@ const Hist = {
   cargar() {
     const hoy = D.today(); if (Hist.dia === hoy && Hist.datos) return Promise.resolve(Hist.datos);
     if (Hist._p) return Hist._p;
-    Hist._p = (async () => { try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/hist.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.fechas) && j.c) Hist.datos = j; } } } catch (e) {} Hist.dia = hoy; Hist._p = null; return Hist.datos; })();
+    Hist._p = (async () => { try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/hist.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.fechas) && j.c) { Hist.datos = j; Hist._fi = null; Spy._divs = null; } } } } catch (e) {} Hist.dia = hoy; Hist._p = null; return Hist.datos; })();
     return Hist._p;
+  },
+  /** cierre "real" (sin ajustar por dividendos) de un ticker en la rueda i: cierre ajustado × escalón k (ver tools/tecnico.mjs). Sin k, el ajustado. */
+  raw(t, i) { const h = Hist.datos; const s = h && h.c[t]; if (!s || s[i] == null) return null; const k = h.k && h.k[t]; if (!k) return s[i]; let q = 1; for (const [j, r] of k) { if (j > i) break; q = r; } return s[i] * q; },
+  /** última rueda con datos ≤ fecha (índice en Hist.datos.fechas), o -1 */
+  rueda(fecha) { const h = Hist.datos; if (!h) return -1; const F = h.fechas; let lo = 0, hi = F.length - 1, best = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (F[mid] <= fecha) { best = mid; lo = mid + 1; } else hi = mid - 1; } return best; },
+  /** Lo que valía la cartera al cierre de una fecha pasada: tenencias de ese día (operaciones con fecha ≤ ese día; los lotes
+   *  sin fecha real entran el 31-dic) × cierre real de ese día. {fecha, V, completo, sinSerie[]} o null. Un ticker sin serie (ALUA)
+   *  entra a su costo y marca completo = false. */
+  valorEn(k, fecha) {
+    const h = Hist.datos; if (!h || !k || !k.ops) return null; const i = Hist.rueda(fecha); if (i < 0) return null; const f = h.fechas[i];
+    const q = {}, costo = {};
+    for (const o of k.ops) { if (o.fecha > f || o.tipo === 'dividendo') continue; const n = Number(o.acciones) || 0; if (o.tipo === 'compra') { q[o.ticker] = (q[o.ticker] || 0) + n; costo[o.ticker] = (costo[o.ticker] || 0) + n * (Number(o.precio) || 0); } else { q[o.ticker] = (q[o.ticker] || 0) - n; costo[o.ticker] = Math.max(0, (costo[o.ticker] || 0) - n * (Number(o.precio) || 0)); } }
+    let V = 0; const sinSerie = [];
+    for (const [t, n] of Object.entries(q)) { if (!(n > 1e-9)) continue; const px = Hist.raw(t, i); if (px != null) V += n * px; else { sinSerie.push(t); V += costo[t] || 0; } }
+    return { fecha: f, V, completo: !sinSerie.length, sinSerie };
   },
   /** índice diario de tus CEDEARs como los tuviste cada día (base 1 el día de la primera compra): {fechas, v} o null.
    *  Cada rueda: tenencia del día anterior × cierre de hoy / × cierre de ayer. Tickers sin serie quedan afuera ese día. */

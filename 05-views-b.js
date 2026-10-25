@@ -567,13 +567,20 @@ function mapaCartera(k) {
   return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), derCls: p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : '', act: 'pos', id: p.ticker })), franja) + lista;
 }
 
+/** ventana elegida para la card vs S&P: una fija (E.VENTANAS) o una fecha a mano ('d:AAAA-MM-DD'); devuelve {modo, v} */
+function ventanaElegida(k) {
+  const m = ui.carteraVentana;
+  if (m && m.startsWith('d:')) { const v = E.ventana(k, m); if (v.disponible) return { modo: m, v }; }
+  const modo = m && k.ventanas[m] && !k.ventanas[m].masLargo ? m : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
+  return { modo, v: k.ventanas[modo] };
+}
 function renderEvolucion(k, seg) {
-  const modo = ui.carteraVentana && k.ventanas[ui.carteraVentana] && !k.ventanas[ui.carteraVentana].masLargo ? ui.carteraVentana : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
-  const v = k.ventanas[modo];
-  const rangos = `<div class="seg rangos">${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}</div>`;
+  const { modo, v } = ventanaElegida(k);
+  const aMano = modo.startsWith('d:');
+  const rangos = `<div class="seg rangos">${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}<button class="${aMano ? 'on' : ''}" data-act="cartera-fecha" title="Elegir desde qué fecha">${aMano ? D.fmt(v.desde, { year: true }) : 'Fecha'}</button></div>`;
   if (!v || !v.disponible) return `<div class="card"><div class="card-head"><h2>vs S&P 500</h2>${seg}</div>${rangos}${empty({ kind: 'periodo', icon: 'cal', head: v && v.motivo || 'Sin datos para esta ventana', sub: 'Probá con un período más largo.' })}</div>`;
-  const r = v.rend; const alfaOk = r.alfa != null && r.alfa >= 0;
-  const serie = E.carteraSerie(k, modo);
+  const r = v.rend;
+  const serie = E.carteraSerie(k, modo, v);
   let chart = '';
   if (serie && serie.fechas.length > 2) {
     // en ventanas cortas (≤ 45 días) el eje va por día en vez de por mes: 1 M con un solo "sep" no dice nada
@@ -594,13 +601,23 @@ function renderEvolucion(k, seg) {
   const top = conAlfa.slice(0, 4), bottom = conAlfa.slice(-4).reverse().filter(p => !top.includes(p));
   const alfaRow = p => `<div class="alfa-row"><span>${esc(p.ticker)}${p.acciones <= 0 ? ' <small class="muted">cerrada</small>' : ''}</span><i><b style="width:${Math.min(100, Math.abs(p.alfaUSD) / Math.max(1, Math.abs(conAlfa[0].alfaUSD), Math.abs(conAlfa[conAlfa.length - 1].alfaUSD)) * 100).toFixed(0)}%;background:${p.alfaUSD >= 0 ? 'var(--good)' : 'var(--crit)'}"></b></i><b class="mono ${p.alfaUSD >= 0 ? 'up' : 'down'}">${p.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(p.alfaUSD), 0)}</b></div>`;
   const box = (l, v, cls, sub) => `<div class="box"><div class="l">${l}</div><div class="v ${cls}">${v}</div><div class="s">${sub}</div></div>`;
+  // Tres numeros (auditoria 25-oct): tu plata (TIR con dividendos), lo mismo en SPY (sombra total return, neta del 30 %) y la diferencia,
+  // en tasa ANUAL cuando la ventana tiene 180 dias o mas (es lo que se compara con un bono al 7 %); en ventanas cortas, lo acumulado
+  // (anualizar un mes multiplica cualquier racha por 12). Debajo, la plata: lo ganado en el periodo. Veredicto: ganas / empate / perdes (±1 pp).
+  const c = E.comparacion(v, k);
+  const usd = x => x == null ? '' : `${x >= 0 ? '+' : '−'}${fmtU(Math.abs(x), 0)}`;
+  const ppTxt = x => x == null ? '—' : `${x >= 0 ? '+' : '−'}${(Math.abs(x) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pp`;
+  const veredicto = c.veredicto === 'gana' ? 'Le ganás' : c.veredicto === 'pierde' ? 'Perdés' : 'Empate';
+  const vCls = c.veredicto === 'gana' ? 'good' : c.veredicto === 'pierde' ? 'crit' : 'warn';
   return `<div class="card"><div class="card-head"><h2>vs S&P 500 <button class="info-btn" data-act="cartera-info" data-id="${modo}" aria-label="Cómo se calcula">${ICONS.info}</button></h2>${seg}</div>
     ${rangos}
     <div class="evo-kpi">
-      ${box('Cartera', r.real != null ? pctS(r.real) : '—', r.real != null ? (r.real >= 0 ? 'up' : 'down') : '', k.valor != null ? fmtU(k.valor, 0) : 'sin precios')}
-      ${box('Sombra S&P', pctS(r.sombra), r.sombra >= 0 ? 'up' : 'down', fmtU(v.sombraValor, 0))}
-      ${box('Alfa', r.alfa != null ? `${r.alfa >= 0 ? '+' : '−'}${(Math.abs(r.alfa) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} pp` : '—', r.alfa != null ? (alfaOk ? 'up' : 'down') : '', r.alfaUSD != null ? `${r.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(r.alfaUSD), 0)}` : '')}
+      ${box('Tu plata', c.cartera != null ? pctS(c.cartera) : '—', c.cartera != null ? (c.cartera >= 0 ? 'up' : 'down') : '', c.ganancia != null ? usd(c.ganancia) : (k.valor != null ? fmtU(k.valor, 0) : 'sin precios'))}
+      ${box('En SPY', c.sombra != null ? pctS(c.sombra) : '—', c.sombra != null ? (c.sombra >= 0 ? 'up' : 'down') : '', c.gananciaSombra != null ? usd(c.gananciaSombra) : fmtU(v.sombraValor, 0))}
+      ${box('Diferencia', ppTxt(c.dif), c.veredicto === 'gana' ? 'up' : c.veredicto === 'pierde' ? 'down' : '', usd(c.difUSD))}
     </div>
+    <div class="evo-ver"><span class="dot ${vCls}"></span><b>${veredicto}</b>${c.dif != null ? ` ${c.veredicto === 'empate' ? 'a' : 'por'} ${(Math.abs(c.dif) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} puntos ${c.anual ? 'al año' : `en ${v.dias} días`}` : ''}</div>
+    <div class="evo-sub">${c.anual ? 'tasa anual' : `acumulado en ${v.dias} días`} · con dividendos · desde el ${D.fmt(v.desde, { year: true })}${v.aprox ? ' · valuación inicial aproximada' : ''}</div>
     ${riesgoRow(k, v)}
     ${chart}
     ${conAlfa.length ? `<div class="divider"></div><div class="card-head" style="margin-bottom:6px"><h3>Alfa por posición</h3><span class="hint">vs SPY, desde el inicio</span></div>${top.map(alfaRow).join('')}${bottom.length ? `<div class="divider" style="margin:6px 0"></div>${bottom.map(alfaRow).join('')}` : ''}` : ''}
@@ -616,7 +633,7 @@ function riesgoRow(k, v) {
   const info = `Medidas desde el ${D.fmt(x.desde, { year: true })} hasta el cierre del ${D.fmt(x.hasta)} (${x.ruedas} ruedas), con los cierres diarios ajustados por splits y dividendos.\n\nPor tiempo (TWR): lo que rindió tu cartera sin importar cuándo pusiste plata, como lo informa un fondo. Se compara con SPY con dividendos.\n\nBeta: cuánto se mueve tu cartera cuando se mueve el S&P 500, medida con tus rendimientos diarios reales (1 = igual; 1,3 = 30 % más). ${bp ? `La de Finnhub ponderada por posición da ${bp.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 })}.` : ''}\n\nAlfa ajustado (Jensen): lo que ganaste por encima de lo que el mercado "te debía" por el riesgo que tomaste: tu rendimiento menos [tasa libre de riesgo + beta × (S&P − tasa libre)], con ${Math.round(x.rfAnual * 100)} % anual en dólares. Si da cerca de cero, le ganás al S&P por tomar más riesgo, no por elegir mejor. Con menos de un año de datos es orientativo.\n\nCaída máxima: lo más que cayó tu cartera desde un pico en este período. Para un inversor de largo plazo es la medida de riesgo que importa: si aguantás eso sin vender.`;
   return `<div class="riesgo">
     ${it('Por tiempo', `${pp(x.twr)} %`, x.twr >= 0 ? 'up' : 'down', `S&P ${pp(x.spy)} %`)}
-    ${it('Beta', x.beta != null ? x.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—', '', x.beta != null ? 'vs S&P, diaria' : 'pocos datos')}
+    ${it('Beta', x.beta != null ? x.beta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—', '', x.beta != null ? 'vs S&P, diaria' : 'pocos datos')}
     ${it('Alfa ajustado', x.alfa != null ? `${pp(x.alfa)} pp` : '—', x.alfa != null ? (x.alfa >= 0 ? 'up' : 'down') : '', x.alfa != null ? 'por riesgo' : 'desde 60 ruedas')}
     ${it('Caída máx.', `${pp(x.dd)} %`, x.dd < -0.1 ? 'down' : '', x.ddPiso ? (x.recuperada ? `recuperada ${D.fmt(x.recuperada)}` : `piso ${D.fmt(x.ddPiso)}`) : 'sin caídas')}
     <span class="rk-i">${infoBtn(info)}</span>
@@ -624,18 +641,23 @@ function riesgoRow(k, v) {
 }
 /** ⓘ de la comparación: las tres medidas que usan los pros (acumulado money-weighted, TIR anual, TWR), cómo se arma la sombra y salvedades */
 function infoEvolucion(modo) {
-  const k = E.cartera(); const v = k.ventanas[modo] || k.ventanas.anio; if (!v || !v.disponible) return;
-  const r = v.rend; const puntos = Object.keys(state.cartera.historial || {}).length; const anual = v.dias >= 30;
-  const p = x => x == null ? '<span class="muted">—</span>' : `<span class="${x >= 0 ? 'up' : 'down'}">${pctS(x)}</span>`;
-  const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
-    <tr><td>Acumulado<small>${r.metodo === 'tir' ? 'ponderado por dinero (TIR)' : 'ponderado por dinero (Dietz)'}</small></td><td>${p(r.real)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
-    <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirReal) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
-    <tr><td>Ponderado por tiempo<small>${r.twr == null && !Hist.riesgo(k, v.desde) && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr != null ? r.twr : (Hist.riesgo(k, v.desde) || {}).twr)}</td><td>${p(r.twr != null ? r.spyDirecto : (Hist.riesgo(k, v.desde) || {}).spy)}</td><td>${p(r.spyDirecto)}</td></tr>
+  const k = E.cartera(); const v = modo && modo.startsWith('d:') ? E.ventana(k, modo) : (k.ventanas[modo] || k.ventanas.anio); if (!v || !v.disponible) return;
+  const r = v.rend; const c = E.comparacion(v, k); const anual = v.dias >= 30; const x = Hist.riesgo(k, v.desde);
+  const p = y => y == null ? '<span class="muted">—</span>' : `<span class="${y >= 0 ? 'up' : 'down'}">${pctS(y)}</span>`;
+  const u = y => y == null ? '<span class="muted">—</span>' : `<span class="${y >= 0 ? 'up' : 'down'}">${y >= 0 ? '+' : '−'}${fmtU(Math.abs(y), 0)}</span>`;
+  const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Tu plata</th><th>En SPY</th><th>SPY solo</th></tr></thead><tbody>
+    <tr><td>Ganado<small>en dólares, con dividendos</small></td><td>${u(c.ganancia)}</td><td>${u(c.gananciaSombra)}</td><td></td></tr>
+    <tr><td>Capital promedio<small>lo que estuvo invertido</small></td><td>${c.capital != null ? fmtU(c.capital, 0) : '—'}</td><td class="muted">igual</td><td></td></tr>
+    <tr><td>En el período<small>TIR llevada a ${v.dias} días</small></td><td>${p(r.realDiv)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
+    <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirRealDiv) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
+    <tr><td>Por tiempo<small>TWR, sin efecto de tus aportes</small></td><td>${p(x ? x.twr : r.twr)}</td><td>${p(x ? x.spy : r.spyDirecto)}</td><td>${p(x ? x.spy : r.spyDirecto)}</td></tr>
   </tbody></table>`;
   Modal.open({ title: 'Cómo se calcula', submit: '', body: `<div class="stack small" style="line-height:1.5">
     ${tabla}
-    <p><b>Precio contra precio.</b> Acá no cuentan dividendos, ni los tuyos ni los del S&P: solo compras, ventas y cotización. Con dividendos, tu cartera rindió ${r.realDiv != null ? pctS(r.realDiv) : '—'} en este rango${r.dividendosVentana ? ` (${fmtU(r.dividendosVentana)} cobrados)` : ''}: es el número de la card "Valor de la cartera". <b>Acumulado</b> es lo que ves en las cajas: cuánto rindió tu plata en el rango contando cuándo entró cada aporte (TIR, el "personal rate of return" de Fidelity o Sharesight). <b>TIR anual</b> es esa misma tasa expresada por año. <b>TWR</b> es la norma profesional (GIPS): mide tu selección de activos sin premiar ni castigar el momento de los aportes; acá se aproxima entre valuaciones guardadas (${puntos} hasta ahora, una por día al traer precios).</p>
-    <p><b>Sombra S&P 500.</b> ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}; después` : `Arranca en cero el ${D.fmt(v.desde, { year: true })} y`} cada compra o venta se replica el mismo día en SPY por el mismo monto. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día. Alfa = cartera − sombra, en puntos y en dólares.</p>
+    <p><b>Tu plata.</b> La tasa interna de retorno (TIR) de tus compras, ventas y dividendos cobrados en sus fechas y el valor de hoy: lo que rindió cada dólar el tiempo que estuvo invertido. Es una <b>velocidad</b>: si de acá en más nada se mueve, la tasa anual baja con los días aunque la ganancia en dólares siga igual. Por eso en ventanas de menos de 180 días las cajas muestran lo acumulado y no la tasa anual (anualizar un mes multiplica cualquier racha por 12). <b>Ganado</b> es la distancia: dólares que entraron a tu bolsillo o a tu cartera en el período.</p>
+    <p><b>En SPY.</b> Tus mismos aportes y retiros, en las mismas fechas, comprando SPY (S&P 500) en lugar de lo que compraste, con los dividendos de SPY reinvertidos netos de la retención del 30 % que le cobran a un tenedor de CEDEAR. ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}.` : `Arranca en cero el ${D.fmt(v.desde, { year: true })}.`} Es la comparación justa: misma plata, mismo momento, dos destinos. <b>Diferencia</b> = tu plata − en SPY; con ±1 punto por año es empate.</p>
+    <p><b>Por tiempo (TWR).</b> La norma de los fondos: encadena el rendimiento diario de lo que tenías cada día, sin premiar ni castigar el momento de tus aportes. Mide la selección de acciones. Desde el inicio está dominada por los meses en que había una sola acción: mirala en YTD o en 1 A.</p>
+    <p><b>Valuaciones.</b> La cartera se valúa cualquier día pasado con los cierres de ese día (sec/hist.json, ajustados por splits), lo que habilita todas las ventanas y la fecha a mano. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día.</p>
     ${v.nota ? `<p class="callout amber" style="margin:0">${esc(v.nota)}</p>` : ''}
   </div>` });
 }

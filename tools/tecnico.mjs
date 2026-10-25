@@ -7,16 +7,20 @@ async function stooq(t) {
   const s = t.toLowerCase().replace('.', '-') + '.us';
   const r = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(s)}&i=d`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
   if (!r.ok) return null; const txt = await r.text(); if (!/^Date,/.test(txt)) return null;
-  const filas = txt.trim().split('\n').slice(1).map(l => l.split(',')).map(c => ({ d: c[0], c: Number(c[4]) })).filter(x => x.d && Number.isFinite(x.c) && x.c > 0);
+  // Stooq: cierre sin ajustar por dividendos (r = c)
+  const filas = txt.trim().split('\n').slice(1).map(l => l.split(',')).map(c => ({ d: c[0], c: Number(c[4]), r: Number(c[4]) })).filter(x => x.d && Number.isFinite(x.c) && x.c > 0);
   return filas.length > 250 ? filas : null;
 }
-async function yahoo(t) {
+async function yahoo(t, conDivs = false) {
   const s = t.replace('.', '-');
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=12y&interval=1d&events=split`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=12y&interval=1d&events=${conDivs ? 'div%7Csplit' : 'split'}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
   if (!r.ok) return null; const j = await r.json(); const res = j && j.chart && j.chart.result && j.chart.result[0]; if (!res) return null;
-  const ts = res.timestamp || [], adj = (res.indicators.adjclose && res.indicators.adjclose[0].adjclose) || res.indicators.quote[0].close;
-  const filas = ts.map((x, i) => ({ d: new Date(x * 1000).toISOString().slice(0, 10), c: Number(adj[i]) })).filter(x => Number.isFinite(x.c) && x.c > 0);
-  return filas.length > 250 ? filas : null;
+  // c = cierre ajustado por splits y dividendos (para EMA, TWR); r = cierre ajustado solo por splits (para valuar la cartera un dia dado)
+  const ts = res.timestamp || [], raw = res.indicators.quote[0].close, adj = (res.indicators.adjclose && res.indicators.adjclose[0].adjclose) || raw;
+  const filas = ts.map((x, i) => ({ d: new Date(x * 1000).toISOString().slice(0, 10), c: Number(adj[i]), r: Number(raw[i]) })).filter(x => Number.isFinite(x.c) && x.c > 0 && Number.isFinite(x.r) && x.r > 0);
+  if (filas.length <= 250) return null;
+  if (conDivs) { const dv = res.events && res.events.dividends || {}; filas.divs = {}; for (const e of Object.values(dv)) { const d = new Date(e.date * 1000).toISOString().slice(0, 10); if (Number(e.amount) > 0) filas.divs[d] = +Number(e.amount).toFixed(5); } }
+  return filas;
 }
 function analizar(f) {
   // EMA 200 y SMA 200 sobre cierres ajustados; "toques": veces que el cierre bajo a la EMA 200 (o por debajo)
@@ -48,21 +52,31 @@ const main = async () => {
   const t0 = Date.now(); let i = 0; let stooqMuerto = false;
   const uno = async t => {
     let f = null, src = null;
-    try { f = await yahoo(t); if (f) src = 'yahoo'; } catch (e) {}
+    try { f = await yahoo(t, t === 'SPY'); if (f) src = 'yahoo'; } catch (e) {}
     if (!f && !stooqMuerto) { try { f = await stooq(t); if (f) src = 'stooq'; } catch (e) { if (e.name === 'TimeoutError') stooqMuerto = true; } }
     if (!f) { dbg.falla.push(t); return; }
-    series[t] = f.slice(-420);  // ~20 meses de cierres ajustados: la app arma el indice diario de la cartera (reserva vs cartera)
+    series[t] = f.filter(x => x.d >= '2025-01-01');  // desde 2025: la app arma el indice diario de la cartera y valua cualquier dia pasado (toda la historia de Facu)
+    if (f.divs) series[t].divs = f.divs;
     try { out[t] = analizar(f); dbg.ok++; dbg[src]++; } catch (e) { dbg.falla.push(t + ':' + e.message); }
   };
   await Promise.all([0, 1, 2, 3].map(async () => { while (i < universo.length && Date.now() - t0 < 20 * 60000) { const t = universo[i++]; await uno(t); await sleep(120); } }));
   dbg.segundos = Math.round((Date.now() - t0) / 1000);
   fs.mkdirSync('sec', { recursive: true });
   fs.writeFileSync('sec/tecnico.json', JSON.stringify(out));
-  // sec/hist.json: cierres ajustados (splits y dividendos) alineados a las ruedas de SPY, compactos
+  // sec/hist.json: cierres ajustados (splits y dividendos) alineados a las ruedas de SPY, compactos.
+  // k[t] = escalones [indice, cierre sin dividendos / cierre ajustado]: cambia solo en cada ex-dividendo, asi el cierre "real"
+  // de un dia es c[i] * k (ultimo escalon <= i). spyDivs = dividendos de SPY por ex-fecha (la sombra S&P total return).
   if (series.SPY) {
-    const fechas = series.SPY.map(x => x.d); const c = {};
-    for (const [t, f] of Object.entries(series)) { const m = new Map(f.map(x => [x.d, x.c])); let ult = null; const arr = fechas.map(d => { const v = m.get(d); if (v != null) ult = v; return ult == null ? null : +Number(ult).toPrecision(6); }); if (arr.some(v => v != null)) c[t] = arr; }
-    fs.writeFileSync('sec/hist.json', JSON.stringify({ generado: new Date().toISOString(), fechas, c }));
+    const fechas = series.SPY.map(x => x.d); const c = {}, k = {};
+    for (const [t, f] of Object.entries(series)) {
+      const m = new Map(f.map(x => [x.d, x])); let ult = null; const arr = fechas.map(d => { const v = m.get(d); if (v != null) ult = v; return ult == null ? null : +Number(ult.c).toPrecision(6); });
+      if (!arr.some(v => v != null)) continue; c[t] = arr;
+      let prev = null; const esc = []; ult = null;
+      fechas.forEach((d, i) => { const v = m.get(d); if (v != null) ult = v; if (!ult) return; const q = +(ult.r / ult.c).toFixed(6); if (prev == null || Math.abs(q - prev) > 5e-6) { esc.push([i, q]); prev = q; } });
+      if (esc.length && !(esc.length === 1 && Math.abs(esc[0][1] - 1) < 5e-6)) k[t] = esc;
+    }
+    const spyDivs = Object.fromEntries(Object.entries(series.SPY.divs || {}).filter(([d]) => d >= '2025-01-01').sort());
+    fs.writeFileSync('sec/hist.json', JSON.stringify({ generado: new Date().toISOString(), fechas, c, k, spyDivs }));
   }
   fs.writeFileSync('sec/_tecnico_debug.json', JSON.stringify(dbg, null, 1));
   console.log(`ok ${dbg.ok} (stooq ${dbg.stooq}, yahoo ${dbg.yahoo}) · falla ${dbg.falla.length}`);

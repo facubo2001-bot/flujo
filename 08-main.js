@@ -167,6 +167,13 @@ const Actions = {
   'grupo-set'(v) { const [t, g] = v.split('|'); if (!state.cartera.grupos) state.cartera.grupos = {}; state.cartera.grupos[t] = g; Persist.save(); Modal.close(); render(); },
   'cartera-info'(v) { infoEvolucion(v); },
   'cartera-ventana'(v) { const k = E.cartera(); const w = k.ventanas[v]; if (w && !w.disponible) { toast(w.motivo || 'Rango no disponible todavía', 4500); return; } ui.carteraVentana = v; render(); },
+  /** vs S&P desde una fecha a mano (Facu: "elegir entre qué fechas"): la cartera se valúa al cierre de ese día con sec/hist.json */
+  'cartera-fecha'() {
+    const k = E.cartera(); const hoy = D.today(); const min = k.primeraOp || hoy; const act = ui.carteraVentana && ui.carteraVentana.startsWith('d:') ? ui.carteraVentana.slice(2) : '';
+    const body = `<div class="stack"><div class="field"><label for="cv-fecha">Desde el</label><input id="cv-fecha" class="input" type="date" value="${act}" min="${min}" max="${D.addDays(hoy, -1)}"></div>
+      <p class="small muted" style="margin:0">Compara tu plata contra el S&P 500 desde ese día hasta hoy. La cartera se valúa con los cierres de ese día.${Hist.datos ? '' : ' (Todavía no cargaron los cierres históricos: probá de nuevo en unos segundos.)'}</p></div>`;
+    Modal.open({ title: 'Desde qué fecha', body, submit: 'Ver', onSubmit: () => { const f = Modal.val('cv-fecha'); if (!f) { toast('Elegí una fecha'); return false; } if (f < min) { toast(`Tu historia arranca el ${D.fmt(min, { year: true })}`); return false; } const v = E.ventana(k, 'd:' + f); if (!v.disponible) { toast(v.motivo || 'No se puede valuar la cartera en esa fecha', 4500); return false; } ui.carteraVentana = 'd:' + f; render(); } });
+  },
   'edit-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (o) formOp({ ...o }); },
   'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
   'export-claude'() { formExportar(); },

@@ -650,7 +650,7 @@ tr.day td{background:var(--surface)}
 .ccl-info span{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .op-row .sub{white-space:normal}
 /* vs S&P 500: tres cajas idénticas, centradas */
-.evo-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.evo-kpi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 8px}
 .evo-kpi .box{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:84px;padding:10px 6px;border-radius:var(--r-sm);background:var(--surface-3);border:0px solid var(--line);text-align:center}
 .evo-kpi .box .l{font-size:10.5px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
 .evo-kpi .box .v{font-family:var(--font-display);font-size:21px;font-weight:900;letter-spacing:-.04em;line-height:1.1;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -1316,6 +1316,12 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 #tooltip{width:max-content;max-width:300px}
 #tooltip .row{flex-wrap:nowrap}
 #tooltip .row span,#tooltip .row b{white-space:nowrap}
+/* vs S&P: veredicto debajo de las tres cajas (25-oct) */
+.evo-ver{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--ink-2);margin:0}
+.evo-ver b{color:var(--ink);font-weight:800}
+.evo-sub{font-size:11.5px;color:var(--ink-3);margin:2px 0 6px 15px}
+.evo-ver .dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.evo-ver .dot.good{background:var(--good)} .evo-ver .dot.warn{background:var(--warn)} .evo-ver .dot.crit{background:var(--crit)}
 
 </style>
 <script type="application/json" id="flujo-data">null</script>
@@ -1659,7 +1665,7 @@ function defaultState() {
     cartera: { operaciones: [], alertas: {}, precios: {}, preciosFecha: null, historial: {}, spy: {}, inicio: null, fund: {} },
   };
 }
-const BUILD = '202610230331';
+const BUILD = '202610251848';
 let state = defaultState();
 const ui = { view: 'resumen', mes: D.thisMonth(), cur: 'ARS', sort: { key: 'fecha', dir: -1 }, filtros: {}, trendRange: 6 };
 
@@ -2059,11 +2065,13 @@ const Spy = {
   fechas() { Spy.tabla(); return Spy._keys; },
   /** último cierre conocido ≤ fecha */
   /** Dividendos de SPY (ex-fecha → USD por acción), para que la sombra sea S&P 500 *total return*: se reinvierten al cierre de la ex-fecha */
-  divs() { if (!Spy._divs) { const d = typeof SPY_DIVS !== 'undefined' && SPY_DIVS.divs ? SPY_DIVS.divs : {}; Spy._divs = Object.keys(d).sort().map(f => ({ fecha: f, monto: Number(d[f]) || 0 })); } return Spy._divs; },
-  /** factor de reinversión de dividendos de SPY para acciones tenidas desde `desde` (exclusive) hasta `hasta` (inclusive): Π (1 + div / cierre ex-fecha) */
-  /** Decisión de diseño (sep-2026): la comparación contra el S&P 500 es precio contra precio, sin dividendos de ningún lado → TR apagado (los datos quedan por si algún día se quiere total return) */
-  TR: false,
-  factor(desde, hasta) { if (!Spy.TR) return 1; let f = 1; for (const d of Spy.divs()) { if (d.fecha <= desde) continue; if (d.fecha > hasta) break; const c = Spy.at(d.fecha); if (c && d.monto) f *= 1 + d.monto / c; } return f; },
+  /** dividendos de SPY por ex-fecha: los embebidos (data/spy-divs.json) más los que trae sec/hist.json cada día (Hist.datos.spyDivs), así no quedan viejos */
+  divs() { if (!Spy._divs) { const d = { ...(typeof SPY_DIVS !== 'undefined' && SPY_DIVS.divs ? SPY_DIVS.divs : {}), ...((typeof Hist !== 'undefined' && Hist.datos && Hist.datos.spyDivs) || {}) }; Spy._divs = Object.keys(d).sort().map(f => ({ fecha: f, monto: Number(d[f]) || 0 })); } return Spy._divs; },
+  /** factor de reinversión de dividendos de SPY para acciones tenidas desde `desde` (exclusive) hasta `hasta` (inclusive): Π (1 + div·(1−RET) / cierre ex-fecha) */
+  /** Desde el 25-oct-2026 (auditoría): la sombra S&P es total return, con los dividendos de SPY netos de la retención del 30 % que
+   *  le cobran a un tenedor de CEDEAR de SPY. Antes era precio contra precio, que inflaba el alfa ~1 pp por año. */
+  TR: true, RET: 0.30,
+  factor(desde, hasta) { if (!Spy.TR) return 1; let f = 1; for (const d of Spy.divs()) { if (d.fecha <= desde) continue; if (d.fecha > hasta) break; const c = Spy.at(d.fecha); if (c && d.monto) f *= 1 + d.monto * (1 - Spy.RET) / c; } return f; },
   /** fecha del último cierre conocido ≤ fecha (null si no hay) */
   fechaDe(fecha) { const m = Spy.tabla(); if (m[fecha]) return fecha; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best; },
   at(fecha) { const m = Spy.tabla(); if (m[fecha]) return m[fecha]; const k = Spy._keys; let lo = 0, hi = k.length - 1, best = null; while (lo <= hi) { const mid = (lo + hi) >> 1; if (k[mid] <= fecha) { best = k[mid]; lo = mid + 1; } else hi = mid - 1; } return best ? m[best] : null; },
@@ -2232,8 +2240,23 @@ const Hist = {
   cargar() {
     const hoy = D.today(); if (Hist.dia === hoy && Hist.datos) return Promise.resolve(Hist.datos);
     if (Hist._p) return Hist._p;
-    Hist._p = (async () => { try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/hist.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.fechas) && j.c) Hist.datos = j; } } } catch (e) {} Hist.dia = hoy; Hist._p = null; return Hist.datos; })();
+    Hist._p = (async () => { try { if (location.protocol.startsWith('http')) { const r = await fetch(`sec/hist.json?d=${hoy}`, { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.fechas) && j.c) { Hist.datos = j; Hist._fi = null; Spy._divs = null; } } } } catch (e) {} Hist.dia = hoy; Hist._p = null; return Hist.datos; })();
     return Hist._p;
+  },
+  /** cierre "real" (sin ajustar por dividendos) de un ticker en la rueda i: cierre ajustado × escalón k (ver tools/tecnico.mjs). Sin k, el ajustado. */
+  raw(t, i) { const h = Hist.datos; const s = h && h.c[t]; if (!s || s[i] == null) return null; const k = h.k && h.k[t]; if (!k) return s[i]; let q = 1; for (const [j, r] of k) { if (j > i) break; q = r; } return s[i] * q; },
+  /** última rueda con datos ≤ fecha (índice en Hist.datos.fechas), o -1 */
+  rueda(fecha) { const h = Hist.datos; if (!h) return -1; const F = h.fechas; let lo = 0, hi = F.length - 1, best = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (F[mid] <= fecha) { best = mid; lo = mid + 1; } else hi = mid - 1; } return best; },
+  /** Lo que valía la cartera al cierre de una fecha pasada: tenencias de ese día (operaciones con fecha ≤ ese día; los lotes
+   *  sin fecha real entran el 31-dic) × cierre real de ese día. {fecha, V, completo, sinSerie[]} o null. Un ticker sin serie (ALUA)
+   *  entra a su costo y marca completo = false. */
+  valorEn(k, fecha) {
+    const h = Hist.datos; if (!h || !k || !k.ops) return null; const i = Hist.rueda(fecha); if (i < 0) return null; const f = h.fechas[i];
+    const q = {}, costo = {};
+    for (const o of k.ops) { if (o.fecha > f || o.tipo === 'dividendo') continue; const n = Number(o.acciones) || 0; if (o.tipo === 'compra') { q[o.ticker] = (q[o.ticker] || 0) + n; costo[o.ticker] = (costo[o.ticker] || 0) + n * (Number(o.precio) || 0); } else { q[o.ticker] = (q[o.ticker] || 0) - n; costo[o.ticker] = Math.max(0, (costo[o.ticker] || 0) - n * (Number(o.precio) || 0)); } }
+    let V = 0; const sinSerie = [];
+    for (const [t, n] of Object.entries(q)) { if (!(n > 1e-9)) continue; const px = Hist.raw(t, i); if (px != null) V += n * px; else { sinSerie.push(t); V += costo[t] || 0; } }
+    return { fecha: f, V, completo: !sinSerie.length, sinSerie };
   },
   /** índice diario de tus CEDEARs como los tuviste cada día (base 1 el día de la primera compra): {fechas, v} o null.
    *  Cada rueda: tenencia del día anterior × cierre de hoy / × cierre de ayer. Tickers sin serie quedan afuera ese día. */
@@ -3428,9 +3451,10 @@ const E = {
     for (const o of ops) {
       const p = get(o.ticker); p.nOps++;
       const q = Number(o.acciones) || 0, px = Number(o.precio) || 0; let qFlujo = q;
+      let conDiv = 0;  // parte de la compra pagada con dividendos cobrados: para la sombra no es plata nueva (SPY ya reinvierte los suyos)
       if (o.tipo === 'compra') { p.lotes.push({ q, px, fecha: o.fecha, id: o.id }); p.acciones += q; p.costo += q * px;
         let resto = q * px; const dc = Number(o.deCaja != null ? o.deCaja : o.deDividendos) || 0;
-        if (dc > 0) { const u = Math.min(dc, resto, poolDiv + poolVentas); const d1 = Math.min(u, poolDiv); poolDiv -= d1; poolVentas -= u - d1; resto -= u; cajaUsada += u; }
+        if (dc > 0) { const u = Math.min(dc, resto, poolDiv + poolVentas); const d1 = Math.min(u, poolDiv); poolDiv -= d1; poolVentas -= u - d1; resto -= u; cajaUsada += u; conDiv = d1; }
         if (!o.plataNueva && poolVentas > 0 && resto > 0) { const u = Math.min(poolVentas, resto); poolVentas -= u; cajaUsada += u; resto -= u; }
         if (!o.plataNueva && resto > 0) sinCubrir[o.fecha] = (sinCubrir[o.fecha] || 0) + resto; }
       else if (o.tipo === 'venta') {
@@ -3445,8 +3469,8 @@ const E = {
       // lote previo sin fecha real ("año cero"): para medir rendimiento entra el 31-dic a lo que valía ese día, no a su costo
       // (si entrara al costo, toda la ganancia de antes aparecería como ganada en pocos días). El costo y la ganancia en USD no cambian.
       const sd = state.cartera.inicio; const mRet = o.legado && o.tipo === 'compra' && sd && sd.precios && sd.precios[o.ticker] && o.fecha <= sd.fecha ? q * sd.precios[o.ticker] : null;
-      flujos.push({ fecha: o.fecha, monto, montoRet: mRet, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
-      if (spx && o.tipo !== 'dividendo') p.spyShares += (mRet != null ? mRet : monto) / spx * Spy.factor(o.fecha, hoy);  // vs S&P: precio contra precio, los dividendos no entran
+      flujos.push({ fecha: o.fecha, monto, montoRet: mRet, montoSombra: monto - conDiv, spy: spx, tipo: o.tipo, ticker: o.ticker, legado: !!o.legado, id: o.id });
+      if (spx && o.tipo !== 'dividendo') p.spyShares += (mRet != null ? mRet : monto - conDiv) / spx * Spy.factor(o.fecha, hoy);  // vs S&P total return (Spy.factor: dividendos de SPY netos del 30 %)
       p.flujoNeto += monto;
     }
     const mep = Number(state.settings.tc) || 0, ccl = Number(state.settings.ccl) || mep;
@@ -3516,6 +3540,18 @@ const E = {
       if (Math.abs(nr - r) < 1e-10) { r = nr; break; } r = nr;
     }
     return isFinite(r) ? r : null;
+  },
+  /** Los tres numeros de la card vs S&P para una ventana (auditoria 25-oct-2026): tu plata (TIR con dividendos), lo mismo en SPY
+   *  (sombra total return neta del 30 %), diferencia y veredicto. En tasa anual si la ventana tiene >= 180 dias; si no, acumulado.
+   *  ganancia = lo que entro a tu bolsillo o a tu cartera en el periodo (valor hoy + dividendos + ventas - lo que tenias - compras). */
+  comparacion(v, k) {
+    if (!v || !v.disponible) return null; const r = v.rend; const anual = v.dias >= 180;
+    const cartera = anual ? r.tirRealDiv : r.realDiv, sombra = anual ? r.tirSombra : r.sombra;
+    const dif = cartera != null && sombra != null ? cartera - sombra : null;
+    const umbral = anual ? 0.01 : 0.005;
+    const ganancia = k.valor != null ? k.valor - v.V0 - r.aportesNetos + r.dividendosVentana : null;
+    const gananciaSombra = v.sombraValor - v.V0 - r.aportesSombra;
+    return { anual, cartera, sombra, dif, difUSD: r.alfaUSD, ganancia, gananciaSombra, capital: r.capital, veredicto: dif == null ? null : dif > umbral ? 'gana' : dif < -umbral ? 'pierde' : 'empate' };
   },
   /** Modified Dietz entre dos valuaciones: (V1 − V0 − ΣF) / (V0 + Σ F_i·w_i), w_i = fracción del período que el flujo estuvo invertido */
   dietz(v0, v1, flujos, desde, hasta) {
@@ -3671,6 +3707,8 @@ const E = {
   },
   VENTANAS: [['1m', '1 M'], ['6m', '6 M'], ['anio', 'YTD'], ['1a', '1 A'], ['3a', '3 A'], ['inicio', 'Todo']],
   /** costo (FIFO) de lo que se tenia al cierre de una fecha, con las operaciones de hoy */
+  /** costo (FIFO) de lo que se tenia de un ticker a una fecha */
+  costoDe(k, t, fecha) { const L = []; for (const o of k.ops) { if (o.fecha > fecha || o.ticker !== t || o.tipo === 'dividendo') continue; const q = Number(o.acciones) || 0; if (o.tipo === 'compra') L.push([q, Number(o.precio) || 0]); else { let r = q; while (r > 1e-9 && L.length) { const x = Math.min(L[0][0], r); L[0][0] -= x; r -= x; if (L[0][0] <= 1e-9) L.shift(); } } } return L.reduce((a, [q, px]) => a + q * px, 0); },
   costoAl(k, fecha) {
     const m = k._costoAl || (k._costoAl = {}); if (m[fecha] != null) return m[fecha];
     const lotes = {};
@@ -3691,13 +3729,20 @@ const E = {
     if (c.inicio && c.inicio.fecha <= fecha && c.inicio.spy) {
       const seed = c.inicio; const esInicial = o => o.fecha <= seed.fecha || !!o.legado; const pos0 = {};
       for (const o of k.ops) if (esInicial(o) && o.tipo !== 'dividendo') pos0[o.ticker] = (pos0[o.ticker] || 0) + (o.tipo === 'compra' ? Number(o.acciones) || 0 : -(Number(o.acciones) || 0));
-      const V = sum(Object.entries(pos0).map(([t, q]) => q > 1e-9 && seed.precios && seed.precios[t] ? q * seed.precios[t] : 0));
-      cands.push({ fecha: seed.fecha, V, spy: seed.spy, tipo: 'seed', esInicial });
+      // precio del seed; si falta, el cierre de ese dia (sec/hist.json); si tampoco, el costo (y se avisa). Antes un ticker sin precio valia 0.
+      const ri = typeof Hist !== 'undefined' ? Hist.rueda(seed.fecha) : -1; const sinPrecio = [];
+      const V = sum(Object.entries(pos0).map(([t, q]) => { if (!(q > 1e-9)) return 0; const px = seed.precios && seed.precios[t]; if (px) return q * px; const hp = ri >= 0 ? Hist.raw(t, ri) : null; if (hp != null) return q * hp; sinPrecio.push(t); return E.costoDe(k, t, seed.fecha); }));
+      cands.push({ fecha: seed.fecha, V, spy: seed.spy, tipo: 'seed', esInicial, aprox: sinPrecio.length > 0, sinSerie: sinPrecio });
     }
     const h = c.historial || {};
     for (const f of Object.keys(h)) if (f <= fecha && h[f].spy && E.fotoOk(k, f, h[f])) cands.push({ fecha: f, V: h[f].v, spy: h[f].spy, tipo: 'snapshot', esInicial: o => o.fecha <= f });
+    // cierres diarios (sec/hist.json): la cartera se puede valuar al cierre de cualquier dia pasado -> todas las ventanas estan disponibles.
+    // Gana sobre la foto del mismo dia (la foto es del momento en que se abrio la app, el cierre es verificable); el seed del 31-dic gana sobre todo.
+    const hv = typeof Hist !== 'undefined' ? Hist.valorEn(k, fecha) : null;
+    if (hv && hv.V > 0) { const f = hv.fecha; const spy = Spy.at(f); if (spy) cands.push({ fecha: f, V: hv.V, spy, tipo: 'hist', esInicial: o => o.fecha <= f, aprox: !hv.completo, sinSerie: hv.sinSerie }); }
     if (!cands.length) return null;
-    cands.sort((a, b) => a.fecha.localeCompare(b.fecha)); return cands[cands.length - 1];
+    const PRIO = { seed: 3, hist: 2, snapshot: 1 };
+    cands.sort((a, b) => a.fecha.localeCompare(b.fecha) || PRIO[a.tipo] - PRIO[b.tipo]); return cands[cands.length - 1];
   },
   /** TWR desde la primera valuacion diaria real hasta hoy (encadenando Dietz entre valuaciones guardadas) */
   twrReal(k) {
@@ -3717,11 +3762,13 @@ const E = {
     if (!k.primeraOp) return { disponible: false, modo, motivo: 'Sin operaciones.' };
     let objetivo;  // fecha de arranque deseada
     if (modo === 'inicio') objetivo = k.primeraOp;
+    else if (modo.startsWith('d:')) objetivo = modo.slice(2);  // fecha elegida a mano (Facu: "elegir entre qué fechas")
     else if (modo === 'anio') objetivo = `${Number(hoy.slice(0, 4)) - 1}-12-31`;
     else if (modo.endsWith('m')) { const n = Number(modo.replace('m', '')); const d = D.parse(hoy); d.setMonth(d.getMonth() - n); objetivo = D.iso(d); }
     else { const n = Number(modo.replace('a', '')); const d = D.parse(hoy); d.setFullYear(d.getFullYear() - n); objetivo = D.iso(d); }
     // cuanto puede alejarse la valuacion guardada de la fecha buscada: en un mes, una semana; en seis, un mes
     const tolerancia = modo === '1m' ? 7 : modo === '6m' ? 30 : 45;
+    if (modo.startsWith('d:') && (!/^\d{4}-\d{2}-\d{2}$/.test(objetivo) || objetivo >= hoy)) return { disponible: false, modo, objetivo, motivo: 'Elegí una fecha anterior a hoy.' };
     let desde, V0 = 0, S0 = 0, spy0, esInicial = () => false, aprox = false, nota = '';
     // un rango que arranca antes de la primera operacion es igual a "Todo": no se muestra (3 A / 5 A con 570 dias de historia)
     if (modo !== 'inicio' && D.daysBetween(objetivo, k.primeraOp) > 15) return { disponible: false, modo, objetivo, masLargo: true, motivo: `Tu historia arranca el ${D.fmt(k.primeraOp, { year: true })}: este rango es igual a Todo.` };
@@ -3732,26 +3779,29 @@ const E = {
       const val = E.valuacionEn(k, objetivo);
       if (!val || D.daysBetween(val.fecha, objetivo) > tolerancia) return { disponible: false, modo, objetivo, motivo: `Todavía no hay una valuación guardada cerca del ${D.fmt(objetivo, { year: true })}. La app guarda una por día hábil cuando trae precios: este rango se habilita solo.` };
       if (D.daysBetween(val.fecha, objetivo) > 3) { aprox = true; nota = `Sin valuación exacta al ${D.fmt(objetivo, { year: true })}: se usa la más cercana (${D.fmt(val.fecha, { year: true })}).`; }
+      if (val.aprox) { aprox = true; nota = `${nota ? nota + ' ' : ''}Sin cierre histórico de ${val.sinSerie.join(', ')}: entra a su costo en la valuación inicial.`; }
       desde = val.fecha; V0 = val.V; spy0 = val.spy; S0 = spy0 ? V0 / spy0 : 0; esInicial = val.esInicial;
     }
     if (!spy0 || !spyHoy) return { disponible: false, modo, motivo: 'Falta la cotización de SPY.' };
     // precio contra precio: los dividendos (tuyos y del S&P) quedan afuera de esta comparación; el rendimiento total con dividendos vive en el resumen y en cada posición
-    const aRet = f => f.montoRet != null ? { ...f, monto: f.montoRet } : f;
+    const aRet = f => f.montoRet != null ? { ...f, monto: f.montoRet, montoSombra: f.montoRet } : f;
     const fl = k.flujos.filter(f => f.tipo !== 'dividendo' && !esInicial({ fecha: f.fecha, legado: f.legado })).map(aRet);
-    // la sombra reinvierte los dividendos de SPY (S&P 500 total return): cada lote de acciones sombra crece por las ex-fechas posteriores a su entrada
-    const S = S0 * Spy.factor(desde, hoy) + sum(fl.map(f => f.spy ? f.monto / f.spy * Spy.factor(f.fecha, hoy) : 0));
+    const mS = f => f.montoSombra != null ? f.montoSombra : f.monto;  // plata nueva para la sombra (una compra pagada con dividendos no lo es)
+    // la sombra reinvierte los dividendos de SPY (S&P 500 total return, netos del 30 %): cada lote de acciones sombra crece por las ex-fechas posteriores a su entrada
+    const S = S0 * Spy.factor(desde, hoy) + sum(fl.map(f => f.spy ? mS(f) / f.spy * Spy.factor(f.fecha, hoy) : 0));
     const sombraValor = S * spyHoy;
     const T = Math.max(1, D.daysBetween(desde, hoy));
     // --- dinero (money-weighted): TIR anual y su equivalente acumulado en la ventana; Dietz como aproximación/respaldo
     const cfs = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...fl.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
-    const tirReal = k.valor != null ? E.xirr(cfs(k.valor)) : null; const tirSombra = E.xirr(cfs(sombraValor));
+    const cfsS = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...fl.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -mS(f) })), { t: T, v: vEnd }];
+    const tirReal = k.valor != null ? E.xirr(cfs(k.valor)) : null; const tirSombra = E.xirr(cfsS(sombraValor));
     // --- rendimiento CON dividendos (lo que ganó tu plata de verdad): mismos flujos + cada dividendo como cash que te entra en su fecha
     const flD = k.flujos.filter(f => !esInicial({ fecha: f.fecha, legado: f.legado })).map(aRet);
     const cfsD = vEnd => [...(V0 > 0 ? [{ t: 0, v: -V0 }] : []), ...flD.map(f => ({ t: D.daysBetween(desde, f.fecha), v: -f.monto })), { t: T, v: vEnd }];
     const tirRealDiv = k.valor != null ? E.xirr(cfsD(k.valor)) : null; const dietzRealDiv = k.valor != null ? E.dietz(V0, k.valor, flD, desde, hoy) : null;
     const dividendosVentana = sum(flD.filter(f => f.tipo === 'dividendo').map(f => -f.monto));
     const acum = tir => tir == null ? null : Math.pow(1 + tir, T / 365) - 1;
-    const dietzReal = k.valor != null ? E.dietz(V0, k.valor, fl, desde, hoy) : null; const dietzSombra = E.dietz(V0, sombraValor, fl, desde, hoy);
+    const dietzReal = k.valor != null ? E.dietz(V0, k.valor, fl, desde, hoy) : null; const dietzSombra = E.dietz(V0, sombraValor, fl.map(f => ({ ...f, monto: mS(f) })), desde, hoy);
     const real = tirReal != null ? acum(tirReal) : dietzReal, sombra = tirSombra != null ? acum(tirSombra) : dietzSombra;
     const realDiv = tirRealDiv != null ? acum(tirRealDiv) : dietzRealDiv;
     // --- tiempo (time-weighted): sub-períodos entre valuaciones conocidas, Dietz en cada uno, encadenados. La sombra es 100 % SPY → su TWR = SPY solo.
@@ -3778,13 +3828,14 @@ const E = {
     }
     const spyDirecto = spyHoy * Spy.factor(desde, hoy) / spy0 - 1;  // S&P 500 total return (precio + dividendos reinvertidos)
     return { disponible: true, modo, desde, objetivo, aprox, V0, S0, spy0, flujos: fl, sombraValor, invertidoNeto: V0 + sum(fl.map(f => f.monto)), nota, dias: T, valuaciones: null,
-      rend: { real, sombra, alfa: real != null && sombra != null ? real - sombra : null, alfaUSD: k.valor != null ? k.valor - sombraValor : null, spyDirecto, dias: T,
+      rend: { real, sombra, alfa: realDiv != null && sombra != null ? realDiv - sombra : null, alfaUSD: k.valor != null ? k.valor - sombraValor : null, spyDirecto, dias: T,
+        aportesNetos: sum(fl.map(f => f.monto)), aportesSombra: sum(fl.map(mS)), capital: V0 + sum(fl.map(f => f.monto * Math.max(0, T - D.daysBetween(desde, f.fecha)) / T)),
         tirReal, tirSombra, tirSpy: T >= 30 ? Math.pow(1 + spyDirecto, 365 / T) - 1 : null, dietzReal, dietzSombra, twr, metodo: tirReal != null ? 'tir' : 'dietz',
         realDiv, tirRealDiv, dividendosVentana } };
   },
   /** Serie temporal de una ventana: sombra S&P (diaria), invertido neto (escalón) y cartera real (valuaciones conocidas: arranque, seed 31-dic, snapshots, hoy) */
-  carteraSerie(k, modo = 'anio') {
-    const v = k.ventanas[modo]; if (!v || !v.disponible) return null;
+  carteraSerie(k, modo = 'anio', v = k.ventanas[modo]) {
+    if (!v || !v.disponible) return null;
     const c = state.cartera; const hoy = D.today();
     const hist = c.historial || {};
     // dias de SPY + dias con foto de la cartera (una foto de un dia sin cierre de SPY guardado no se pierde)
@@ -3810,6 +3861,7 @@ const E = {
       else if (f === v.desde) r = modo === 'inicio' || v.desde === k.primeraOp ? 0 : v.V0;
       else if (seed && f === seed.fecha && seed.tipo === 'seed') r = seed.V;
       else if (hist[f] && E.fotoOk(k, f, hist[f])) r = hist[f].v;
+      else if (typeof Hist !== 'undefined' && Hist.datos) { const hv = Hist.valorEn(k, f); if (hv && hv.fecha === f && hv.V > 0) r = hv.V; }  // cierre de ese dia (sec/hist.json): la curva real de toda la ventana
       real.push(r);
     }
     // La cartera solo se conoce en los dias con foto (arranque, seed, snapshots diarios, hoy). Unir fotos
@@ -5293,13 +5345,20 @@ function mapaCartera(k) {
   return mapaBloques(top.map(p => ({ label: p.ticker, peso: p.peso, der: dpTxt(p), derCls: p.dp > 0 ? 'up' : p.dp < 0 ? 'down' : '', act: 'pos', id: p.ticker })), franja) + lista;
 }
 
+/** ventana elegida para la card vs S&P: una fija (E.VENTANAS) o una fecha a mano ('d:AAAA-MM-DD'); devuelve {modo, v} */
+function ventanaElegida(k) {
+  const m = ui.carteraVentana;
+  if (m && m.startsWith('d:')) { const v = E.ventana(k, m); if (v.disponible) return { modo: m, v }; }
+  const modo = m && k.ventanas[m] && !k.ventanas[m].masLargo ? m : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
+  return { modo, v: k.ventanas[modo] };
+}
 function renderEvolucion(k, seg) {
-  const modo = ui.carteraVentana && k.ventanas[ui.carteraVentana] && !k.ventanas[ui.carteraVentana].masLargo ? ui.carteraVentana : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
-  const v = k.ventanas[modo];
-  const rangos = `<div class="seg rangos">${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}</div>`;
+  const { modo, v } = ventanaElegida(k);
+  const aMano = modo.startsWith('d:');
+  const rangos = `<div class="seg rangos">${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => `<button class="${m === modo ? 'on' : ''} ${k.ventanas[m].disponible ? '' : 'off'}" data-act="cartera-ventana" data-id="${m}">${l}</button>`).join('')}<button class="${aMano ? 'on' : ''}" data-act="cartera-fecha" title="Elegir desde qué fecha">${aMano ? D.fmt(v.desde, { year: true }) : 'Fecha'}</button></div>`;
   if (!v || !v.disponible) return `<div class="card"><div class="card-head"><h2>vs S&P 500</h2>${seg}</div>${rangos}${empty({ kind: 'periodo', icon: 'cal', head: v && v.motivo || 'Sin datos para esta ventana', sub: 'Probá con un período más largo.' })}</div>`;
-  const r = v.rend; const alfaOk = r.alfa != null && r.alfa >= 0;
-  const serie = E.carteraSerie(k, modo);
+  const r = v.rend;
+  const serie = E.carteraSerie(k, modo, v);
   let chart = '';
   if (serie && serie.fechas.length > 2) {
     // en ventanas cortas (≤ 45 días) el eje va por día en vez de por mes: 1 M con un solo "sep" no dice nada
@@ -5320,13 +5379,23 @@ function renderEvolucion(k, seg) {
   const top = conAlfa.slice(0, 4), bottom = conAlfa.slice(-4).reverse().filter(p => !top.includes(p));
   const alfaRow = p => `<div class="alfa-row"><span>${esc(p.ticker)}${p.acciones <= 0 ? ' <small class="muted">cerrada</small>' : ''}</span><i><b style="width:${Math.min(100, Math.abs(p.alfaUSD) / Math.max(1, Math.abs(conAlfa[0].alfaUSD), Math.abs(conAlfa[conAlfa.length - 1].alfaUSD)) * 100).toFixed(0)}%;background:${p.alfaUSD >= 0 ? 'var(--good)' : 'var(--crit)'}"></b></i><b class="mono ${p.alfaUSD >= 0 ? 'up' : 'down'}">${p.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(p.alfaUSD), 0)}</b></div>`;
   const box = (l, v, cls, sub) => `<div class="box"><div class="l">${l}</div><div class="v ${cls}">${v}</div><div class="s">${sub}</div></div>`;
+  // Tres numeros (auditoria 25-oct): tu plata (TIR con dividendos), lo mismo en SPY (sombra total return, neta del 30 %) y la diferencia,
+  // en tasa ANUAL cuando la ventana tiene 180 dias o mas (es lo que se compara con un bono al 7 %); en ventanas cortas, lo acumulado
+  // (anualizar un mes multiplica cualquier racha por 12). Debajo, la plata: lo ganado en el periodo. Veredicto: ganas / empate / perdes (±1 pp).
+  const c = E.comparacion(v, k);
+  const usd = x => x == null ? '' : `${x >= 0 ? '+' : '−'}${fmtU(Math.abs(x), 0)}`;
+  const ppTxt = x => x == null ? '—' : `${x >= 0 ? '+' : '−'}${(Math.abs(x) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pp`;
+  const veredicto = c.veredicto === 'gana' ? 'Le ganás' : c.veredicto === 'pierde' ? 'Perdés' : 'Empate';
+  const vCls = c.veredicto === 'gana' ? 'good' : c.veredicto === 'pierde' ? 'crit' : 'warn';
   return `<div class="card"><div class="card-head"><h2>vs S&P 500 <button class="info-btn" data-act="cartera-info" data-id="${modo}" aria-label="Cómo se calcula">${ICONS.info}</button></h2>${seg}</div>
     ${rangos}
     <div class="evo-kpi">
-      ${box('Cartera', r.real != null ? pctS(r.real) : '—', r.real != null ? (r.real >= 0 ? 'up' : 'down') : '', k.valor != null ? fmtU(k.valor, 0) : 'sin precios')}
-      ${box('Sombra S&P', pctS(r.sombra), r.sombra >= 0 ? 'up' : 'down', fmtU(v.sombraValor, 0))}
-      ${box('Alfa', r.alfa != null ? `${r.alfa >= 0 ? '+' : '−'}${(Math.abs(r.alfa) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} pp` : '—', r.alfa != null ? (alfaOk ? 'up' : 'down') : '', r.alfaUSD != null ? `${r.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(r.alfaUSD), 0)}` : '')}
+      ${box('Tu plata', c.cartera != null ? pctS(c.cartera) : '—', c.cartera != null ? (c.cartera >= 0 ? 'up' : 'down') : '', c.ganancia != null ? usd(c.ganancia) : (k.valor != null ? fmtU(k.valor, 0) : 'sin precios'))}
+      ${box('En SPY', c.sombra != null ? pctS(c.sombra) : '—', c.sombra != null ? (c.sombra >= 0 ? 'up' : 'down') : '', c.gananciaSombra != null ? usd(c.gananciaSombra) : fmtU(v.sombraValor, 0))}
+      ${box('Diferencia', ppTxt(c.dif), c.veredicto === 'gana' ? 'up' : c.veredicto === 'pierde' ? 'down' : '', usd(c.difUSD))}
     </div>
+    <div class="evo-ver"><span class="dot ${vCls}"></span><b>${veredicto}</b>${c.dif != null ? ` ${c.veredicto === 'empate' ? 'a' : 'por'} ${(Math.abs(c.dif) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} puntos ${c.anual ? 'al año' : `en ${v.dias} días`}` : ''}</div>
+    <div class="evo-sub">${c.anual ? 'tasa anual' : `acumulado en ${v.dias} días`} · con dividendos · desde el ${D.fmt(v.desde, { year: true })}${v.aprox ? ' · valuación inicial aproximada' : ''}</div>
     ${riesgoRow(k, v)}
     ${chart}
     ${conAlfa.length ? `<div class="divider"></div><div class="card-head" style="margin-bottom:6px"><h3>Alfa por posición</h3><span class="hint">vs SPY, desde el inicio</span></div>${top.map(alfaRow).join('')}${bottom.length ? `<div class="divider" style="margin:6px 0"></div>${bottom.map(alfaRow).join('')}` : ''}` : ''}
@@ -5342,7 +5411,7 @@ function riesgoRow(k, v) {
   const info = `Medidas desde el ${D.fmt(x.desde, { year: true })} hasta el cierre del ${D.fmt(x.hasta)} (${x.ruedas} ruedas), con los cierres diarios ajustados por splits y dividendos.\n\nPor tiempo (TWR): lo que rindió tu cartera sin importar cuándo pusiste plata, como lo informa un fondo. Se compara con SPY con dividendos.\n\nBeta: cuánto se mueve tu cartera cuando se mueve el S&P 500, medida con tus rendimientos diarios reales (1 = igual; 1,3 = 30 % más). ${bp ? `La de Finnhub ponderada por posición da ${bp.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 })}.` : ''}\n\nAlfa ajustado (Jensen): lo que ganaste por encima de lo que el mercado "te debía" por el riesgo que tomaste: tu rendimiento menos [tasa libre de riesgo + beta × (S&P − tasa libre)], con ${Math.round(x.rfAnual * 100)} % anual en dólares. Si da cerca de cero, le ganás al S&P por tomar más riesgo, no por elegir mejor. Con menos de un año de datos es orientativo.\n\nCaída máxima: lo más que cayó tu cartera desde un pico en este período. Para un inversor de largo plazo es la medida de riesgo que importa: si aguantás eso sin vender.`;
   return `<div class="riesgo">
     ${it('Por tiempo', `${pp(x.twr)} %`, x.twr >= 0 ? 'up' : 'down', `S&P ${pp(x.spy)} %`)}
-    ${it('Beta', x.beta != null ? x.beta.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—', '', x.beta != null ? 'vs S&P, diaria' : 'pocos datos')}
+    ${it('Beta', x.beta != null ? x.beta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—', '', x.beta != null ? 'vs S&P, diaria' : 'pocos datos')}
     ${it('Alfa ajustado', x.alfa != null ? `${pp(x.alfa)} pp` : '—', x.alfa != null ? (x.alfa >= 0 ? 'up' : 'down') : '', x.alfa != null ? 'por riesgo' : 'desde 60 ruedas')}
     ${it('Caída máx.', `${pp(x.dd)} %`, x.dd < -0.1 ? 'down' : '', x.ddPiso ? (x.recuperada ? `recuperada ${D.fmt(x.recuperada)}` : `piso ${D.fmt(x.ddPiso)}`) : 'sin caídas')}
     <span class="rk-i">${infoBtn(info)}</span>
@@ -5350,18 +5419,23 @@ function riesgoRow(k, v) {
 }
 /** ⓘ de la comparación: las tres medidas que usan los pros (acumulado money-weighted, TIR anual, TWR), cómo se arma la sombra y salvedades */
 function infoEvolucion(modo) {
-  const k = E.cartera(); const v = k.ventanas[modo] || k.ventanas.anio; if (!v || !v.disponible) return;
-  const r = v.rend; const puntos = Object.keys(state.cartera.historial || {}).length; const anual = v.dias >= 30;
-  const p = x => x == null ? '<span class="muted">—</span>' : `<span class="${x >= 0 ? 'up' : 'down'}">${pctS(x)}</span>`;
-  const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Cartera</th><th>Sombra S&P</th><th>SPY solo</th></tr></thead><tbody>
-    <tr><td>Acumulado<small>${r.metodo === 'tir' ? 'ponderado por dinero (TIR)' : 'ponderado por dinero (Dietz)'}</small></td><td>${p(r.real)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
-    <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirReal) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
-    <tr><td>Ponderado por tiempo<small>${r.twr == null && !Hist.riesgo(k, v.desde) && (k.twrReal = k.twrReal || E.twrReal(k)) ? `TWR: solo con valuaciones diarias reales (desde el ${D.fmt(k.twrReal.desde, { year: true })}: ${pctS(k.twrReal.twr)} vs SPY ${k.twrReal.spy != null ? pctS(k.twrReal.spy) : '\u2014'})` : 'TWR, sin efecto de tus aportes'}</small></td><td>${p(r.twr != null ? r.twr : (Hist.riesgo(k, v.desde) || {}).twr)}</td><td>${p(r.twr != null ? r.spyDirecto : (Hist.riesgo(k, v.desde) || {}).spy)}</td><td>${p(r.spyDirecto)}</td></tr>
+  const k = E.cartera(); const v = modo && modo.startsWith('d:') ? E.ventana(k, modo) : (k.ventanas[modo] || k.ventanas.anio); if (!v || !v.disponible) return;
+  const r = v.rend; const c = E.comparacion(v, k); const anual = v.dias >= 30; const x = Hist.riesgo(k, v.desde);
+  const p = y => y == null ? '<span class="muted">—</span>' : `<span class="${y >= 0 ? 'up' : 'down'}">${pctS(y)}</span>`;
+  const u = y => y == null ? '<span class="muted">—</span>' : `<span class="${y >= 0 ? 'up' : 'down'}">${y >= 0 ? '+' : '−'}${fmtU(Math.abs(y), 0)}</span>`;
+  const tabla = `<table class="metricas"><thead><tr><th>${D.fmt(v.desde, { year: true })}<br>hasta hoy, ${v.dias} días</th><th>Tu plata</th><th>En SPY</th><th>SPY solo</th></tr></thead><tbody>
+    <tr><td>Ganado<small>en dólares, con dividendos</small></td><td>${u(c.ganancia)}</td><td>${u(c.gananciaSombra)}</td><td></td></tr>
+    <tr><td>Capital promedio<small>lo que estuvo invertido</small></td><td>${c.capital != null ? fmtU(c.capital, 0) : '—'}</td><td class="muted">igual</td><td></td></tr>
+    <tr><td>En el período<small>TIR llevada a ${v.dias} días</small></td><td>${p(r.realDiv)}</td><td>${p(r.sombra)}</td><td>${p(r.spyDirecto)}</td></tr>
+    <tr><td>TIR anual<small>${anual ? 'la misma tasa, por año' : 'a partir de 30 días'}</small></td><td>${anual ? p(r.tirRealDiv) : p(null)}</td><td>${anual ? p(r.tirSombra) : p(null)}</td><td>${p(r.tirSpy)}</td></tr>
+    <tr><td>Por tiempo<small>TWR, sin efecto de tus aportes</small></td><td>${p(x ? x.twr : r.twr)}</td><td>${p(x ? x.spy : r.spyDirecto)}</td><td>${p(x ? x.spy : r.spyDirecto)}</td></tr>
   </tbody></table>`;
   Modal.open({ title: 'Cómo se calcula', submit: '', body: `<div class="stack small" style="line-height:1.5">
     ${tabla}
-    <p><b>Precio contra precio.</b> Acá no cuentan dividendos, ni los tuyos ni los del S&P: solo compras, ventas y cotización. Con dividendos, tu cartera rindió ${r.realDiv != null ? pctS(r.realDiv) : '—'} en este rango${r.dividendosVentana ? ` (${fmtU(r.dividendosVentana)} cobrados)` : ''}: es el número de la card "Valor de la cartera". <b>Acumulado</b> es lo que ves en las cajas: cuánto rindió tu plata en el rango contando cuándo entró cada aporte (TIR, el "personal rate of return" de Fidelity o Sharesight). <b>TIR anual</b> es esa misma tasa expresada por año. <b>TWR</b> es la norma profesional (GIPS): mide tu selección de activos sin premiar ni castigar el momento de los aportes; acá se aproxima entre valuaciones guardadas (${puntos} hasta ahora, una por día al traer precios).</p>
-    <p><b>Sombra S&P 500.</b> ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}; después` : `Arranca en cero el ${D.fmt(v.desde, { year: true })} y`} cada compra o venta se replica el mismo día en SPY por el mismo monto. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día. Alfa = cartera − sombra, en puntos y en dólares.</p>
+    <p><b>Tu plata.</b> La tasa interna de retorno (TIR) de tus compras, ventas y dividendos cobrados en sus fechas y el valor de hoy: lo que rindió cada dólar el tiempo que estuvo invertido. Es una <b>velocidad</b>: si de acá en más nada se mueve, la tasa anual baja con los días aunque la ganancia en dólares siga igual. Por eso en ventanas de menos de 180 días las cajas muestran lo acumulado y no la tasa anual (anualizar un mes multiplica cualquier racha por 12). <b>Ganado</b> es la distancia: dólares que entraron a tu bolsillo o a tu cartera en el período.</p>
+    <p><b>En SPY.</b> Tus mismos aportes y retiros, en las mismas fechas, comprando SPY (S&P 500) en lugar de lo que compraste, con los dividendos de SPY reinvertidos netos de la retención del 30 % que le cobran a un tenedor de CEDEAR. ${v.V0 ? `Lo que tenías el ${D.fmt(v.desde, { year: true })} (${fmtU(v.V0, 0)}) pasa a SPY a ${fmtU(v.spy0)}${v.aprox ? ' (valuación aproximada)' : ''}.` : `Arranca en cero el ${D.fmt(v.desde, { year: true })}.`} Es la comparación justa: misma plata, mismo momento, dos destinos. <b>Diferencia</b> = tu plata − en SPY; con ±1 punto por año es empate.</p>
+    <p><b>Por tiempo (TWR).</b> La norma de los fondos: encadena el rendimiento diario de lo que tenías cada día, sin premiar ni castigar el momento de tus aportes. Mide la selección de acciones. Desde el inicio está dominada por los meses en que había una sola acción: mirala en YTD o en 1 A.</p>
+    <p><b>Valuaciones.</b> La cartera se valúa cualquier día pasado con los cierres de ese día (sec/hist.json, ajustados por splits), lo que habilita todas las ventanas y la fecha a mano. Las operaciones nuevas usan el SPY del momento en que las guardás; las anteriores, el cierre del día.</p>
     ${v.nota ? `<p class="callout amber" style="margin:0">${esc(v.nota)}</p>` : ''}
   </div>` });
 }
@@ -6535,8 +6609,11 @@ const Intercambio = {
     const k = E.cartera(); const s = state.settings; const hoy = D.today(); const hora = new Date();
     const n = v => v == null ? '' : Number(v).toFixed(2); const pct = v => v == null ? '' : (v * 100).toFixed(1) + ' %';
     const pctO = v => v == null ? 's/d' : pct(v);
-    const rend = (v, nombre) => v.disponible ? `- **${nombre}** (desde ${v.desde}, ${v.dias} días): cartera con dividendos ${pctO(v.rend.realDiv)} · precio contra precio: cartera ${pctO(v.rend.real)} · sombra S&P 500 ${pctO(v.rend.sombra)} · alfa ${v.rend.alfa != null ? (v.rend.alfa * 100).toFixed(1) + ' pp' : 's/d'}${v.rend.alfaUSD != null ? ` (${v.rend.alfaUSD >= 0 ? '+' : ''}${n(v.rend.alfaUSD)} USD)` : ''} · TIR anual ${pctO(v.rend.tirReal)} vs sombra ${pctO(v.rend.tirSombra)} ${v.rend.twr != null ? ` · TWR ${pctO(v.rend.twr)} vs SPY solo ${pctO(v.rend.spyDirecto)}` : ''}` : `- **${nombre}**: no disponible`;
-    const rendJSON = v => v.disponible ? { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, carteraConDividendos: { acumulado: v.rend.realDiv, tirAnual: v.rend.tirRealDiv, dividendosUSD: +v.rend.dividendosVentana.toFixed(2) }, acumulado: { cartera: v.rend.real, sombraSP500: v.rend.sombra, sp500Directo: v.rend.spyDirecto, alfaPP: v.rend.alfa, alfaUSD: v.rend.alfaUSD != null ? +v.rend.alfaUSD.toFixed(2) : null }, tirAnual: { cartera: v.rend.tirReal, sombraSP500: v.rend.tirSombra, sp500Directo: v.rend.tirSpy }, twr: { cartera: v.rend.twr, sombraSP500: v.rend.spyDirecto, sp500Directo: v.rend.spyDirecto }, nota: v.nota || null } : null;
+    const rend = (v, nombre) => { if (!v.disponible) return `- **${nombre}**: no disponible`; const c = E.comparacion(v, k); const sg = x => x == null ? 's/d' : `${x >= 0 ? '+' : ''}${n(x)} USD`;
+      return `- **${nombre}** (desde ${v.desde}, ${v.dias} días): tu plata (TIR con dividendos) ${pctO(v.rend.tirRealDiv)} anual · en SPY (mismos aportes, con dividendos netos del 30 %) ${pctO(v.rend.tirSombra)} anual · diferencia ${v.rend.tirRealDiv != null && v.rend.tirSombra != null ? ((v.rend.tirRealDiv - v.rend.tirSombra) * 100).toFixed(1) + ' pp' : 's/d'} (${sg(v.rend.alfaUSD)}) → ${c.veredicto === 'gana' ? 'LE GANA' : c.veredicto === 'pierde' ? 'PIERDE' : 'EMPATE'} · en el período: cartera ${pctO(v.rend.realDiv)} vs sombra ${pctO(v.rend.sombra)} · ganado ${sg(c.ganancia)} sobre US$ ${n(c.capital)} promedio invertidos · SPY solo ${pctO(v.rend.spyDirecto)}${v.rend.twr != null ? ` · TWR ${pctO(v.rend.twr)} vs SPY ${pctO(v.rend.spyDirecto)}` : ''}`; };
+    const rendJSON = v => { if (!v.disponible) return null; const c = E.comparacion(v, k); const r2 = x => x == null ? null : +x.toFixed(2);
+      return { desde: v.desde, dias: v.dias, metodoAcumulado: v.rend.metodo, comparacion: { enTasaAnual: c.anual, tuPlata: c.cartera, enSPY: c.sombra, diferenciaPP: c.dif, diferenciaUSD: r2(c.difUSD), ganadoUSD: r2(c.ganancia), ganadoSombraUSD: r2(c.gananciaSombra), capitalPromedioUSD: r2(c.capital), veredicto: c.veredicto },
+        carteraConDividendos: { acumulado: v.rend.realDiv, tirAnual: v.rend.tirRealDiv, dividendosUSD: +v.rend.dividendosVentana.toFixed(2) }, sombraSP500ConDividendos: { acumulado: v.rend.sombra, tirAnual: v.rend.tirSombra, valorUSD: r2(v.sombraValor) }, precioContraPrecio: { cartera: v.rend.real, tirAnual: v.rend.tirReal }, sp500Directo: { acumulado: v.rend.spyDirecto, tirAnual: v.rend.tirSpy }, twr: { cartera: v.rend.twr, spy: v.rend.spyDirecto }, nota: v.nota || null }; };
     const twrR = E.twrReal(k); const ptX = E.patrimonio(k); const valorTot = ptX.activos.length ? ptX.total : k.valor;
     const parciales = k.posiciones.filter(p => Math.abs(p.realizado) >= 0.005);
     const realCerr = sum(k.cerradas.map(p => p.realizado)), realParc = sum(parciales.map(p => p.realizado));
@@ -6572,7 +6649,7 @@ ${c.verdad}
 ${E.VENTANAS.filter(([m]) => !k.ventanas[m].masLargo).map(([m, l]) => rend(k.ventanas[m], l === 'Todo' ? 'Todo (desde la primera operaci\u00f3n)' : l)).join('\n')}${(() => { const bp = Hist.betaPonderada(k); const ls = [['anio', 'YTD'], ['inicio', 'Todo']].map(([m, l]) => { const v = k.ventanas[m]; const x = v && v.disponible ? Hist.riesgo(k, v.desde) : null; if (!x) return null; const p1 = y => `${(y * 100).toFixed(1)} %`;
       return `- **Riesgo y rendimiento por tiempo (${l}, ${x.desde} a ${x.hasta}, ${x.ruedas} ruedas)**: TWR cartera ${p1(x.twr)} vs SPY con dividendos ${p1(x.spy)} \u00b7 beta realizada ${x.beta != null ? x.beta.toFixed(2) : 's/d (menos de 60 ruedas)'} \u00b7 alfa de Jensen ${x.alfa != null ? `${(x.alfa * 100).toFixed(1)} pp` : 's/d'} (tasa libre ${Math.round(x.rfAnual * 100)} % anual) \u00b7 ca\u00edda m\u00e1xima ${p1(x.dd)}${x.ddPiso ? ` (pico ${x.ddPico}, piso ${x.ddPiso}${x.recuperada ? `, recuperada ${x.recuperada}` : ', sin recuperar'})` : ''}`; }).filter(Boolean);
       return ls.length ? '\n' + ls.join('\n') + (bp ? `\n- Beta de Finnhub ponderada por posici\u00f3n (5 a\u00f1os de cada empresa): ${bp.beta.toFixed(2)}` : '') : ''; })()}
-- "Sombra S&P 500" = las mismas compras/ventas hechas en SPY el mismo d\u00eda. La comparaci\u00f3n es precio contra precio: no cuentan dividendos, ni los propios ni los del S&P. Alfa = cartera \u2212 sombra. Acumulado y TIR son money-weighted (TIR anual = tasa por a\u00f1o); TWR es time-weighted (GIPS), aproximado entre valuaciones guardadas. Rdo total por posici\u00f3n = (precio hoy \u2212 PPC + dividendos cobrados) / costo.
+- "En SPY" / "sombra S&P 500" = los mismos aportes y retiros, en las mismas fechas, comprando SPY, con los dividendos de SPY reinvertidos netos de la retenci\u00f3n del 30 % (la comparaci\u00f3n justa: misma plata, mismo momento, dos destinos). Tu plata y la sombra son money-weighted (TIR; "en el per\u00edodo" es la TIR llevada a los d\u00edas de la ventana); diferencia = tu plata \u2212 sombra; ±1 pp anual es empate. TWR es time-weighted (GIPS) con cierres diarios. La cartera se val\u00faa cualquier d\u00eda pasado con los cierres de ese d\u00eda. Rdo total por posici\u00f3n = (precio hoy \u2212 PPC + dividendos cobrados) / costo.
 - Sueldo neto $ ${fmtARS.format(Number(s.ingreso) || 0)} por mes \u00b7 presupuesto de gasto $ ${fmtARS.format(Number(s.presupuesto) || 0)}
 
 ${c.tablaPx}
@@ -7425,6 +7502,13 @@ const Actions = {
   'grupo-set'(v) { const [t, g] = v.split('|'); if (!state.cartera.grupos) state.cartera.grupos = {}; state.cartera.grupos[t] = g; Persist.save(); Modal.close(); render(); },
   'cartera-info'(v) { infoEvolucion(v); },
   'cartera-ventana'(v) { const k = E.cartera(); const w = k.ventanas[v]; if (w && !w.disponible) { toast(w.motivo || 'Rango no disponible todavía', 4500); return; } ui.carteraVentana = v; render(); },
+  /** vs S&P desde una fecha a mano (Facu: "elegir entre qué fechas"): la cartera se valúa al cierre de ese día con sec/hist.json */
+  'cartera-fecha'() {
+    const k = E.cartera(); const hoy = D.today(); const min = k.primeraOp || hoy; const act = ui.carteraVentana && ui.carteraVentana.startsWith('d:') ? ui.carteraVentana.slice(2) : '';
+    const body = `<div class="stack"><div class="field"><label for="cv-fecha">Desde el</label><input id="cv-fecha" class="input" type="date" value="${act}" min="${min}" max="${D.addDays(hoy, -1)}"></div>
+      <p class="small muted" style="margin:0">Compara tu plata contra el S&P 500 desde ese día hasta hoy. La cartera se valúa con los cierres de ese día.${Hist.datos ? '' : ' (Todavía no cargaron los cierres históricos: probá de nuevo en unos segundos.)'}</p></div>`;
+    Modal.open({ title: 'Desde qué fecha', body, submit: 'Ver', onSubmit: () => { const f = Modal.val('cv-fecha'); if (!f) { toast('Elegí una fecha'); return false; } if (f < min) { toast(`Tu historia arranca el ${D.fmt(min, { year: true })}`); return false; } const v = E.ventana(k, 'd:' + f); if (!v.disponible) { toast(v.motivo || 'No se puede valuar la cartera en esa fecha', 4500); return false; } ui.carteraVentana = 'd:' + f; render(); } });
+  },
   'edit-op'(id) { const o = state.cartera.operaciones.find(x => x.id === id); if (o) formOp({ ...o }); },
   'op-ccl-usar'(v) { const el = $('#o-ccl'); const [val, src] = String(v).split('|'); if (el && val) { el.value = val; el.dataset.manual = '1'; el.dataset.fuente = src || 'manual'; formOpCalc(); } },
   'export-claude'() { formExportar(); },
