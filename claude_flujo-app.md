@@ -1,6 +1,6 @@
 # Gestor de gastos — app de finanzas personales de Facu
 
-## ▶ LEER PRIMERO (actualizado 25-oct-2026, build 202610251848)
+## ▶ LEER PRIMERO (actualizado 28-oct-2026, build 202610282144)
 
 **Qué es:** PWA en vanilla JS (gastos + cartera de CEDEARs) publicada en GitHub Pages desde este repo **público** `facubo2001-bot/flujo`. Facu la usa en el iPhone y en la compu; sus datos viven en el teléfono y se sincronizan con un gist privado (Ajustes → Sincronización). Facu habla en castellano rioplatense, informal; respuestas cortas y directas. Vara de calidad: "lo que no se pueda corregir no lo ponemos" (datos confiables antes que lindos).
 
@@ -641,3 +641,9 @@ Aportes externos en la caja (plata nueva que entra a Balanz, cauciones/MM) · "O
 - **`tools/tecnico.mjs`**: Yahoo devuelve también el cierre sin ajustar por dividendos (`r`); `sec/hist.json` suma `k[t]` (escalones índice → cierre real / cierre ajustado, cambian solo en cada ex-dividendo) y `spyDivs` (SPY con `events=div`), y la serie arranca el 2025-01-01 (antes 420 ruedas: la historia de Facu se iba a caer del archivo). Hasta que corra el Action, la app valúa con cierres ajustados (diferencia < 1 %).
 - Probado con Playwright a 390×844 con las 183 operaciones reales inyectadas y la fecha congelada al 24-oct: YTD 17,4 % vs 14,3 % (+3,1 pp, +US$ 75; con ALUA al costo), Todo 18,7 % vs 14,5 % (+4,2 pp, +US$ 116: igual al cálculo independiente), 6 M 10,2 % vs 11,2 % (empate), 1 M en acumulado, fecha a mano 24-abr-26 = 6 M; export y demo sin errores de página.
 - **La Proyección sigue mostrando "mi ritmo" (TIR desde el inicio)**: Facu no pidió tocarla; la auditoría recomienda sacarla o topearla en 12 %.
+
+## Franja vs S&P en el Mapa + alfa de todas las posiciones (28-oct-2026, build 202610282144)
+- Facu: "tiene que ser mi alerta más grande: che, te está ganando el S&P". Cada vista de la card (Mapa · Grupos · vs S&P) conserva su razón de ser; solo se suma esto:
+- **Mapa** (`vsFranja(k)`, `.vs-fr`): arriba de los bloques, una franja con el veredicto del año en curso (o desde el inicio si no hay YTD): "Le ganás al S&P · +3,1 pp · +US$ 75" y abajo "2026 · tu plata 17,4 % vs SPY 14,3 % anual". Empate en ámbar; **si el S&P gana, la franja entera va en rojo** ("El S&P te gana"). Tocarla abre la vista vs S&P. **Grupos sin franja** (pedido de Facu).
+- **vs S&P**: el veredicto debajo de las tres cajas pasa a la misma franja (`.vs-fr.fijo`), grande y con color, en lugar del renglón chico.
+- **Alfa por posición**: todas las abiertas, ordenadas de mayor a menor, con barras divergentes desde el centro (verde a la derecha, rojo a la izquierda); tocar una fila abre la ficha; las cerradas se suman con "Sumar las N cerradas" (`ui.alfaCerradas`, acción `alfa-cerradas`). Antes eran 4 arriba y 4 abajo.

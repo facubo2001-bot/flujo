@@ -161,6 +161,7 @@ const Actions = {
   'pend-limpiar'() { confirmar('¿Borrar todas las hechas?', () => { state.pendientes = Pend.lista().filter(p => !p.hecho); Persist.save(); pendBadge(); setTimeout(formPend, 0); }); },
   'pick-ced'(code) { const c = Cedears.de(code); if (c) formOpSet(Cedears.ticker(c)); },
   'cartera-chart'(v) { ui.carteraChart = v; render(); },
+  'alfa-cerradas'() { ui.alfaCerradas = !ui.alfaCerradas; render(); },
   'al-orden'(id) { state.settings.alOrden = id; Persist.save(); render(); },
   'pz-orden'(id) { const o = state.settings.pzOrden || { k: 'valor', dir: -1 }; state.settings.pzOrden = o.k === id ? { k: id, dir: -o.dir } : { k: id, dir: id === 'az' ? 1 : -1 }; Persist.save(); render(); },
   'grupo-cambiar'(t) { formGrupo(t); },

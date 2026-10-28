@@ -618,10 +618,16 @@ tr.day td{background:var(--surface)}
 .seg.rangos{display:inline-flex;margin-bottom:4px}
 .seg.rangos button{padding:5px 11px;font-size:12.5px}
 .seg.rangos button.off{opacity:.35}
-.alfa-row{display:grid;grid-template-columns:76px 1fr auto;gap:10px;align-items:center;font-size:13px;padding:4px 0}
-.alfa-row i{display:block;height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden}
-.alfa-row i b{display:block;height:100%;border-radius:3px}
-.alfa-row .up{color:var(--good-text)} .alfa-row .down{color:var(--crit-text)}
+.alfa-row{display:grid;grid-template-columns:58px 1fr 78px;gap:10px;align-items:center;font-size:13px;padding:3px 0;cursor:pointer}
+.alfa-row span{font-weight:700;white-space:nowrap;line-height:1.1}
+.alfa-row span small{display:block;font-size:10px;font-weight:500;color:var(--ink-3)}
+/* barra divergente: el centro es cero; positivos a la derecha, negativos a la izquierda (queda la "escalera" de mayor a menor) */
+.alfa-row i{position:relative;display:block;height:10px}
+.alfa-row i::before{content:'';position:absolute;left:50%;top:-4px;bottom:-4px;width:1px;background:var(--line-2)}
+.alfa-row i b{position:absolute;top:0;height:100%;border-radius:2px}
+.alfa-row b.up{background:var(--good)} .alfa-row b.down{background:var(--crit)}
+.alfa-row em{font-style:normal;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.alfa-row em.up{color:var(--good-text)} .alfa-row em.down{color:var(--crit-text)}
 .ccl-info{display:flex;flex-direction:column;gap:4px;margin-top:6px;font-size:12.5px;color:var(--ink-2)}
 .ccl-info span{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .op-row .sub{white-space:normal}
@@ -1298,3 +1304,13 @@ table.proy th small,table.proy td small{display:block;font-size:10.5px;color:var
 .evo-sub{font-size:11.5px;color:var(--ink-3);margin:2px 0 6px 15px}
 .evo-ver .dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
 .evo-ver .dot.good{background:var(--good)} .evo-ver .dot.warn{background:var(--warn)} .evo-ver .dot.crit{background:var(--crit)}
+/* franja vs S&P arriba del mapa (28-oct) */
+.vs-fr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px;cursor:pointer}
+.vs-fr .t{display:flex;align-items:center;gap:8px}
+.vs-fr .t b{font-size:15px;font-weight:900;letter-spacing:-.01em}
+.vs-fr .t em{margin-left:auto;font-style:normal;font-weight:900;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vs-fr .dot{width:9px;height:9px;margin:0;flex:none}
+.vs-fr .s{font-size:12px;color:var(--ink-3);margin:3px 0 0 17px}
+.vs-fr.good .t em{color:var(--good-text)} .vs-fr.warn .t em{color:var(--warn-text)}
+.vs-fr.crit{border-color:var(--crit);background:rgba(255,74,69,.10)} .vs-fr.crit .t em,.vs-fr.crit .t b{color:var(--crit-text)}
+.vs-fr.fijo{cursor:default;margin:0 0 6px}

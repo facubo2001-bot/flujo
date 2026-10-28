@@ -338,7 +338,7 @@ function viewCartera() {
   const seg = `<div class="seg" style="padding:2px">${segB('comp', 'Mapa')}${segB('dist', 'Grupos')}${segB('evo', 'vs S&P')}</div>`;
   let chartCard;
   if (modo === 'comp') {
-    chartCard = `<div class="card"><div class="card-head"><h2>Composici\u00f3n</h2>${seg}</div>${mapaCartera(k)}</div>`;
+    chartCard = `<div class="card"><div class="card-head"><h2>Composici\u00f3n</h2>${seg}</div>${vsFranja(k)}${mapaCartera(k)}</div>`;
   } else if (modo === 'dist') chartCard = `<div class="card"><div class="card-head"><h2>Distribuci\u00f3n</h2>${seg}</div>${distCartera(k)}</div>`;
   else chartCard = renderEvolucion(k, seg);
   html += `<div class="grid g-12 section">
@@ -574,6 +574,20 @@ function ventanaElegida(k) {
   const modo = m && k.ventanas[m] && !k.ventanas[m].masLargo ? m : (k.ventanas.anio.disponible ? 'anio' : 'inicio');
   return { modo, v: k.ventanas[modo] };
 }
+/** Franja "vs S&P 500" arriba del mapa (Facu, 28-oct: "tiene que ser mi alerta más grande"): el año en curso (o desde el inicio si
+ *  todavía no hay YTD), tu plata vs SPY en tasa anual y la diferencia. Perdiendo, en rojo. Tocar abre la vista vs S&P. */
+function vsFranja(k) {
+  const v = k.ventanas.anio && k.ventanas.anio.disponible ? k.ventanas.anio : k.ventanas.inicio; const c = v && v.disponible ? E.comparacion(v, k) : null;
+  if (!c || c.dif == null) return '';
+  const cls = c.veredicto === 'gana' ? 'good' : c.veredicto === 'pierde' ? 'crit' : 'warn';
+  const tit = c.veredicto === 'gana' ? 'Le ganás al S&P' : c.veredicto === 'pierde' ? 'El S&P te gana' : 'Empate con el S&P';
+  const pp = `${c.dif >= 0 ? '+' : '−'}${(Math.abs(c.dif) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pp`;
+  const usd = c.difUSD != null ? ` · ${c.difUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(c.difUSD), 0)}` : '';
+  const pc = x => M.pct(x, 1);
+  const cuando = v.modo === 'anio' ? D.today().slice(0, 4) : 'Desde el inicio';
+  return `<div class="vs-fr ${cls}" data-act="cartera-chart" data-id="evo"><div class="t"><span class="dot ${cls}"></span><b>${tit}</b><em>${pp}${usd}</em></div>
+    <div class="s">${cuando} · tu plata ${pc(c.cartera)} vs SPY ${pc(c.sombra)} ${c.anual ? 'anual' : `en ${v.dias} d`}</div></div>`;
+}
 function renderEvolucion(k, seg) {
   const { modo, v } = ventanaElegida(k);
   const aMano = modo.startsWith('d:');
@@ -597,9 +611,13 @@ function renderEvolucion(k, seg) {
       + (serie.haySueltos ? `<div class="i-row">${infoBtn(`${serie.desdeDiario ? `Tu cartera se registra d\u00eda a d\u00eda desde el ${D.fmt(serie.desdeDiario)}` : 'Tu cartera se empieza a registrar d\u00eda a d\u00eda desde hoy'}; antes solo hay puntos sueltos (el arranque y las fotos guardadas). Los n\u00fameros de arriba s\u00ed cuentan todo el per\u00edodo: salen de tus operaciones.`)}</div>` : '');
   }
   // alfa por posición (mismas compras hechas en SPY): quién suma y quién resta
-  const conAlfa = [...k.posiciones, ...k.cerradas].filter(p => p.alfaUSD != null).sort((a, b) => b.alfaUSD - a.alfaUSD);
-  const top = conAlfa.slice(0, 4), bottom = conAlfa.slice(-4).reverse().filter(p => !top.includes(p));
-  const alfaRow = p => `<div class="alfa-row"><span>${esc(p.ticker)}${p.acciones <= 0 ? ' <small class="muted">cerrada</small>' : ''}</span><i><b style="width:${Math.min(100, Math.abs(p.alfaUSD) / Math.max(1, Math.abs(conAlfa[0].alfaUSD), Math.abs(conAlfa[conAlfa.length - 1].alfaUSD)) * 100).toFixed(0)}%;background:${p.alfaUSD >= 0 ? 'var(--good)' : 'var(--crit)'}"></b></i><b class="mono ${p.alfaUSD >= 0 ? 'up' : 'down'}">${p.alfaUSD >= 0 ? '+' : '−'}${fmtU(Math.abs(p.alfaUSD), 0)}</b></div>`;
+  // alfa por posición (mismas compras hechas en SPY), TODAS ordenadas de mayor a menor con barras desde el centro (Facu, 28-oct:
+  // "ordenado de mayor a menor, que se vea todo"). Las abiertas siempre; las cerradas se suman con el botón.
+  const conAlfa = [...k.posiciones, ...(ui.alfaCerradas ? k.cerradas : [])].filter(p => p.alfaUSD != null).sort((a, b) => b.alfaUSD - a.alfaUSD);
+  const nCerr = k.cerradas.filter(p => p.alfaUSD != null).length;
+  const maxA = Math.max(1, ...conAlfa.map(p => Math.abs(p.alfaUSD)));
+  const alfaRow = p => { const w = (Math.abs(p.alfaUSD) / maxA * 50).toFixed(1); const pos = p.alfaUSD >= 0;
+    return `<div class="alfa-row" data-act="pos" data-id="${esc(p.ticker)}"><span>${esc(p.ticker)}${p.acciones <= 0 ? '<small>cerrada</small>' : ''}</span><i><b class="${pos ? 'up' : 'down'}" style="${pos ? 'left' : 'right'}:50%;width:${w}%"></b></i><em class="${Math.abs(p.alfaUSD) < 0.5 ? '' : pos ? 'up' : 'down'}">${Math.abs(p.alfaUSD) < 0.5 ? '' : pos ? '+' : '−'}${fmtU(Math.abs(p.alfaUSD), 0)}</em></div>`; };
   const box = (l, v, cls, sub) => `<div class="box"><div class="l">${l}</div><div class="v ${cls}">${v}</div><div class="s">${sub}</div></div>`;
   // Tres numeros (auditoria 25-oct): tu plata (TIR con dividendos), lo mismo en SPY (sombra total return, neta del 30 %) y la diferencia,
   // en tasa ANUAL cuando la ventana tiene 180 dias o mas (es lo que se compara con un bono al 7 %); en ventanas cortas, lo acumulado
@@ -607,7 +625,6 @@ function renderEvolucion(k, seg) {
   const c = E.comparacion(v, k);
   const usd = x => x == null ? '' : `${x >= 0 ? '+' : '−'}${fmtU(Math.abs(x), 0)}`;
   const ppTxt = x => x == null ? '—' : `${x >= 0 ? '+' : '−'}${(Math.abs(x) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pp`;
-  const veredicto = c.veredicto === 'gana' ? 'Le ganás' : c.veredicto === 'pierde' ? 'Perdés' : 'Empate';
   const vCls = c.veredicto === 'gana' ? 'good' : c.veredicto === 'pierde' ? 'crit' : 'warn';
   return `<div class="card"><div class="card-head"><h2>vs S&P 500 <button class="info-btn" data-act="cartera-info" data-id="${modo}" aria-label="Cómo se calcula">${ICONS.info}</button></h2>${seg}</div>
     ${rangos}
@@ -616,11 +633,11 @@ function renderEvolucion(k, seg) {
       ${box('En SPY', c.sombra != null ? pctS(c.sombra) : '—', c.sombra != null ? (c.sombra >= 0 ? 'up' : 'down') : '', c.gananciaSombra != null ? usd(c.gananciaSombra) : fmtU(v.sombraValor, 0))}
       ${box('Diferencia', ppTxt(c.dif), c.veredicto === 'gana' ? 'up' : c.veredicto === 'pierde' ? 'down' : '', usd(c.difUSD))}
     </div>
-    <div class="evo-ver"><span class="dot ${vCls}"></span><b>${veredicto}</b>${c.dif != null ? ` ${c.veredicto === 'empate' ? 'a' : 'por'} ${(Math.abs(c.dif) * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} puntos ${c.anual ? 'al año' : `en ${v.dias} días`}` : ''}</div>
-    <div class="evo-sub">${c.anual ? 'tasa anual' : `acumulado en ${v.dias} días`} · con dividendos · desde el ${D.fmt(v.desde, { year: true })}${v.aprox ? ' · valuación inicial aproximada' : ''}</div>
+    ${c.dif != null ? `<div class="vs-fr fijo ${vCls}"><div class="t"><span class="dot ${vCls}"></span><b>${c.veredicto === 'gana' ? 'Le ganás al S&P' : c.veredicto === 'pierde' ? 'El S&P te gana' : 'Empate con el S&P'}</b><em>${ppTxt(c.dif)}${c.difUSD != null ? ` · ${usd(c.difUSD)}` : ''}</em></div>
+      <div class="s">${c.anual ? 'tasa anual' : `acumulado en ${v.dias} días`} · con dividendos · desde el ${D.fmt(v.desde, { year: true })}${v.aprox ? ' · valuación inicial aproximada' : ''}</div></div>` : ''}
     ${riesgoRow(k, v)}
     ${chart}
-    ${conAlfa.length ? `<div class="divider"></div><div class="card-head" style="margin-bottom:6px"><h3>Alfa por posición</h3><span class="hint">vs SPY, desde el inicio</span></div>${top.map(alfaRow).join('')}${bottom.length ? `<div class="divider" style="margin:6px 0"></div>${bottom.map(alfaRow).join('')}` : ''}` : ''}
+    ${conAlfa.length ? `<div class="divider"></div><div class="card-head" style="margin-bottom:6px"><h3>Alfa por posición</h3><span class="hint">vs SPY, desde que la compraste</span></div><div class="alfa-list">${conAlfa.map(alfaRow).join('')}</div>${nCerr ? `<button class="btn ghost al-mas" data-act="alfa-cerradas">${ui.alfaCerradas ? 'Solo las que tengo' : `Sumar las ${nCerr} cerradas`}</button>` : ''}` : ''}
   </div>`;
 }
 /** renglón de riesgo debajo de los 3 números: por tiempo, beta, alfa ajustado por riesgo y caída máxima (Hist.riesgo) */
