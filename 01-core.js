@@ -389,6 +389,8 @@ const Persist = {
     if (!s.categorias || !s.categorias.length) s.categorias = base.categorias;
     for (const k of ['tarjetas','cuentas','movimientos','recurrentes','ingresos','inversiones','pagos','viajes','pendientes']) if (!Array.isArray(s[k])) s[k] = [];
     if (!s.aprendido) s.aprendido = {};
+    // YPFD se cargó con ratio 1:1 (2-nov-26) pero desde el split del 4-ago-26 son 10 YPFD por ADR: se recalculan acciones y precio USD
+    if (s.cartera && Array.isArray(s.cartera.operaciones)) for (const o of s.cartera.operaciones) if (o && o.ticker === 'YPF' && o.modo === 'cedear' && o.ratio === '1:1' && o.fecha >= '2026-08-04' && o.cedears && o.precioCedear && o.ccl) { o.ratio = '10:1'; o.acciones = o.cedears / 10; o.precio = o.precioCedear * 10 / o.ccl; if (o.verif) o.verif = { ...o.verif, nivel: 'ok', items: [] }; }
     // tesis guardada dentro de la alerta (version del 21-oct de otro chat): pasa a cartera.tesis, que es donde la lee la ficha
     if (s.cartera && s.cartera.alertas) for (const [t, a] of Object.entries(s.cartera.alertas)) if (a && a.tesis) { if (!s.cartera.tesis) s.cartera.tesis = {}; if (!s.cartera.tesis[t]) s.cartera.tesis[t] = a.tesis; delete a.tesis; }
     // lotes previos sin fecha real ("año cero"): van al último día hábil de 2025 (pedido de Facu, 6-oct)
