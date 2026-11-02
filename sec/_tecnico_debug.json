@@ -1,5 +1,5 @@
 {
- "corrida": "2026-11-01T16:51:09.084Z",
+ "corrida": "2026-11-02T20:24:33.484Z",
  "ok": 378,
  "stooq": 0,
  "yahoo": 378,
@@ -15,8 +15,8 @@
   "CBD",
   "CS",
   "EA",
-  "EBR",
   "ELP",
+  "EBR",
   "ERJ",
   "HNPIY",
   "LFC",
@@ -25,6 +25,7 @@
   "ORAN",
   "PCRFY",
   "PTR",
+  "SCCO",
   "SHPW",
   "SKHY",
   "SNP",
@@ -34,5 +35,5 @@
   "WBA",
   "WBO"
  ],
- "segundos": 103
+ "segundos": 29
 }
