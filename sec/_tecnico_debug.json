@@ -1,8 +1,8 @@
 {
- "corrida": "2026-11-02T20:24:33.484Z",
- "ok": 378,
+ "corrida": "2026-11-03T17:54:38.669Z",
+ "ok": 379,
  "stooq": 0,
- "yahoo": 378,
+ "yahoo": 379,
  "falla": [
   "AABA",
   "ADGO",
@@ -15,8 +15,8 @@
   "CBD",
   "CS",
   "EA",
-  "ELP",
   "EBR",
+  "ELP",
   "ERJ",
   "HNPIY",
   "LFC",
@@ -25,7 +25,6 @@
   "ORAN",
   "PCRFY",
   "PTR",
-  "SCCO",
   "SHPW",
   "SKHY",
   "SNP",
@@ -35,5 +34,5 @@
   "WBA",
   "WBO"
  ],
- "segundos": 29
+ "segundos": 27
 }
