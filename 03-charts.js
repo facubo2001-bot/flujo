@@ -41,7 +41,8 @@ const Charts = {
     let hits = '';
     const bw = n > 1 ? iw / (n - 1) : iw;
     labels.forEach((l, i) => {
-      const rows = series.filter(s => s.values[i] != null).map(s => tipRow(s.color, s.name, tipFmt(s.values[i], s))).join('');
+      // una serie punteada (proyeccion) que arranca justo donde termina la real repite el mismo numero ese dia: no se lista
+      const rows = series.filter(s => s.values[i] != null && !(s.dashed && series.some(o => o !== s && !o.dashed && o.color === s.color && o.values[i] === s.values[i]))).map(s => tipRow(s.color, s.name, tipFmt(s.values[i], s))).join('');
       hits += `<rect class="hit" x="${x(i) - bw / 2}" y="${padT}" width="${bw}" height="${ih}" data-tip="${esc(`<b>${esc(tipTitle(i))}</b>${rows}`)}"/>`;
     });
     // recorrer con el dedo (Facu, 23-oct: "como en las apps de inversion, pasas el dedo y punto a punto te dice el valor"):
