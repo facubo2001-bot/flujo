@@ -1,5 +1,5 @@
 {
- "corrida": "2026-11-18T18:52:15.166Z",
+ "corrida": "2026-11-19T18:59:56.884Z",
  "universo": 408,
  "ok": 324,
  "sinCik": [
@@ -44,7 +44,6 @@
   "LFC",
   "MBT",
   "MMC",
-  "NSANY",
   "ORAN",
   "PCRFY",
   "PSQ",
@@ -85,6 +84,7 @@
   "DIA",
   "DTEGY",
   "IBN",
+  "NSANY",
   "SKHY (F-1:5 F-1/A:5)",
   "SPCX (10-Q:838 S-8:12 S-1/A:5)",
   "SPY",

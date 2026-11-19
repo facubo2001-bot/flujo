@@ -1,5 +1,5 @@
 {
- "corrida": "2026-11-18T18:53:44.988Z",
+ "corrida": "2026-11-19T19:01:58.322Z",
  "ok": 377,
  "stooq": 0,
  "yahoo": 377,
@@ -26,9 +26,9 @@
   "ORAN",
   "PCRFY",
   "PTR",
-  "ROKU",
   "SHPW",
   "SKHY",
+  "SNDK",
   "SNP",
   "SPCX",
   "TTM",
@@ -36,5 +36,5 @@
   "WBA",
   "WBO"
  ],
- "segundos": 26
+ "segundos": 31
 }
